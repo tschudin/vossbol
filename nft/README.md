@@ -11,7 +11,7 @@ sign the tinySSB packet is ommitted):
 - ```mid``` the message IDs for the two log entries
 - ```2-sidechain.bin``` sidechain of entry 2: the sequence of 10 chunks containing the text and voice data, including the hash pointers
 - ```2-content.bipf``` the raw content of the sidechain, in binary
-- ```2-content.txt``` a hex dump of above BIPF data
+- ```2-content.txt``` a hex dump of above [BIPF](https://github.com/ssbc/bipf) data
 - ```2-voice.c2``` the voice data in Codec2 format
 - ```2-voice.wav``` above voice data, converted to WAV for convenience
 
