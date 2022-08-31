@@ -82,9 +82,9 @@ the Smartphones.
 
 - each feed has a directory in the /feeds directory, the feed ID is encoded in hex
 - inside the feed directory, the file named ```log``` is the append-only log
-which contains the contatenation of the tinySSB packets
+which simply is the concatenation of the tinySSB packets
 - the latest log entry's ID (aka "key", "ref", "message ID", "mid") is stored in a file that starts with ```+``` followed by that latest message's sequence number
-- a message's sidechain is stored in a separate file (where all chunks are concatenated):
+- a message's sidechain is stored in a separate file (where also the chunks are simply concatenated in sequence):
   - when the file name starts with ```!```, the sidechain is not fully replicated yet
   - when the file name start with a dot, the sidechain is complete
   - on both cases the above prefix is followed by the message's sequence number
@@ -157,6 +157,7 @@ Internet gospel... Remedy: select the SSID by hand, again.
 ## Wish list of enhancements
 
 - show number of WiFi clients on the T-Beam screen
+- have the code run on the Heltec LoRa32 device
 - add zap command for single feeds
 - add FTP to the T-Beam for faster content up/download than tinySSB replication
 - add remote status collection command (get each T-Beam's GPS position, key metrics)
