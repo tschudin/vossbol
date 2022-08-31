@@ -1,0 +1,131 @@
+TAV ("text and voice") format is:
+  [ 'TAV', txt, codec2, timestamp, optional_gps ]
+
+
+ac 3c                   | lst (len=2+965)
+18 54 41 56             |    str 'TAV' (len=1+3)
+c0 01 57 6f 72 6b 73 20 |    str 'Works for the first time' (len=2+24)
+66 6f 72 20 74 68 65 20 |
+66 69 72 73 74 20 74 69 |
+6d 65                   |
+81 3a c0 de c2 01 00 0a |    byt 0xc0dec201000a00b70000158440af00005c0040928000f300005f80005f0000158680928100380000b800005680005a8000928000f386c0cc0040380500f38000e78000e789000c8e40129c00bd3fc0e2cfc0c24a00c8bb4032118057afc0e99280aa3b80d89140c8a9400c9040cc12c0c11000c12000c11000bd8fc0c101c08f90006084c0748840e180005598801ebd8055afc085530085664027d6008556007cc4c0a32300034c80f1d5009dd3c0205000efa000d7cfc05230405aa000b62600c4ffc0df514055428081c0001a30c036e700d266807fe6407fd680d24480c04b802053808ad000b7c000b5d500b5d440b5d400b5c38042b340c919003c0380a11000da20003e99c0b393c0bd03c0558280215fc0bdd740d66fc0bee500f1d540b655c0a336c0d8cfc081c000606a8042d5c077a300033fc0ea51c07fdb80f56fc0bd5440de43c0bede00eecb4042c4002d9480e1dfc01bc00062d9007fc4806d44806d3340a33300a33bc06d1940568fc02f8000ea00c0769000b52500cc30007692803e9440b710006fa200aa23c00cbac0af3000261140212000d8d0c0677c80675640d9c1001140004e4b00255b8050d600ad55c01b54005ad0006e10403c1a80d8c00036d54036d440afc840e1d000e1c00040c00081c0004d300068ebc068d600d05600d055c0d255c0ad55c01142c05ec0005eb0004d2000e180004910001ba0005c0000bd4b80c125405ab000c12500ea2000262fc0c110005a8000a34b0016dfc01b440085650085650035e5404365804755802dd5c02dd5c01bc0002050005ec000f9d00073d7c0a0d6807cd5407cd4c020c4008dd4807fd44055440049a9804d5640a0e58055ef0005e6404466006056006056006056806ad6c07366c0e8e6002455000345803dc30086db8086d580034340af4600efc0805c86c0b808000cefc0b5d5c042d58042d580b5d68050c3808930c03f56807cd6009c55c057c44074d600a0dac07fdfc049d4803c54408954c06654806655003f54c03f5500a0d4c099d50099d4c06554c071d4c07f5480b1b4401194c0a41680d24c0055d4c01054c0c0c44056c000af400017400069e4807653c06ab400698fc0f8cfc07bc0008bc000614000c8cac005344024afc0bd34c0254580f1c080f1c780b6378068cfc0c64fc0c63d00b62c4050acc0a40240558540558500f18580aa02c0051440aa0a40700840700180aa07c0b809801a8200e400005f04001587401880005f80005a8580b800005a8000b800005f00001b0000e78fc00ca9000c8a80 (len=2+928)
+00 b7 00 00 15 84 40 af |
+00 00 5c 00 40 92 80 00 |
+f3 00 00 5f 80 00 5f 00 |
+00 15 86 80 92 81 00 38 |
+00 00 b8 00 00 56 80 00 |
+5a 80 00 92 80 00 f3 86 |
+c0 cc 00 40 38 05 00 f3 |
+80 00 e7 80 00 e7 89 00 |
+0c 8e 40 12 9c 00 bd 3f |
+c0 e2 cf c0 c2 4a 00 c8 |
+bb 40 32 11 80 57 af c0 |
+e9 92 80 aa 3b 80 d8 91 |
+40 c8 a9 40 0c 90 40 cc |
+12 c0 c1 10 00 c1 20 00 |
+c1 10 00 bd 8f c0 c1 01 |
+c0 8f 90 00 60 84 c0 74 |
+88 40 e1 80 00 55 98 80 |
+1e bd 80 55 af c0 85 53 |
+00 85 66 40 27 d6 00 85 |
+56 00 7c c4 c0 a3 23 00 |
+03 4c 80 f1 d5 00 9d d3 |
+c0 20 50 00 ef a0 00 d7 |
+cf c0 52 30 40 5a a0 00 |
+b6 26 00 c4 ff c0 df 51 |
+40 55 42 80 81 c0 00 1a |
+30 c0 36 e7 00 d2 66 80 |
+7f e6 40 7f d6 80 d2 44 |
+80 c0 4b 80 20 53 80 8a |
+d0 00 b7 c0 00 b5 d5 00 |
+b5 d4 40 b5 d4 00 b5 c3 |
+80 42 b3 40 c9 19 00 3c |
+03 80 a1 10 00 da 20 00 |
+3e 99 c0 b3 93 c0 bd 03 |
+c0 55 82 80 21 5f c0 bd |
+d7 40 d6 6f c0 be e5 00 |
+f1 d5 40 b6 55 c0 a3 36 |
+c0 d8 cf c0 81 c0 00 60 |
+6a 80 42 d5 c0 77 a3 00 |
+03 3f c0 ea 51 c0 7f db |
+80 f5 6f c0 bd 54 40 de |
+43 c0 be de 00 ee cb 40 |
+42 c4 00 2d 94 80 e1 df |
+c0 1b c0 00 62 d9 00 7f |
+c4 80 6d 44 80 6d 33 40 |
+a3 33 00 a3 3b c0 6d 19 |
+40 56 8f c0 2f 80 00 ea |
+00 c0 76 90 00 b5 25 00 |
+cc 30 00 76 92 80 3e 94 |
+40 b7 10 00 6f a2 00 aa |
+23 c0 0c ba c0 af 30 00 |
+26 11 40 21 20 00 d8 d0 |
+c0 67 7c 80 67 56 40 d9 |
+c1 00 11 40 00 4e 4b 00 |
+25 5b 80 50 d6 00 ad 55 |
+c0 1b 54 00 5a d0 00 6e |
+10 40 3c 1a 80 d8 c0 00 |
+36 d5 40 36 d4 40 af c8 |
+40 e1 d0 00 e1 c0 00 40 |
+c0 00 81 c0 00 4d 30 00 |
+68 eb c0 68 d6 00 d0 56 |
+00 d0 55 c0 d2 55 c0 ad |
+55 c0 11 42 c0 5e c0 00 |
+5e b0 00 4d 20 00 e1 80 |
+00 49 10 00 1b a0 00 5c |
+00 00 bd 4b 80 c1 25 40 |
+5a b0 00 c1 25 00 ea 20 |
+00 26 2f c0 c1 10 00 5a |
+80 00 a3 4b 00 16 df c0 |
+1b 44 00 85 65 00 85 65 |
+00 35 e5 40 43 65 80 47 |
+55 80 2d d5 c0 2d d5 c0 |
+1b c0 00 20 50 00 5e c0 |
+00 f9 d0 00 73 d7 c0 a0 |
+d6 80 7c d5 40 7c d4 c0 |
+20 c4 00 8d d4 80 7f d4 |
+40 55 44 00 49 a9 80 4d |
+56 40 a0 e5 80 55 ef 00 |
+05 e6 40 44 66 00 60 56 |
+00 60 56 00 60 56 80 6a |
+d6 c0 73 66 c0 e8 e6 00 |
+24 55 00 03 45 80 3d c3 |
+00 86 db 80 86 d5 80 03 |
+43 40 af 46 00 ef c0 80 |
+5c 86 c0 b8 08 00 0c ef |
+c0 b5 d5 c0 42 d5 80 42 |
+d5 80 b5 d6 80 50 c3 80 |
+89 30 c0 3f 56 80 7c d6 |
+00 9c 55 c0 57 c4 40 74 |
+d6 00 a0 da c0 7f df c0 |
+49 d4 80 3c 54 40 89 54 |
+c0 66 54 80 66 55 00 3f |
+54 c0 3f 55 00 a0 d4 c0 |
+99 d5 00 99 d4 c0 65 54 |
+c0 71 d4 c0 7f 54 80 b1 |
+b4 40 11 94 c0 a4 16 80 |
+d2 4c 00 55 d4 c0 10 54 |
+c0 c0 c4 40 56 c0 00 af |
+40 00 17 40 00 69 e4 80 |
+76 53 c0 6a b4 00 69 8f |
+c0 f8 cf c0 7b c0 00 8b |
+c0 00 61 40 00 c8 ca c0 |
+05 34 40 24 af c0 bd 34 |
+c0 25 45 80 f1 c0 80 f1 |
+c7 80 b6 37 80 68 cf c0 |
+c6 4f c0 c6 3d 00 b6 2c |
+40 50 ac c0 a4 02 40 55 |
+85 40 55 85 00 f1 85 80 |
+aa 02 c0 05 14 40 aa 0a |
+40 70 08 40 70 01 80 aa |
+07 c0 b8 09 80 1a 82 00 |
+e4 00 00 5f 04 00 15 87 |
+40 18 80 00 5f 80 00 5a |
+85 80 b8 00 00 5a 80 00 |
+b8 00 00 5f 00 00 1b 00 |
+00 e7 8f c0 0c a9 00 0c |
+8a 80                   |
+22 99 47 0e 63          |    int 1661880217 (len=1+4)
+
+['TAV', 'Works for the first time', b"\xc0\xde\xc2\x01\x00\n\x00\xb7\x00\x00\x15\x84@\xaf\x00\x00\\\x00@\x92\x80\x00\xf3\x00\x00_\x80\x00_\x00\x00\x15\x86\x80\x92\x81\x008\x00\x00\xb8\x00\x00V\x80\x00Z\x80\x00\x92\x80\x00\xf3\x86\xc0\xcc\x00@8\x05\x00\xf3\x80\x00\xe7\x80\x00\xe7\x89\x00\x0c\x8e@\x12\x9c\x00\xbd?\xc0\xe2\xcf\xc0\xc2J\x00\xc8\xbb@2\x11\x80W\xaf\xc0\xe9\x92\x80\xaa;\x80\xd8\x91@\xc8\xa9@\x0c\x90@\xcc\x12\xc0\xc1\x10\x00\xc1 \x00\xc1\x10\x00\xbd\x8f\xc0\xc1\x01\xc0\x8f\x90\x00`\x84\xc0t\x88@\xe1\x80\x00U\x98\x80\x1e\xbd\x80U\xaf\xc0\x85S\x00\x85f@'\xd6\x00\x85V\x00|\xc4\xc0\xa3#\x00\x03L\x80\xf1\xd5\x00\x9d\xd3\xc0 P\x00\xef\xa0\x00\xd7\xcf\xc0R0@Z\xa0\x00\xb6&\x00\xc4\xff\xc0\xdfQ@UB\x80\x81\xc0\x00\x1a0\xc06\xe7\x00\xd2f\x80\x7f\xe6@\x7f\xd6\x80\xd2D\x80\xc0K\x80 S\x80\x8a\xd0\x00\xb7\xc0\x00\xb5\xd5\x00\xb5\xd4@\xb5\xd4\x00\xb5\xc3\x80B\xb3@\xc9\x19\x00<\x03\x80\xa1\x10\x00\xda \x00>\x99\xc0\xb3\x93\xc0\xbd\x03\xc0U\x82\x80!_\xc0\xbd\xd7@\xd6o\xc0\xbe\xe5\x00\xf1\xd5@\xb6U\xc0\xa36\xc0\xd8\xcf\xc0\x81\xc0\x00`j\x80B\xd5\xc0w\xa3\x00\x03?\xc0\xeaQ\xc0\x7f\xdb\x80\xf5o\xc0\xbdT@\xdeC\xc0\xbe\xde\x00\xee\xcb@B\xc4\x00-\x94\x80\xe1\xdf\xc0\x1b\xc0\x00b\xd9\x00\x7f\xc4\x80mD\x80m3@\xa33\x00\xa3;\xc0m\x19@V\x8f\xc0/\x80\x00\xea\x00\xc0v\x90\x00\xb5%\x00\xcc0\x00v\x92\x80>\x94@\xb7\x10\x00o\xa2\x00\xaa#\xc0\x0c\xba\xc0\xaf0\x00&\x11@! \x00\xd8\xd0\xc0g|\x80gV@\xd9\xc1\x00\x11@\x00NK\x00%[\x80P\xd6\x00\xadU\xc0\x1bT\x00Z\xd0\x00n\x10@<\x1a\x80\xd8\xc0\x006\xd5@6\xd4@\xaf\xc8@\xe1\xd0\x00\xe1\xc0\x00@\xc0\x00\x81\xc0\x00M0\x00h\xeb\xc0h\xd6\x00\xd0V\x00\xd0U\xc0\xd2U\xc0\xadU\xc0\x11B\xc0^\xc0\x00^\xb0\x00M \x00\xe1\x80\x00I\x10\x00\x1b\xa0\x00\\\x00\x00\xbdK\x80\xc1%@Z\xb0\x00\xc1%\x00\xea \x00&/\xc0\xc1\x10\x00Z\x80\x00\xa3K\x00\x16\xdf\xc0\x1bD\x00\x85e\x00\x85e\x005\xe5@Ce\x80GU\x80-\xd5\xc0-\xd5\xc0\x1b\xc0\x00 P\x00^\xc0\x00\xf9\xd0\x00s\xd7\xc0\xa0\xd6\x80|\xd5@|\xd4\xc0 \xc4\x00\x8d\xd4\x80\x7f\xd4@UD\x00I\xa9\x80MV@\xa0\xe5\x80U\xef\x00\x05\xe6@Df\x00`V\x00`V\x00`V\x80j\xd6\xc0sf\xc0\xe8\xe6\x00$U\x00\x03E\x80=\xc3\x00\x86\xdb\x80\x86\xd5\x80\x03C@\xafF\x00\xef\xc0\x80\\\x86\xc0\xb8\x08\x00\x0c\xef\xc0\xb5\xd5\xc0B\xd5\x80B\xd5\x80\xb5\xd6\x80P\xc3\x80\x890\xc0?V\x80|\xd6\x00\x9cU\xc0W\xc4@t\xd6\x00\xa0\xda\xc0\x7f\xdf\xc0I\xd4\x80<T@\x89T\xc0fT\x80fU\x00?T\xc0?U\x00\xa0\xd4\xc0\x99\xd5\x00\x99\xd4\xc0eT\xc0q\xd4\xc0\x7fT\x80\xb1\xb4@\x11\x94\xc0\xa4\x16\x80\xd2L\x00U\xd4\xc0\x10T\xc0\xc0\xc4@V\xc0\x00\xaf@\x00\x17@\x00i\xe4\x80vS\xc0j\xb4\x00i\x8f\xc0\xf8\xcf\xc0{\xc0\x00\x8b\xc0\x00a@\x00\xc8\xca\xc0\x054@$\xaf\xc0\xbd4\xc0%E\x80\xf1\xc0\x80\xf1\xc7\x80\xb67\x80h\xcf\xc0\xc6O\xc0\xc6=\x00\xb6,@P\xac\xc0\xa4\x02@U\x85@U\x85\x00\xf1\x85\x80\xaa\x02\xc0\x05\x14@\xaa\n@p\x08@p\x01\x80\xaa\x07\xc0\xb8\t\x80\x1a\x82\x00\xe4\x00\x00_\x04\x00\x15\x87@\x18\x80\x00_\x80\x00Z\x85\x80\xb8\x00\x00Z\x80\x00\xb8\x00\x00_\x00\x00\x1b\x00\x00\xe7\x8f\xc0\x0c\xa9\x00\x0c\x8a\x80", 1661880217]
+(total is 967 bytes)
