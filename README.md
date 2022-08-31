@@ -1,4 +1,4 @@
-# vosbbol - a demo of voice-over-tinySSB-over-LoRa
+# vossbol - a demo of voice-over-tinySSB-over-LoRa
 
 August 2022
 
