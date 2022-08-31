@@ -98,7 +98,7 @@ void node_tick()
     return;
 
   Serial.print("|dmxt|=" + String(dmxt_cnt) + ", |blbt|=" + String(blbt_cnt));
-  Serial.println(", stats: |feeds|=" + String(feed_cnt) + ", |entries|=" + String(msg_cnt) + ", |chunks|=" + String(chunk_cnt));
+  Serial.println(", stats: |feeds|=" + String(feed_cnt) + ", |entries|=" + String(entry_cnt) + ", |chunks|=" + String(chunk_cnt));
 
   // FIXME: limit vector to 100B, rotate through set
   struct bipf_s *lptr = bipf_mkList();

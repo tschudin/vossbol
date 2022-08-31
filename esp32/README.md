@@ -70,6 +70,7 @@ the Smartphones.
 - (FIXME: are special steps needed for libsodium?)
 - in tools -> board -> ESP Arduino, select T-Beam
 - in tools -> port, choose the appropriate serial device
+- change the LoRa frequency to match your country's regulation (```LORA_BAND``` in ```vossbol_tbeam.ino```)
 - compile and upload
 
 ### FLASH partitions
@@ -132,17 +133,17 @@ Note that command "a" is/was only useful to test the GrowOnlySet functionality
 The T-Beam display will, beside the SSID and GPS time if available, show
 three coarse metrics:
 - F number of feeds
-- M number of log entries (messages)
+- E number of log entries
 - C number of chunks
 
 which permits to quickly assess whether two devices are synced with
-high probability (identical F/M/C can occur although content state
+high probability (identical F/E/C can occur although content state
 diverges).
 
 
 ### You need an external (non-LoRa) device
 
-- You need at least one client device that understands the tinySSB protocol over Wifi. Currently a client can be either a Python implementation of tinySSB on a laptop, or the tineSSB-enabled Android Tremola-App.
+- You need at least one client device that understands the tinySSB protocol over Wifi. Currently a client can be either a Python implementation of tinySSB on a laptop, or the tinySSB-enabled Android Tremola-App.
 - the SSID is different for each T-Beam (to control access, for experiments) with a pattern "tinySSB-XXXX", the password is always "dWeb2022".
 - we use UDP multicast at 239.5.5.8/1558
 

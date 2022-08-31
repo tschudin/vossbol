@@ -214,7 +214,7 @@ void loop()
   }
 #endif
 
-  int sum = feed_cnt + msg_cnt + chunk_cnt;
+  int sum = feed_cnt + entry_cnt + chunk_cnt;
   if (sum != old_repo_sum) {
     old_repo_sum = sum;
     refresh = 1;
@@ -231,7 +231,7 @@ void loop()
 
     theDisplay.setFont(ArialMT_Plain_16);
     right_aligned(feed_cnt,  'F', 0); 
-    right_aligned(msg_cnt,   'M', 22); 
+    right_aligned(entry_cnt, 'E', 22); 
     right_aligned(chunk_cnt, 'C', 42); 
 
     int total = MyFS.totalBytes();

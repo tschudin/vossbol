@@ -6,7 +6,7 @@
 // -----------------------------------------------------------------------
 
 // for global stats: (see also feed_cnt in main file)
-int msg_cnt;
+int entry_cnt;
 int chunk_cnt;
 
 
@@ -88,7 +88,7 @@ void repo_load()
           if (!strcmp(pos, "log")) {
             int cnt = g.size() / TINYSSB_PKT_LEN;
             feeds[ndx].next_seq = cnt + 1;
-            msg_cnt += cnt;
+            entry_cnt += cnt;
           } else if (pos[0] == '+') { // contains hash (mid) of highest log entry
             int seq = atoi(pos+1);
             if (seq > feeds[ndx].max_prev_seq) {
@@ -207,7 +207,7 @@ void repo_feed_append(unsigned char *fid, unsigned char *pkt)
   File f = MyFS.open(_feed_path(fid), FILE_APPEND);
   f.write(pkt, TINYSSB_PKT_LEN);
   f.close();
-  msg_cnt++;
+  entry_cnt++;
 
   unsigned char h[crypto_hash_sha256_BYTES];
   crypto_hash_sha256(h, buf, sizeof(buf));
