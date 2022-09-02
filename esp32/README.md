@@ -73,16 +73,27 @@ the Smartphones.
 - change the LoRa frequency to match your country's regulation (```LORA_BAND``` in ```vossbol_tbeam.ino```)
 - compile and upload
 
+
 ### FLASH partitions
 
-- one can/could resize the SPIFFS partition, but the default config seems to be fine
-- afterwards (but also when using the existing partition for the first time), the partition will be formatted when tinySSB runs for the first time.
+The partition size was changed in order to host the
+larger-than-default executable while maximizing the space for the
+SPIFFS/littleFS parition. Currently 2.5MB are available for persisting
+the logs.
 
-### File system layout
+Because the partitions.csv file was not reliably taken into account by
+the Arduino scripts, I switched to the ```arduino-cli``` command line
+tool, and created a Makefile that invokes it with the right arguments.
+
+If you change the partition sizes (because the executable grows even
+larger), old persisted content will be lost: A new littleFS file
+system will be formatted the first time tinySSB runs again.
+
+
+### LittleFS file system layout
 
 - each feed has a directory in the /feeds directory, the feed ID is encoded in hex
-- inside the feed directory, the file named ```log``` is the append-only log
-which simply is the concatenation of the tinySSB packets
+- inside the feed directory, the file named ```log``` is the append-only log which simply is the concatenation of the tinySSB packets
 - the latest log entry's ID (aka "key", "ref", "message ID", "mid") is stored in a file that starts with ```+``` followed by that latest message's sequence number
 - a message's sidechain is stored in a separate file (where also the chunks are simply concatenated in sequence):
   - when the file name starts with ```!```, the sidechain is not fully replicated yet

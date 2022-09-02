@@ -227,10 +227,14 @@ void loop()
     theDisplay.clear();
 
     theDisplay.setFont(ArialMT_Plain_10);
-    theDisplay.drawString(0 , 0, ssid); // String("node ") + to_hex(my_mac, 6, 1));
-    theDisplay.drawString(0, 12, gps_line);
+    theDisplay.drawString(0, 3, tSSB_WIFI_SSID "-");
+    theDisplay.setFont(ArialMT_Plain_16);
+    theDisplay.drawString(42, 0, ssid+8);
+    theDisplay.setFont(ArialMT_Plain_10);
+    
+    theDisplay.drawString(0, 18, gps_line);
     // theDisplay.drawString(0, 24, goset_line);
-    theDisplay.drawString(0, 24, wheel[lora_cnt % 4]);     // lora_line
+    theDisplay.drawString(0, 30, wheel[lora_cnt % 4]);     // lora_line
 
     theDisplay.setFont(ArialMT_Plain_16);
     right_aligned(feed_cnt,  'F', 0); 
