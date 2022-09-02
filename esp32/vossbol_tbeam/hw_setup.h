@@ -21,11 +21,9 @@
 SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 // SSD1306 theDisplay(0x3c, 4, 15);  // heltec lora32SDA_OLED, SCL_OLED);
 
-
 // GPS
 # include <TinyGPS++.h>
 # include <axp20x.h>
-
 
 # define SCK     5    // GPIO5  -- SX1278's SCK
 # define MISO    19   // GPIO19 -- SX1278's MISO
@@ -39,9 +37,9 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 
 // FS
 #include <littlefs_api.h>
-#include <esp_littlefs.h>
-#include <lfs_util.h>
-#include <lfs.h>
+// #include <esp_littlefs.h>
+// #include <lfs_util.h>
+// #include <lfs.h>
 // #include <LITTLEFS.h>
 #include <littleFS.h>
 
@@ -49,10 +47,11 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 #include <sodium/crypto_hash_sha256.h>
 #include <sodium/crypto_sign_ed25519.h>
 
-// WiFi
+// WiFi and BT
 #include <WiFi.h>
 #include <WiFiAP.h>
-#include <WiFiUdp.h>
+// #include <WiFiUdp.h>
+#include "BluetoothSerial.h"
 
 
 // create instances
@@ -60,6 +59,7 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 #define MyFS LITTLEFS
 WiFiUDP udp;
 IPAddress broadcastIP;
+BluetoothSerial BT;
 
 #if !defined(ARDUINO_WIFI_LORA_32_V2)
 TinyGPSPlus gps;
@@ -151,6 +151,10 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   } else {
     Serial.println("udp   " + broadcastIP.toString() + " / " + String(tSSB_UDP_PORT));
   }
+
+  BT.begin(ssid);
+  BT.setPin("0000");
+  BT.write(KISS_FEND);
 
   Serial.println();
   delay(500);

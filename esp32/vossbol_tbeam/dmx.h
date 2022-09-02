@@ -80,6 +80,8 @@ void arm_blb(unsigned char *h,
              unsigned char *fid=NULL, int seq=-1, int bnr=-1)
 {
   int ndx = _blbt_index(h);
+  if (ndx >= 0) // this entry will be either erased or newly written to
+      free(blbt[ndx].fid);
   if (fct == NULL) { // del
     if (ndx != -1) {
       memmove(blbt+ndx, blbt+ndx+1, (blbt_cnt - ndx - 1) * sizeof(struct blb_s));
@@ -96,7 +98,8 @@ void arm_blb(unsigned char *h,
   }
   memcpy(blbt[ndx].h, h, HASH_LEN);
   blbt[ndx].fct = fct;
-  blbt[ndx].fid = fid;
+  blbt[ndx].fid = (unsigned char*) malloc(FID_LEN);
+  memcpy(blbt[ndx].fid, fid, FID_LEN);
   blbt[ndx].seq = seq;
   blbt[ndx].bnr = bnr;
 }

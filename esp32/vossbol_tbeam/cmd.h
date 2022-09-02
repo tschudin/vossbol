@@ -31,8 +31,9 @@ void cmd_rx(String cmd) {
       // goset_dump(theGOset);
       Serial.println("Installed feeds:");
       for (int i = 0; i < feed_cnt; i++) {
-        Serial.println(String("  ") + String(i) + " " + to_hex(feeds[i].fid, 32)
-                       + ", next_seq=" + String(feeds[i].next_seq));
+        unsigned char *key = theGOset->goset_keys + i*FID_LEN;
+        Serial.println(String("  ") + String(i) + " " + to_hex(key, 32)
+                       + ", next_seq=" + String(fid2feed(key)->next_seq));
       }
       Serial.println("DMX table:");
       for (int i = 0; i < dmxt_cnt; i++)
@@ -45,6 +46,8 @@ void cmd_rx(String cmd) {
       Serial.println();
       break;
     case 'f': // Directory dump
+      Serial.println("\nFile system: " + String(MyFS.totalBytes(), DEC) + " total bytes, "
+                                 + String(MyFS.usedBytes(), DEC) + " used");
       listDir(MyFS, FEED_DIR, 2);
       break;
     case 'r': // reset

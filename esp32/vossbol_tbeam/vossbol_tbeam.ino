@@ -76,6 +76,7 @@ void incoming_chnk_request(unsigned char* buf, int len, unsigned char* aux);
 
 // our own local code:
 #include "bipf.h"
+#include "kiss.h"
 #include "hw_setup.h"
 #include "io.h"
 #include "goset.h"
@@ -123,16 +124,13 @@ void setup()
 
   Serial.println("\nFile system: " + String(MyFS.totalBytes(), DEC) + " total bytes, "
                                  + String(MyFS.usedBytes(), DEC) + " used");
-  MyFS.remove("/goset.bin");
   MyFS.mkdir(FEED_DIR);
-  // listDir(MyFS, "/", 0);
   listDir(MyFS, FEED_DIR, 0);
   // ftpSrv.begin(".",".");
   
   delay(2000);
   Serial.println("init done, starting loop now. Type '?' for list of commands\n");
 }
-
 
 int incoming(struct face_s *f, unsigned char *pkt, int len)
 {
@@ -193,6 +191,11 @@ void loop()
     // Serial.println("/" + String(udp.remotePort()));
     pkt_len = udp.read(pkt_buf, sizeof(pkt_buf));
     incoming(&udp_face, pkt_buf, pkt_len);
+  }
+
+  packetSize = kiss_read(BT, &bt_kiss);
+  if (packetSize > 0) {
+    incoming(&bt_face, bt_kiss.buf, packetSize);
   }
 
 #if !defined(ARDUINO_WIFI_LORA_32_V2)

@@ -11,7 +11,7 @@
 #define IO_MAX_QUEUE_LEN         10
 #define LORA_INTERPACKET_TIME  1000  // millis
 #define UDP_INTERPACKET_TIME    100  // millis
-#define NR_OF_FACES               2
+#define NR_OF_FACES               (sizeof(faces) / sizeof(void*))
 
 // unsigned char *io_queue[IO_MAX_QUEUE_LEN]; // ring buffer of |len|...pkt...|
 // int io_queue_len = 0, io_offs = 0;
@@ -29,7 +29,8 @@ struct face_s {
 
 struct face_s lora_face;
 struct face_s udp_face;
-struct face_s *faces[NR_OF_FACES];
+struct face_s bt_face;
+struct face_s *faces[] = { &lora_face, &udp_face, &bt_face };
 
 uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
   uint32_t crc = 0xffffffffu;
@@ -77,6 +78,21 @@ void udp_send(unsigned char *buf, short len)
   */
 }
 
+void bt_send(unsigned char *buf, short len)
+{
+  if (BT.connected()) {
+    uint32_t crc = crc32_ieee(buf, len);
+    unsigned char *buf2 = (unsigned char*) malloc(len + sizeof(crc));
+    memcpy(buf2, buf, len);
+    memcpy(buf2+len, &crc, sizeof(crc));
+    kiss_write(BT, buf2, len+sizeof(crc));
+    Serial.println("BT: sent " + String(len + sizeof(crc)) + "B: "
+            + to_hex(buf2,8) + ".." + to_hex(buf2 + len + sizeof(crc) - 6, 6));
+
+  } else
+    Serial.println("BT not connected");
+}
+
 // --------------------------------------------------------------------------------
 
 void io_init()
@@ -87,8 +103,9 @@ void io_init()
   udp_face.name = (char*) "udp";
   udp_face.next_delta = UDP_INTERPACKET_TIME;
   udp_face.send = udp_send;
-  faces[0] = &lora_face;
-  faces[1] = &udp_face;
+  bt_face.name = (char*) "bt";
+  bt_face.next_delta = UDP_INTERPACKET_TIME;
+  bt_face.send = bt_send;
 }
 
 void io_send(unsigned char *buf, short len, struct face_s *f=NULL)

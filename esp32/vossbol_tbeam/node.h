@@ -168,15 +168,14 @@ void node_tick()
               }
             }
             if (seq > 0) {
-              int ndx = feed_index(fid);
               int next_chunk = g.size() / TINYSSB_PKT_LEN;
               // FIXME: check if sidechain is already full, then swap '.' for '!' (e.g. after a crash)
               struct bipf_s *slptr = bipf_mkList();
-              bipf_list_append(slptr, bipf_mkInt(ndx));
+              bipf_list_append(slptr, bipf_mkInt(_key_index(theGOset,fid)));
               bipf_list_append(slptr, bipf_mkInt(seq));
               bipf_list_append(slptr, bipf_mkInt(next_chunk));
               bipf_list_append(lptr, slptr);
-              arm_blb(h, incoming_chunk, feeds[ndx].fid, seq, next_chunk);
+              arm_blb(h, incoming_chunk, fid, seq, next_chunk);
             }
           }
           g.close();
