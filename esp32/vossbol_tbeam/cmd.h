@@ -9,13 +9,13 @@ void cmd_rx(String cmd) {
   Serial.println(String("CMD ") + cmd); 
   switch(cmd[0]) {
     case '?':
-      Serial.println("  ?  help");
-      Serial.println("  a  add new random key");
-      Serial.println("  d  dump DMXT and CHKT");
-      Serial.println("  f  list file system");
-      Serial.println("  r  reset this repo");
-      Serial.println("  x  reboot");
-      Serial.println("  z  zap (reset also remote nodes)");
+      Serial.println("  ?    help");
+      Serial.println("  a    add new random key");
+      Serial.println("  d    dump DMXT and CHKT");
+      Serial.println("  f    list file system");
+      Serial.println("  r    reset this repo to blank");
+      Serial.println("  x    reboot");
+      Serial.println("  z[N] zap (feed with index N) on all nodes");
       break;
     case 'a': { // inject new key
       unsigned char key[GOSET_KEY_LEN];
@@ -57,10 +57,14 @@ void cmd_rx(String cmd) {
     case 'x': // reboot
       Serial.println("rebooting ...\n");
       esp_restart();  
-    case 'z': // zap
+    case 'z': { // zap
       Serial.println("zap protocol started ...\n");
-      goset_zap(theGOset);
+      int ndx = -1;
+      if (cmd[1] != '\0')
+        ndx = atoi(cmd.c_str()+1);
+      goset_zap(theGOset, ndx);
       break;
+    }
     default:
       Serial.println("unknown command");
       break;

@@ -26,7 +26,7 @@ char* _feed_path(unsigned char *fid, int seq = -1, int blob = -1)
     else // this is for the hash (mid), else a plain log
       sprintf(p+strlen(p), "+%d", seq);
   } else
-    sprintf(p+strlen(p), blob ? "!%d" : ".%d", seq); // sidechain
+    sprintf(p+strlen(p), blob ? "!%d" : "-%d", seq); // sidechain
   return p;
 }
 
@@ -56,10 +56,14 @@ void repo_clean(char *path)
 
 void repo_reset(char *path)
 {
+  if (path != NULL)
+    Serial.printf("repo reset of path %s\n", path);
   repo_clean(path);
+  if (path != NULL)
+    MyFS.rmdir(path);
 
-  listDir(MyFS, "/", 0);
-  listDir(MyFS, FEED_DIR, 1);
+  // listDir(MyFS, "/", 0);
+  // listDir(MyFS, FEED_DIR, 1);
   esp_restart(); // FIXME?? is this still necessary? if not, then we have to erase the in-memory GOset ...
 }
 
@@ -95,7 +99,9 @@ void repo_load()
               g.read(feeds[ndx].prev, HASH_LEN);
               feeds[ndx].max_prev_seq = seq;
             }
-          } else if (pos[0] == '.' || pos[0] == '!') {
+          } else if (pos[0] == '.' || pos[0] == '-' || pos[0] == '!') {
+            // the dot is being phased out because of file transfer problems
+            // on UNIX where it becomes a hidden file
             chunk_cnt += g.size() / TINYSSB_PKT_LEN;
           }
           g.close();
@@ -260,7 +266,7 @@ void repo_sidechain_append(unsigned char *buf, int blbt_ndx)
       char *old = _feed_path(bp->fid, bp->seq, 1);
       char *fin = strdup(old);
       char *pos = strrchr(fin, '!');
-      *pos = '.';
+      *pos = '-';
       MyFS.rename(old, fin);
       free(fin);
     } else { // chain extends, install next chunk handler

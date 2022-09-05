@@ -46,6 +46,7 @@ struct novelty_s {
 struct zap_s {
   unsigned char typ;
   unsigned char key[GOSET_KEY_LEN];
+  int32_t ndx; // -1: zap everything, else: index of entry to zap
 };
 
 #define NOVELTY_LEN sizeof(struct novelty_s)
@@ -115,7 +116,7 @@ unsigned char* _mkClaim(struct goset_s *gp, int lo, int hi)
   return (unsigned char*) &claim;
 }
 
-unsigned char* _mkZap(struct goset_s *gp)
+unsigned char* _mkZap(struct goset_s *gp) // fill buffer with zap packet
 {
   static unsigned char pkt[DMX_LEN + ZAP_LEN];
   memcpy(pkt, goset_dmx, DMX_LEN);
@@ -234,8 +235,16 @@ void goset_tick(struct goset_s *gp)
   unsigned long now = millis();
   if (gp->zap_state != 0) {
     if (now > gp->zap_state + ZAP_ROUND_LEN) { // two rounds after zap started
-      Serial.println("ZAP phase II ended, resetting now");
-      repo_reset();
+      int ndx = ntohl(gp->zap.ndx);
+      Serial.println("ZAP phase II ended, resetting now, ndx=" + String(ndx));
+      if (ndx == -1)
+        repo_reset();
+      else {
+        char path[90];
+        unsigned char *fid = gp->goset_keys + ndx * FID_LEN;
+        sprintf(path, "%s/%s", FEED_DIR, to_hex(fid, FID_LEN));
+        repo_reset(path);
+      }
     }
     if (now < gp->zap_state && now > gp->zap_next) { // phase I
       Serial.println("sending zap message");
@@ -340,13 +349,14 @@ void goset_tick(struct goset_s *gp)
                    + " " + to_hex(gp->pending_claims[i].xo,32));
 }
 
-void goset_zap(struct goset_s *gp)
+void goset_zap(struct goset_s *gp, int ndx)
 {
   unsigned long now = millis();
   gp->zap.typ = 'z';
-  for (int i=0; i < sizeof(gp->zap.key)/4; i++) {
-    unsigned int r = esp_random();
-    memcpy(gp->zap.key + 4*i, (unsigned char*) &r, sizeof(4));
+  gp->zap.ndx = htonl(ndx);
+  for (int i=0; i < sizeof(gp->zap.key)/sizeof(uint32_t); i++) {
+    uint32_t r = esp_random();
+    memcpy(gp->zap.key + 4*i, (unsigned char*) &r, sizeof(uint32_t));
   }
   gp->zap_state = now + ZAP_ROUND_LEN;
   gp->zap_next = now + 1000;
