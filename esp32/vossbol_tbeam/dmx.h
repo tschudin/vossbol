@@ -114,7 +114,7 @@ void compute_dmx(unsigned char *dst, unsigned char *buf, int len)
   crypto_hash_sha256_final(&h, out);
   // Serial.printf("comput_dmx %s", to_hex((unsigned char*)DMX_PFX, DMX_LEN));
   // Serial.printf("%s\n", to_hex(buf, len));
-  // memcpy(dst, out, DMX_LEN);
+  memcpy(dst, out, DMX_LEN);
   // Serial.printf(" --> dmx=%s\n", to_hex(dst, DMX_LEN));
 }
 
