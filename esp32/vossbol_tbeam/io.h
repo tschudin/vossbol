@@ -30,7 +30,8 @@ struct face_s {
 struct face_s lora_face;
 struct face_s udp_face;
 struct face_s bt_face;
-struct face_s *faces[] = { &lora_face, &udp_face, &bt_face };
+struct face_s ble_face;
+struct face_s *faces[] = { &lora_face, &udp_face, &bt_face, &ble_face };
 
 uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
   uint32_t crc = 0xffffffffu;
@@ -89,8 +90,8 @@ void bt_send(unsigned char *buf, short len)
     Serial.println("BT: sent " + String(len + sizeof(crc)) + "B: "
             + to_hex(buf2,8) + ".." + to_hex(buf2 + len + sizeof(crc) - 6, 6));
 
-  } else
-    Serial.println("BT not connected");
+  } // else
+    // Serial.println("BT not connected");
 }
 
 // --------------------------------------------------------------------------------
@@ -106,6 +107,9 @@ void io_init()
   bt_face.name = (char*) "bt";
   bt_face.next_delta = UDP_INTERPACKET_TIME;
   bt_face.send = bt_send;
+  ble_face.name = (char*) "ble";
+  ble_face.next_delta = UDP_INTERPACKET_TIME;
+  ble_face.send = ble_send;
 }
 
 void io_send(unsigned char *buf, short len, struct face_s *f=NULL)

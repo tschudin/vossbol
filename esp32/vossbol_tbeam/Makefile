@@ -1,11 +1,20 @@
 # Makefile
 
+# usage:
+#   make compile
+#   make upload  SERIAL=/dev/tty.....
+#   make monitor SERIAL=/dev/tty.....
+
 
 BINDIR=/opt/homebrew/bin
 FQBN=esp32:esp32:t-beam
-# SERIAL=/dev/tty.wchusbserial54750108741
-# SERIAL=/dev/tty.wchusbserial54750108741
-SERIAL=/dev/cu.wchusbserial54750389471
+
+ifndef SERIAL
+	#SERIAL=/dev/tty.wchusbserial54750108741  # fc84
+	#SERIAL=/dev/tty.wchusbserial54750108751  # fcd4
+	 SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
+	#SERIAL=/dev/tty.wchusbserial54750389471  # f948
+endif
 
 all: compile
 
@@ -14,11 +23,13 @@ compile:
 		--build-properties build.partitions=partitions.csv,upload.maximum_size=1572864
 
 upload:
+	$(info ** uploading to $(SERIAL))
+	$(info )
 	$(BINDIR)/arduino-cli upload -v --fqbn $(FQBN) -p $(SERIAL) .
 
 monitor:
+	$(info use CTRL-A CTRL-\ to quit the screen program)
 	screen $(SERIAL) 115200
-	# use CTRL-A CTRL-\ to quit the screen program
 
 clean:
 	rm -rf *~

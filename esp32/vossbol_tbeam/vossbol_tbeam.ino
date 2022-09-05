@@ -30,9 +30,23 @@
 #define PKTTYPE_plain48  '\x00' // single packet with 48B payload
 #define PKTTYPE_chain20  '\x01' // start of hash sidechain (pkt contains BIPF-encoded content length)
 
-char ssid[sizeof(tSSB_WIFI_SSID) + 6];
+/* Nordic UART
+#define BLE_SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+#define BLE_CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+#define BLE_CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+*/
+
+#define BLE_SERVICE_UUID           "6e400001-7646-4b5b-9a50-71becce51558"
+#define BLE_CHARACTERISTIC_UUID_RX "6e400002-7646-4b5b-9a50-71becce51558"
+#define BLE_CHARACTERISTIC_UUID_TX "6e400003-7646-4b5b-9a50-71becce51558"
+
+#define BLE_RING_BUF_SIZE 3
 
 // -----------------------------------------------------------------------------
+
+char ssid[sizeof(tSSB_WIFI_SSID) + 6];
+int wifi_clients = 0;
+int ble_clients = 0;
 
 /* FTP server would be neat:
 // #define DEFAULT_STORAGE_TYPE_ESP32 STORAGE_LITTLEFS
@@ -160,8 +174,17 @@ int spin;
 
 void loop()
 {
-  unsigned char pkt_buf[200];
+  unsigned char pkt_buf[200], *cp;
   int packetSize, pkt_len;
+
+  if (WiFi.softAPgetStationNum() != wifi_clients) {
+    wifi_clients = WiFi.softAPgetStationNum();
+    refresh = 1;
+  }
+  if (bleDeviceConnected != ble_clients) {
+    ble_clients = bleDeviceConnected;
+    refresh = 1;
+  }
   
   io_dequeue();
   goset_tick(theGOset);
@@ -196,6 +219,11 @@ void loop()
   packetSize = kiss_read(BT, &bt_kiss);
   if (packetSize > 0) {
     incoming(&bt_face, bt_kiss.buf, packetSize);
+  }
+
+  cp = ble_fetch_received();
+  if (cp != NULL) {
+    incoming(&ble_face, cp+1, *cp);
   }
 
 #if !defined(ARDUINO_WIFI_LORA_32_V2)
@@ -234,12 +262,14 @@ void loop()
     
     theDisplay.drawString(0, 18, gps_line);
     // theDisplay.drawString(0, 24, goset_line);
-    theDisplay.drawString(0, 30, wheel[lora_cnt % 4]);     // lora_line
+    theDisplay.drawString(0, 30, "w=" + String(wifi_clients) + \
+                                 " e=" + String(ble_clients) + \
+                                 " l=" + wheel[lora_cnt % 4]);
 
     theDisplay.setFont(ArialMT_Plain_16);
     right_aligned(feed_cnt,  'F', 0); 
     right_aligned(entry_cnt, 'E', 22); 
-    right_aligned(chunk_cnt, 'C', 42); 
+    right_aligned(chunk_cnt, 'C', 44); 
 
     int total = MyFS.totalBytes();
     int avail = total - MyFS.usedBytes();
