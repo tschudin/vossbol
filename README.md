@@ -31,7 +31,7 @@ Smartphone1                             Smartphone2          Smartphone3
 ## Software
 
 - directory esp32 (currently for T-Beam)
-- directory tinyTremola (Android app)
+- directory android (tinyTremola Android app)
 - directory py (command line scripts to interact with the mesh)
 
 ---
