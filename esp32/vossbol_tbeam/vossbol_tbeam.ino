@@ -86,6 +86,7 @@ void incoming_pkt(unsigned char* buf, int len, unsigned char *fid);
 void incoming_chunk(unsigned char* buf, int len, int blbt_ndx);
 void incoming_want_request(unsigned char* buf, int len, unsigned char* aux);
 void incoming_chnk_request(unsigned char* buf, int len, unsigned char* aux);
+void ble_init();
 
 
 // our own local code:
@@ -146,15 +147,18 @@ void setup()
   Serial.println("init done, starting loop now. Type '?' for list of commands\n");
 }
 
-int incoming(struct face_s *f, unsigned char *pkt, int len)
+int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
 {
-  if (len <= (DMX_LEN + sizeof(uint32_t)) || crc_check(pkt, len) != 0) {
+  if (len <= (DMX_LEN + sizeof(uint32_t)) || (has_crc && crc_check(pkt, len) != 0)) {
     Serial.println(String("Bad CRC for face ") + f->name + String(" pkt=") + to_hex(pkt, len));
     lora_bad_crc++;
     return -1;
   }
-  // Serial.println("CRC OK");
-  if (!on_rx(pkt, len - sizeof(uint32_t))) // remove 4 CRC bytes for CRC32
+  if (has_crc) {
+    // Serial.println("CRC OK");
+    len -= sizeof(uint32_t);
+  }
+  if (!on_rx(pkt, len))
     return 0;
   Serial.println(String("DMX: unknown ") + to_hex(pkt, DMX_LEN));
   return -1;
@@ -202,7 +206,7 @@ void loop()
         pkt_buf[pkt_len++] = c;
     }
     lora_cnt++;
-    incoming(&lora_face, pkt_buf, pkt_len);
+    incoming(&lora_face, pkt_buf, pkt_len, 1);
     // sprintf(lora_line, "LoRa %d/%d: %dB, rssi=%d", lora_cnt, lora_bad_crc, pkt_len, LoRa.packetRssi());
     refresh = 1;
   }
@@ -213,17 +217,17 @@ void loop()
     // Serial.print(udp.remoteIP());
     // Serial.println("/" + String(udp.remotePort()));
     pkt_len = udp.read(pkt_buf, sizeof(pkt_buf));
-    incoming(&udp_face, pkt_buf, pkt_len);
+    incoming(&udp_face, pkt_buf, pkt_len, 1);
   }
 
   packetSize = kiss_read(BT, &bt_kiss);
   if (packetSize > 0) {
-    incoming(&bt_face, bt_kiss.buf, packetSize);
+    incoming(&bt_face, bt_kiss.buf, packetSize, 1);
   }
 
   cp = ble_fetch_received();
   if (cp != NULL) {
-    incoming(&ble_face, cp+1, *cp);
+    incoming(&ble_face, cp+1, *cp, 0);
   }
 
 #if !defined(ARDUINO_WIFI_LORA_32_V2)

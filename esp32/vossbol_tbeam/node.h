@@ -50,8 +50,8 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux)
     int seq = (*slpptr)->u.list[1]->u.i;
     int cnr = (*slpptr)->u.list[2]->u.i; // chunk nr
     Serial.print(" " + String(fNDX) + "." + String(seq) + "." + String(cnr));
-    struct feed_s *f = feeds + fNDX;
-    unsigned char *pkt = repo_feed_read(f->fid, seq);
+    unsigned char *fid = theGOset->goset_keys + FID_LEN * fNDX;
+    unsigned char *pkt = repo_feed_read(fid, seq);
     if (pkt == NULL || pkt[DMX_LEN] != PKTTYPE_chain20) continue;
     int szlen = 4;
     int sz = bipf_varint_decode(pkt, DMX_LEN + 1, &szlen);
@@ -59,10 +59,10 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux)
     int max_chunks = (sz - (48 - szlen) + 99) / 100;
     if (cnr > max_chunks) continue;
     while (cnr <= max_chunks && credit > 0) {
-      unsigned char *chunk = repo_feed_read_chunk(f->fid, seq, cnr);
+      unsigned char *chunk = repo_feed_read_chunk(fid, seq, cnr);
       if (chunk == NULL)
         break;
-      Serial.println(String("  have chunk ") + to_hex(f->fid,20) + "." + String(seq) + "." + String(cnr));
+      Serial.println(String("  have chunk ") + to_hex(fid,20) + "." + String(seq) + "." + String(cnr));
       io_enqueue(chunk, TINYSSB_PKT_LEN);
       credit--;
       cnr++;

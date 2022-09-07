@@ -104,7 +104,16 @@ void repo_load()
             // on UNIX where it becomes a hidden file
             chunk_cnt += g.size() / TINYSSB_PKT_LEN;
           }
-          g.close();
+          if (pos[0] == '.') { // rename the '.' files to use '-'
+            char path1[100], path2[100];
+            strcpy(path1, g.name());
+            strcpy(path2, g.name());
+            g.close();
+            pos = strrchr(path2, '/');
+            pos[1] = '-';
+            MyFS.rename(path1, path2);
+          } else
+            g.close();
           g = ldir.openNextFile("r");
         }
       }

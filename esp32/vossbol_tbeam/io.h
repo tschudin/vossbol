@@ -29,9 +29,11 @@ struct face_s {
 
 struct face_s lora_face;
 struct face_s udp_face;
-struct face_s bt_face;
 struct face_s ble_face;
+struct face_s bt_face;
 struct face_s *faces[] = { &lora_face, &udp_face, &bt_face, &ble_face };
+
+// --------------------------------------------------------------------------------
 
 uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
   uint32_t crc = 0xffffffffu;
@@ -41,6 +43,101 @@ uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
       crc = crc & 1 ? (crc >> 1) ^ 0xEDB88320u : crc >> 1;
   }
   return htonl(crc ^ 0xffffffffu);
+}
+
+// --------------------------------------------------------------------------------
+
+BLECharacteristic *TXChar = nullptr;
+BLECharacteristic *RXChar = nullptr;
+bool bleDeviceConnected = 0;
+char txString[128] = {0};
+
+typedef unsigned char tssb_pkt_t[1+127];
+tssb_pkt_t ble_ring_buf[BLE_RING_BUF_SIZE];
+int ble_ring_buf_len = 0;
+int ble_ring_buf_cur = 0;
+
+unsigned char* ble_fetch_received() // first byte has length, up to 127B
+{
+  unsigned char *cp;
+  if (ble_ring_buf_len == 0)
+    return NULL;
+  cp = (unsigned char*) (ble_ring_buf + ble_ring_buf_cur);
+  noInterrupts();
+  ble_ring_buf_cur = (ble_ring_buf_cur + 1) % BLE_RING_BUF_SIZE;
+  ble_ring_buf_len--;
+  interrupts();
+  return cp;
+}
+
+class UARTServerCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+      bleDeviceConnected = 1;
+      Serial.println("** Device connected");
+      // stop advertising when a peer is connected (we can only serve one client)
+      pServer->getAdvertising()->stop();
+    };
+    void onDisconnect(BLEServer* pServer) {
+      bleDeviceConnected = 0;
+      Serial.println("** Device disconnected");
+      // resume advertising when peer disconnects
+      pServer->getAdvertising()->start();
+    }
+};
+
+class RXCallbacks: public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic *pChar) {
+    uint16_t len = pChar->getValue().length();
+    Serial.println("RXCallback " + String(len) + " bytes");
+    if (len > 0 && len <= 127 && ble_ring_buf_len < BLE_RING_BUF_SIZE) {
+      // no CRC check, as none is sent for BLE
+      int ndx = (ble_ring_buf_cur + ble_ring_buf_len) % BLE_RING_BUF_SIZE;
+      unsigned char *pos = (unsigned char*) (ble_ring_buf + ndx);
+      *pos = len;
+      memcpy(pos+1, pChar->getData(), len);
+      noInterrupts();
+      ble_ring_buf_len++;
+      interrupts();
+    }
+  }
+};
+
+void ble_init()
+{
+  // Create the BLE Device
+  BLEDevice::setMTU(128);
+  BLEDevice::init("tinySSB virtual LoRa pub");
+  BLEDevice::setMTU(128);
+  // Create the BLE Server
+  BLEServer *UARTServer = BLEDevice::createServer();
+  // UARTServer->setMTU(128);
+  UARTServer->setCallbacks(new UARTServerCallbacks());
+  // Create the BLE Service
+  BLEService *UARTService = UARTServer->createService(BLE_SERVICE_UUID);
+  // Create a BLE Characteristic
+  TXChar = UARTService->createCharacteristic(BLE_CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  //  TXChar = UARTService->createCharacteristic(CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_NOTIFY);
+  TXChar->addDescriptor(new BLE2902());
+  TXChar->setNotifyProperty(true);
+  TXChar->setReadProperty(true);
+  RXChar = UARTService->createCharacteristic(BLE_CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE);
+  RXChar->setCallbacks(new RXCallbacks());
+  // Start the service
+  UARTService->start();
+  // Start advertising
+  UARTServer->getAdvertising()->start();
+  esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(128); // 23);
+  if (local_mtu_ret) {
+    Serial.println("set local MTU failed, error code = " + String(local_mtu_ret));
+  }
+
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(BLE_SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
+    pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
+    pAdvertising->setMinPreferred(0x12);
+    BLEDevice::startAdvertising();
+    Serial.println("Characteristic defined! Now you can read it in your phone!");
 }
 
 // --------------------------------------------------------------------------------
@@ -79,6 +176,15 @@ void udp_send(unsigned char *buf, short len)
   */
 }
 
+void ble_send(unsigned char *buf, short len) {
+  if (bleDeviceConnected == 0) return;
+  // no CRC added, we rely on BLE's CRC
+  TXChar->setValue(buf, len);
+  TXChar->notify();
+  Serial.printf("BLE: sent %dB: %s..\n", len, to_hex(buf,8));
+  // , to_hex(buf + len - 6, 6));
+}
+
 void bt_send(unsigned char *buf, short len)
 {
   if (BT.connected()) {
@@ -104,12 +210,12 @@ void io_init()
   udp_face.name = (char*) "udp";
   udp_face.next_delta = UDP_INTERPACKET_TIME;
   udp_face.send = udp_send;
-  bt_face.name = (char*) "bt";
-  bt_face.next_delta = UDP_INTERPACKET_TIME;
-  bt_face.send = bt_send;
   ble_face.name = (char*) "ble";
   ble_face.next_delta = UDP_INTERPACKET_TIME;
   ble_face.send = ble_send;
+  bt_face.name = (char*) "bt";
+  bt_face.next_delta = UDP_INTERPACKET_TIME;
+  bt_face.send = bt_send;
 }
 
 void io_send(unsigned char *buf, short len, struct face_s *f=NULL)
