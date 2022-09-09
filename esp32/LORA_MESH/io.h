@@ -29,9 +29,19 @@ struct face_s {
 
 struct face_s lora_face;
 struct face_s udp_face;
-struct face_s ble_face;
 struct face_s bt_face;
-struct face_s *faces[] = { &lora_face, &udp_face, &bt_face, &ble_face };
+#if defined(MAIN_BLEDevice_H_)
+  struct face_s ble_face;
+#endif
+
+struct face_s *faces[] = {
+  &lora_face,
+  &udp_face,
+  &bt_face,
+#if defined(MAIN_BLEDevice_H_)
+  &ble_face
+#endif
+};
 
 // --------------------------------------------------------------------------------
 
@@ -46,6 +56,8 @@ uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
 }
 
 // --------------------------------------------------------------------------------
+
+#if defined(MAIN_BLEDevice_H_)
 
 BLECharacteristic *TXChar = nullptr;
 BLECharacteristic *RXChar = nullptr;
@@ -140,6 +152,9 @@ void ble_init()
     Serial.println("Characteristic defined! Now you can read it in your phone!");
 }
 
+#endif // BLE
+
+
 // --------------------------------------------------------------------------------
 
 void lora_send(unsigned char *buf, short len)
@@ -176,6 +191,8 @@ void udp_send(unsigned char *buf, short len)
   */
 }
 
+#if defined(MAIN_BLEDevice_H_)
+
 void ble_send(unsigned char *buf, short len) {
   if (bleDeviceConnected == 0) return;
   // no CRC added, we rely on BLE's CRC
@@ -184,6 +201,8 @@ void ble_send(unsigned char *buf, short len) {
   Serial.printf("BLE: sent %dB: %s..\n", len, to_hex(buf,8));
   // , to_hex(buf + len - 6, 6));
 }
+
+#endif // BLE
 
 void bt_send(unsigned char *buf, short len)
 {
@@ -210,9 +229,11 @@ void io_init()
   udp_face.name = (char*) "udp";
   udp_face.next_delta = UDP_INTERPACKET_TIME;
   udp_face.send = udp_send;
+#if defined(MAIN_BLEDevice_H_)
   ble_face.name = (char*) "ble";
   ble_face.next_delta = UDP_INTERPACKET_TIME;
   ble_face.send = ble_send;
+#endif
   bt_face.name = (char*) "bt";
   bt_face.next_delta = UDP_INTERPACKET_TIME;
   bt_face.send = bt_send;

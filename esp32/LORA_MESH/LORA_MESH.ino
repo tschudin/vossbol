@@ -185,10 +185,13 @@ void loop()
     wifi_clients = WiFi.softAPgetStationNum();
     refresh = 1;
   }
+  
+#if defined(MAIN_BLEDevice_H_)
   if (bleDeviceConnected != ble_clients) {
     ble_clients = bleDeviceConnected;
     refresh = 1;
   }
+#endif
   
   io_dequeue();
   goset_tick(theGOset);
@@ -225,12 +228,14 @@ void loop()
     incoming(&bt_face, bt_kiss.buf, packetSize, 1);
   }
 
+#if defined(MAIN_BLEDevice_H_)
   cp = ble_fetch_received();
   if (cp != NULL) {
     incoming(&ble_face, cp+1, *cp, 0);
   }
+#endif
 
-#if !defined(ARDUINO_WIFI_LORA_32_V2)
+#if defined(AXP_DEBUG)
   while (GPS.available())
     gps.encode(GPS.read());
   if (gps.time.second() != old_gps_sec) {
@@ -266,9 +271,9 @@ void loop()
     
     theDisplay.drawString(0, 18, gps_line);
     // theDisplay.drawString(0, 24, goset_line);
-    theDisplay.drawString(0, 30, "w=" + String(wifi_clients) + \
-                                 " e=" + String(ble_clients) + \
-                                 " l=" + wheel[lora_cnt % 4]);
+    theDisplay.drawString(0, 30, "W:" + String(wifi_clients) + \
+                                 " E:" + String(ble_clients) + \
+                                 " L:" + wheel[lora_cnt % 4]);
 
     theDisplay.setFont(ArialMT_Plain_16);
     right_aligned(feed_cnt,  'F', 0); 
