@@ -10,16 +10,16 @@ unsigned int node_next_vector; // time when one of the two next vectors should b
 void incoming_want_request(unsigned char *buf, int len, unsigned char *aux)
 {
   struct bipf_s *lptr = bipf_loads(buf + DMX_LEN, len - DMX_LEN);
-  if (lptr == NULL || lptr->typ != BIPF_LIST) return;
+  if (lptr == NULL || lptr->typ != BIPF_LIST || lptr->cnt < 1) return;
+  struct bipf_s **lst = lptr->u.list;
+  if (lst[0]->typ != BIPF_INT) return;
+  int offs = lst[0]->u.i;
   String v = "";
-  struct bipf_s **slpptr = lptr->u.list;
   int credit = 3;
-  for (int i = 0; i < lptr->cnt; i++, slpptr++) {
-    if ((*slpptr)->typ != BIPF_LIST || (*slpptr)->cnt < 2 ||
-        (*slpptr)->u.list[0]->typ != BIPF_INT || (*slpptr)->u.list[1]->typ != BIPF_INT)
-        continue;
-    int fNDX = (*slpptr)->u.list[0]->u.i;
-    int seq = (*slpptr)->u.list[1]->u.i;
+  for (int i = 1; i < lptr->cnt; i++) {
+    if (lst[i]->typ != BIPF_INT) continue;
+    int fNDX = (offs + i-1) % theGOset->goset_len;
+    int seq = lst[i]->u.i;
     v += (v.length() == 0 ? "[ " : ", ") + String(fNDX) + "." + String(seq);
     unsigned char *fid = theGOset->goset_keys + fNDX * GOSET_KEY_LEN;
     while (credit > 0) {
@@ -92,6 +92,8 @@ void incoming_chunk(unsigned char *buf, int len, int blbt_ndx)
 void node_tick()
 {
   static unsigned char turn; // alternate between requesting log entries an chunks
+  static unsigned int log_offs;
+  static unsigned int chunk_offs;
   unsigned long now = millis();
   if (now < node_next_vector && (node_next_vector-now) < 2*NODE_ROUND_LEN) // FIXME: test whether wraparound works
     return;
@@ -108,10 +110,16 @@ void node_tick()
   turn = 1 - turn;
   if (turn) {
     // FIXME: limit vector to 100B, rotate through set
-    for (int i = 0; i < theGOset->goset_len; i++) {
-      unsigned char *fid = theGOset->goset_keys + i*GOSET_KEY_LEN;
+    log_offs = (log_offs+1) % theGOset->goset_len;
+    bipf_list_append(lptr, bipf_mkInt(log_offs));
+    int encoding_len = bipf_encodingLength(lptr);
+    int i;
+    for (i = 0; i < theGOset->goset_len; i++) {
+      unsigned int ndx = (log_offs + i) % theGOset->goset_len;
+      unsigned char *fid = theGOset->goset_keys + ndx*GOSET_KEY_LEN;
       struct feed_s *f = fid2feed(fid);
 
+      // arm DMX
       unsigned char pktID[FID_LEN + 4 + HASH_LEN];
       memcpy(pktID, fid, FID_LEN);
       int s = htonl(f->next_seq); // big endian
@@ -122,12 +130,16 @@ void node_tick()
       arm_dmx(dmx, incoming_pkt, f->fid);
 
       // add to want vector
-      struct bipf_s *slptr = bipf_mkList();
-      bipf_list_append(slptr, bipf_mkInt(i));
-      bipf_list_append(slptr, bipf_mkInt(f->next_seq));
-      bipf_list_append(lptr, slptr);
-      v += (v.length() == 0 ? "[ " : ", ") + String(i) + "." + String(f->next_seq);
+      struct bipf_s *bptr = bipf_mkInt(f->next_seq);
+      encoding_len += bipf_encodingLength(bptr);
+      bipf_list_append(lptr, bptr);
+      v += (v.length() == 0 ? "[ " : ", ") + String(ndx) + "." + String(f->next_seq);
+      if (encoding_len > 100) {
+        i++;
+        break;
+      }
     }
+    log_offs = (log_offs+i) % theGOset->goset_len;
     if (lptr->cnt > 0) {
       int sz = bipf_encodingLength(lptr);
       unsigned char buf[sz];
@@ -140,63 +152,74 @@ void node_tick()
   }
   
   // hunt for unfinished sidechains
-  File fdir = MyFS.open(FEED_DIR);
-  File f = fdir.openNextFile("r");
-  while (f) {
-    if (f.isDirectory()) {
-      unsigned char *fid = from_hex(strrchr(f.name(), '/')+1, FID_LEN); // from_b64(pos, FID_LEN)
-      if (fid != NULL) {
-        File ldir = MyFS.open(f.name());
-        File g = ldir.openNextFile("r");
-        while (g) {
-          // Serial.println(String("looking at ") + g.name());
-          char *pos = strchr(g.name(), '!');
-          if (pos != NULL) {
-            int seq = atoi(pos+1);
-            unsigned char h[HASH_LEN];
-            int sz = g.size();
-            if (sz == 0) { // must fetch first ptr from log
-              unsigned char *pkt = repo_feed_read(fid, seq);
-              if (pkt != NULL)
-                memcpy(h, pkt+DMX_LEN+1+28, HASH_LEN);
-              else
-                seq = -1;
-            } else { // must fetch latest ptr from chain file
-              g.seek(sz - HASH_LEN, SeekSet);
-              if (g.read(h, HASH_LEN) != HASH_LEN) {
-                Serial.println("could not read() after seek");
-                seq = -1;
-              } else {
-                int i;
-                for (i = 0; i < HASH_LEN; i++)
-                  if (h[i] != 0)
-                    break;
-                if (i == HASH_LEN) // reached end of chain
-                  seq = -1;
-              }
-            }
-            if (seq > 0) {
-              int next_chunk = g.size() / TINYSSB_PKT_LEN;
-              // FIXME: check if sidechain is already full, then swap '.' for '!' (e.g. after a crash)
-              struct bipf_s *slptr = bipf_mkList();
-              int ki = _key_index(theGOset,fid);
-              bipf_list_append(slptr, bipf_mkInt(ki));
-              bipf_list_append(slptr, bipf_mkInt(seq));
-              bipf_list_append(slptr, bipf_mkInt(next_chunk));
-              bipf_list_append(lptr, slptr);
-              arm_blb(h, incoming_chunk, fid, seq, next_chunk);
-              v += (v.length() == 0 ? "[ " : ", ") + String(ki) + "." + String(seq) + "." + String(next_chunk);
-            }
+  chunk_offs = (chunk_offs+1) % theGOset->goset_len;
+  Serial.printf("chunk_offs starting: %d\n", chunk_offs);
+  int encoding_len = 0;
+  int requested_first = -1; // in number of feeds requesting sthg
+  for (int i = 0; i < theGOset->goset_len; i++) {
+    unsigned int ndx = (chunk_offs + i) % theGOset->goset_len;
+    unsigned char *fid = theGOset->goset_keys + ndx*GOSET_KEY_LEN;
+    struct feed_s *f = fid2feed(fid);
+    char dname[100];
+    sprintf(dname, "/%s/%s", FEED_DIR, to_hex(fid,32));
+    File fdir = MyFS.open(dname);
+    File g = fdir.openNextFile("r");
+    while (g) {
+      // Serial.println(String("looking at ") + g.name());
+      char *pos = strchr(g.name(), '!');
+      if (pos != NULL) {
+        int seq = atoi(pos+1);
+        unsigned char h[HASH_LEN];
+        int sz = g.size();
+        if (sz == 0) { // must fetch first ptr from log
+          unsigned char *pkt = repo_feed_read(fid, seq);
+          if (pkt != NULL)
+            memcpy(h, pkt+DMX_LEN+1+28, HASH_LEN);
+          else
+            seq = -1;
+        } else { // must fetch latest ptr from chain file
+          g.seek(sz - HASH_LEN, SeekSet);
+          if (g.read(h, HASH_LEN) != HASH_LEN) {
+            Serial.println("could not read() after seek");
+            seq = -1;
+          } else {
+            int j;
+            for (j = 0; j < HASH_LEN; i++)
+              if (h[j] != 0)
+                break;
+            if (j == HASH_LEN) // reached end of chain
+              seq = -1;
           }
-          g.close();
-          g = ldir.openNextFile("r");
-        } // while (g)
+        }
+        if (seq > 0) {
+          int next_chunk = g.size() / TINYSSB_PKT_LEN;
+          // FIXME: check if sidechain is already full, then swap '.' for '!' (e.g. after a crash)
+          struct bipf_s *slptr = bipf_mkList();
+          bipf_list_append(slptr, bipf_mkInt(ndx));
+          bipf_list_append(slptr, bipf_mkInt(seq));
+          bipf_list_append(slptr, bipf_mkInt(next_chunk));
+          bipf_list_append(lptr, slptr);
+          arm_blb(h, incoming_chunk, fid, seq, next_chunk);
+          v += (v.length() == 0 ? "[ " : ", ") + String(ndx) + "." + String(seq) + "." + String(next_chunk);
+          encoding_len += bipf_encodingLength(slptr);
+          if (requested_first == -1)
+            requested_first = i;
+        }
       }
-    }
-    f.close();
-    f = fdir.openNextFile("r");
+      g.close();
+      if (encoding_len > 100)
+        break;
+      g = fdir.openNextFile("r");
+    } // while (g)
+    fdir.close();
+    if (encoding_len > 100)
+      break;
   }
-  fdir.close();
+  if (requested_first != -1)
+    chunk_offs = (chunk_offs+requested_first) % theGOset->goset_len;
+  Serial.printf("chunk_offs ending: %d, requested_first: %d\n",
+                chunk_offs, requested_first);
+  
   if (lptr->cnt > 0) {
     int sz = bipf_encodingLength(lptr);
     unsigned char buf[sz];
