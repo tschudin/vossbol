@@ -4,8 +4,8 @@
 // Aug 2022 <christian.tschudin@unibas.ch>
 
 
-#define NODE_ROUND_LEN  5000 // millis
-unsigned int node_next_vector; // time when next vector should be sent
+#define NODE_ROUND_LEN  (8000/2) // millis, take turns between log entries and chunks
+unsigned int node_next_vector; // time when one of the two next vectors should be sent
 
 void incoming_want_request(unsigned char *buf, int len, unsigned char *aux)
 {
@@ -91,6 +91,7 @@ void incoming_chunk(unsigned char *buf, int len, int blbt_ndx)
 
 void node_tick()
 {
+  static unsigned char turn; // alternate between requesting log entries an chunks
   unsigned long now = millis();
   if (now < node_next_vector && (node_next_vector-now) < 2*NODE_ROUND_LEN) // FIXME: test whether wraparound works
     return;
@@ -102,41 +103,43 @@ void node_tick()
   Serial.printf("|dmxt|=%d, |blbt|=%d, |feeds|=%d, |entries|=%d, |chunks|=%d\n",
                 dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt);
 
-  // FIXME: limit vector to 100B, rotate through set
-  struct bipf_s *lptr = bipf_mkList();
   String v = "";
-  for (int i = 0; i < theGOset->goset_len; i++) {
-    unsigned char *fid = theGOset->goset_keys + i*GOSET_KEY_LEN;
-    struct feed_s *f = fid2feed(fid);
+  struct bipf_s *lptr = bipf_mkList();
+  turn = 1 - turn;
+  if (turn) {
+    // FIXME: limit vector to 100B, rotate through set
+    for (int i = 0; i < theGOset->goset_len; i++) {
+      unsigned char *fid = theGOset->goset_keys + i*GOSET_KEY_LEN;
+      struct feed_s *f = fid2feed(fid);
 
-    unsigned char pktID[FID_LEN + 4 + HASH_LEN];
-    memcpy(pktID, fid, FID_LEN);
-    int s = htonl(f->next_seq); // big endian
-    memcpy(pktID + FID_LEN, (unsigned char*) &s, 4);
-    memcpy(pktID + FID_LEN + 4, f->prev, HASH_LEN);
-    unsigned char dmx[DMX_LEN];
-    compute_dmx(dmx, pktID, FID_LEN + 4 + HASH_LEN);
-    arm_dmx(dmx, incoming_pkt, f->fid);
+      unsigned char pktID[FID_LEN + 4 + HASH_LEN];
+      memcpy(pktID, fid, FID_LEN);
+      int s = htonl(f->next_seq); // big endian
+      memcpy(pktID + FID_LEN, (unsigned char*) &s, 4);
+      memcpy(pktID + FID_LEN + 4, f->prev, HASH_LEN);
+      unsigned char dmx[DMX_LEN];
+      compute_dmx(dmx, pktID, FID_LEN + 4 + HASH_LEN);
+      arm_dmx(dmx, incoming_pkt, f->fid);
 
-    // add to want vector
-    struct bipf_s *slptr = bipf_mkList();
-    bipf_list_append(slptr, bipf_mkInt(i));
-    bipf_list_append(slptr, bipf_mkInt(f->next_seq));
-    bipf_list_append(lptr, slptr);
-    v += (v.length() == 0 ? "[ " : ", ") + String(i) + "." + String(f->next_seq);
+      // add to want vector
+      struct bipf_s *slptr = bipf_mkList();
+      bipf_list_append(slptr, bipf_mkInt(i));
+      bipf_list_append(slptr, bipf_mkInt(f->next_seq));
+      bipf_list_append(lptr, slptr);
+      v += (v.length() == 0 ? "[ " : ", ") + String(i) + "." + String(f->next_seq);
+    }
+    if (lptr->cnt > 0) {
+      int sz = bipf_encodingLength(lptr);
+      unsigned char buf[sz];
+      bipf_encode(buf, lptr);
+      io_enqueue(buf, sz, want_dmx);
+      bipf_free(lptr);
+      Serial.printf(">> %dB log entry request: %s ]\n", sz, v.c_str());
+    }
+    return;
   }
-  if (lptr->cnt > 0) {
-    int sz = bipf_encodingLength(lptr);
-    unsigned char buf[sz];
-    bipf_encode(buf, lptr);
-    io_enqueue(buf, sz, want_dmx);
-    bipf_free(lptr);
-    Serial.printf(">> %dB log entry request: %s ]\n", sz, v.c_str());
-  }
-
+  
   // hunt for unfinished sidechains
-  v = "";
-  lptr = bipf_mkList();
   File fdir = MyFS.open(FEED_DIR);
   File f = fdir.openNextFile("r");
   while (f) {
