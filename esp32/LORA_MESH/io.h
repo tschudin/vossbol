@@ -8,8 +8,8 @@
    dmx(7B) + more_data(var) + CRC32(4B)
 */
 
-#define IO_MAX_QUEUE_LEN         10
-#define LORA_INTERPACKET_TIME  1000  // millis
+#define IO_MAX_QUEUE_LEN          6
+#define LORA_INTERPACKET_TIME  1200  // millis
 #define UDP_INTERPACKET_TIME    100  // millis
 #define NR_OF_FACES               (sizeof(faces) / sizeof(void*))
 

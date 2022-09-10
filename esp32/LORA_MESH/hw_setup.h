@@ -13,8 +13,7 @@
 
 #else // ARDUINO_TBeam
 
-# include <OLEDDisplay.h>
-# include <SSD1306.h>
+# include <SSD1306.h> // display
 # include <Wire.h> 
 # include <LoRa.h>
 
@@ -164,7 +163,6 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   BT.write(KISS_FEND);
 
   Serial.println();
-  delay(500);
 }
 
 // ---------------------------------------------------------------------------------

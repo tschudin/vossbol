@@ -156,10 +156,10 @@ struct goset_s* goset_new()
 
 void goset_dump(struct goset_s *gp)
 {
-  Serial.println("GOset: " + String(gp->goset_len, DEC) + " keys");
+  Serial.printf("GOset: %d keys\n", gp->goset_len);
   for (int i = 0; i < gp->goset_len; i++) {
-    Serial.print("  " + String(i,DEC) + " ");
-    Serial.println(to_hex(gp->goset_keys + i * GOSET_KEY_LEN, GOSET_KEY_LEN));
+    Serial.printf("  %2d %s\n", i,
+                  to_hex(gp->goset_keys + i * GOSET_KEY_LEN, GOSET_KEY_LEN));
   }
 }
 
@@ -173,7 +173,7 @@ void goset_add(struct goset_s *gp, unsigned char *key)
       return;
     }
   if (gp->goset_len >= GOSET_MAX_KEYS) {
-    Serial.println("too many keys: " + String(gp->goset_len, DEC));
+    Serial.printf("  too many keys: %d\n", gp->goset_len);
     return;
   }
   repo_new_feed(key);
@@ -191,8 +191,7 @@ void goset_add(struct goset_s *gp, unsigned char *key)
     }
   }
 
-  Serial.print("added key ");
-  Serial.println(to_hex(key, GOSET_KEY_LEN));
+  Serial.printf("added key %s, len=%d\n", to_hex(key, GOSET_KEY_LEN), gp->goset_len);
 }
 
 void goset_rx(unsigned char *pkt, int len, unsigned char *aux)
@@ -202,26 +201,29 @@ void goset_rx(unsigned char *pkt, int len, unsigned char *aux)
   pkt += DMX_LEN;
   len -= DMX_LEN;
 
-  Serial.println("goset_rx " + String((char) (pkt[0])) + " " + String(len) + "B");
   if (pkt[0] == 'n' && len == NOVELTY_LEN) {
+    Serial.printf("goset_rx t=n %s\n", to_hex(pkt+1, GOSET_KEY_LEN));
     goset_add(gp, pkt+1);
     return;
   }
   if (pkt[0] == 'z' && len == ZAP_LEN) {
-    Serial.println("ZAP message received");
+    Serial.println("goset_rx t=z");
     unsigned long now = millis();
     if (gp->zap_state == 0) {
-      Serial.println("ZAP phase I starts");
+      Serial.println("  ZAP phase I starts");
       memcpy(&gp->zap, pkt, ZAP_LEN);
       gp->zap_state = now + ZAP_ROUND_LEN;
       gp->zap_next = now;
     }
     return;
   }
-  if (pkt[0] != 'c' || len != CLAIM_LEN)
+  if (pkt[0] != 'c' || len != CLAIM_LEN) {
+    Serial.printf("goset_rx t=%c ??\n", pkt[0]);
     return;
+  }
   struct claim_s *cp = (struct claim_s *) pkt;
-  if (isZero(cp->lo, GOSET_KEY_LEN))
+  Serial.printf("goset_rx t=c, xo=%s, |span|=%d\n", to_hex(cp->xo, GOSET_KEY_LEN), cp->cnt);
+  if (isZero(cp->lo, GOSET_KEY_LEN)) // remove this clause
     return;
   if (cp->cnt > gp->largest_claim_span)
     gp->largest_claim_span = cp->cnt;
@@ -247,7 +249,7 @@ void goset_tick(struct goset_s *gp)
       }
     }
     if (now < gp->zap_state && now > gp->zap_next) { // phase I
-      Serial.println("sending zap message");
+      Serial.printf("  sending zap message (%d bytes)\n", DMX_LEN + ZAP_LEN);
       io_send(_mkZap(gp), DMX_LEN + ZAP_LEN, NULL);
       gp->zap_next = now + 1000;
     }
@@ -297,7 +299,7 @@ void goset_tick(struct goset_s *gp)
     // Serial.println("  not eliminated " + String(lo,DEC) + " " + String(hi,DEC) + " " + String(cp->cnt));
     if (partial->cnt <= cp->cnt) { // ask for help, but only for smallest entry, and only once in this round
       if (max_ask-- > 0) {
-        Serial.print("asking for help " + String(partial->cnt));
+        Serial.print("  asking for help " + String(partial->cnt));
         Serial.print(String(" ") + to_hex(partial->lo,4) + String(".."));
         Serial.println(String(" ") + to_hex(partial->hi,4) + String(".."));
         io_enqueue((unsigned char*) partial, CLAIM_LEN, goset_dmx, NULL);
@@ -314,7 +316,7 @@ void goset_tick(struct goset_s *gp)
     }
     if (max_help-- > 0) { // we have larger claim span, offer help (but limit # of claims)
       hi--, lo++;
-      Serial.print("offer help span=" + String(partial->cnt - 2));
+      Serial.print("  offer help span=" + String(partial->cnt - 2));
       Serial.print(String(" ") + to_hex(gp->goset_keys+lo*GOSET_KEY_LEN,4) + String(".."));
       Serial.println(String(" ") + to_hex(gp->goset_keys+hi*GOSET_KEY_LEN,4) + String(".."));
       if (hi <= lo)
@@ -341,12 +343,12 @@ void goset_tick(struct goset_s *gp)
     gp->pending_c_cnt = MAX_PENDING-5;
   // if (gp->pending_c_cnt > 2)
   //   gp->pending_c_cnt = 2; // better: log2(largest_claim_span) ?
-  Serial.println(String(gp->pending_c_cnt,DEC) + " pending claims, GOset size is " + String(gp->goset_len, DEC));
+  if (gp->pending_c_cnt > 0)
+    Serial.printf("  |GOset|=%d, %d pending claims", gp->goset_len, gp->pending_c_cnt);
   // unsigned char *heap = reinterpret_cast<unsigned char*>(sbrk(0));
   // Serial.println(String(", heap sbrk=") + to_hex((unsigned char *)&heap, sizeof(heap)));
   for (int i = 0; i < gp->pending_c_cnt; i++)
-    Serial.println("  pend claim span=" + String(gp->pending_claims[i].cnt, DEC)
-                   + " " + to_hex(gp->pending_claims[i].xo,32));
+    Serial.printf("  xor=%s, |span|=%d\n", to_hex(gp->pending_claims[i].xo,32), gp->pending_claims[i].cnt);
 }
 
 void goset_zap(struct goset_s *gp, int ndx)

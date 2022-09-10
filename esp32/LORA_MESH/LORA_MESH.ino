@@ -116,6 +116,12 @@ int lora_bad_crc = 0;
 void setup()
 {
   hw_setup();
+
+  theDisplay.setFont(ArialMT_Plain_16);
+  theDisplay.drawString(0 , 0, "SSB.virt.lora.pub");
+  theDisplay.setFont(ArialMT_Plain_10);
+  theDisplay.drawString(0 , 18, __DATE__ " " __TIME__);
+  theDisplay.display();
   
   io_init();
 
@@ -128,12 +134,6 @@ void setup()
   
   repo_load();
 
-  theDisplay.setFont(ArialMT_Plain_16);
-  theDisplay.drawString(0 , 0, "SSB.virt.lora.pub");
-  theDisplay.setFont(ArialMT_Plain_10);
-  theDisplay.drawString(0 , 18, __DATE__ " " __TIME__);
-  theDisplay.display();
-  delay(1000);
   strcpy(lora_line, "?");
   strcpy(goset_line, "?");
 
@@ -143,8 +143,9 @@ void setup()
   listDir(MyFS, FEED_DIR, 0);
   // ftpSrv.begin(".",".");
   
-  delay(2000);
   Serial.println("init done, starting loop now. Type '?' for list of commands\n");
+
+  delay(1500); // keep the screen for some time so the display headline can be read ..
 }
 
 int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
@@ -163,7 +164,6 @@ int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
   Serial.println(String("DMX: unknown ") + to_hex(pkt, DMX_LEN));
   return -1;
 }
-
 
 void right_aligned(int cnt, char c, int y)
 {

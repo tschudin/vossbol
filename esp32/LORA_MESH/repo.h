@@ -143,7 +143,7 @@ void repo_load()
 void repo_new_feed(unsigned char *fid)
 {
   char *path = _feed_path(fid);
-  Serial.println("new feed " + String(path));
+  Serial.printf("new feed '%s'\n", path);
   MyFS.remove(path);
   File f = MyFS.open(path, "w");
   f.close();
@@ -192,9 +192,10 @@ int repo_feed_len(unsigned char *fid)
 
 void repo_feed_append(unsigned char *fid, unsigned char *pkt)
 {
+  Serial.println(String("incoming entry for log ") + to_hex(fid, FID_LEN));
   int ndx = feed_index(fid);
   if (ndx < 0) {
-    Serial.println("no such feed");
+    Serial.println("  no such feed");
     return;
   }
   // check dmx
@@ -207,19 +208,19 @@ void repo_feed_append(unsigned char *fid, unsigned char *pkt)
   unsigned char dmx[DMX_LEN];
   compute_dmx(dmx, buf + strlen(DMX_PFX), FID_LEN + 4 + HASH_LEN);
   if (memcmp(dmx, pkt, DMX_LEN)) { // wrong dmx field
-    Serial.println(" DMX mismatch");
+    Serial.println("  DMX mismatch");
     return;
   }
   // check signature
   memcpy(buf + strlen(DMX_PFX) + FID_LEN + 4 + HASH_LEN, pkt, TINYSSB_PKT_LEN);
   int b = crypto_sign_ed25519_verify_detached(pkt + 56, buf, strlen(DMX_PFX) + FID_LEN + 4 + HASH_LEN + 56, fid);
   if (b) {
-    Serial.println("ed25519 signature verification failed");
+    Serial.println("  ed25519 signature verification failed");
     return;
   }
 
-  Serial.println("  writing pkt to log");
   File f = MyFS.open(_feed_path(fid), FILE_APPEND);
+  Serial.printf("  writing log entry %d.%d\n", _key_index(theGOset,fid), f.size()/TINYSSB_PKT_LEN + 1);
   f.write(pkt, TINYSSB_PKT_LEN);
   f.close();
   entry_cnt++;
@@ -240,7 +241,7 @@ void repo_feed_append(unsigned char *fid, unsigned char *pkt)
     // read length of content
     int len = 4; // max lenght of content length field
     int sz = bipf_varint_decode(pkt, DMX_LEN+1, &len);
-    Serial.println("**  sidechain has length (in B):" + String(sz));
+    Serial.printf("  sidechain will have %d bytes\n", sz);
     if (sz > (48 - HASH_LEN - len)) { // create sidechain file
       f = MyFS.open(_feed_path(fid, feeds[ndx].next_seq-1, 1), FILE_WRITE);
       f.close();
@@ -263,7 +264,7 @@ void repo_sidechain_append(unsigned char *buf, int blbt_ndx)
   struct blb_s *bp = blbt + blbt_ndx;
   File f = MyFS.open(_feed_path(bp->fid, bp->seq, 1), "a");
   if (f && (f.size() / TINYSSB_PKT_LEN) == bp->bnr) {
-    Serial.println("extending sidechain");
+    Serial.printf("  persisting chunk %d.%d.%d\n", _key_index(theGOset,bp->fid), bp->seq, bp->bnr);
     f.write(buf, TINYSSB_PKT_LEN);
     f.close();
     chunk_cnt++;
@@ -281,7 +282,8 @@ void repo_sidechain_append(unsigned char *buf, int blbt_ndx)
     } else { // chain extends, install next chunk handler
       arm_blb(buf + TINYSSB_PKT_LEN - HASH_LEN, incoming_chunk, bp->fid, bp->seq, bp->bnr+1);
     }
-  }
+  } else
+    Serial.printf("  invalid chunk %d.%d.%d or file problem?\n", _key_index(theGOset,bp->fid), bp->seq, bp->bnr);
   arm_blb(bp->h); // remove old CHUNK handler for this packet
 }
 

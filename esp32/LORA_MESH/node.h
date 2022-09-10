@@ -11,7 +11,7 @@ void incoming_want_request(unsigned char *buf, int len, unsigned char *aux)
 {
   struct bipf_s *lptr = bipf_loads(buf + DMX_LEN, len - DMX_LEN);
   if (lptr == NULL || lptr->typ != BIPF_LIST) return;
-  Serial.print("want handler: received vector is [");
+  String v = "";
   struct bipf_s **slpptr = lptr->u.list;
   int credit = 3;
   for (int i = 0; i < lptr->cnt; i++, slpptr++) {
@@ -20,18 +20,19 @@ void incoming_want_request(unsigned char *buf, int len, unsigned char *aux)
         continue;
     int fNDX = (*slpptr)->u.list[0]->u.i;
     int seq = (*slpptr)->u.list[1]->u.i;
-    Serial.print(" " + String(fNDX) + "." + String(seq));
+    v += (v.length() == 0 ? "[ " : ", ") + String(fNDX) + "." + String(seq);
     unsigned char *fid = theGOset->goset_keys + fNDX * GOSET_KEY_LEN;
     while (credit > 0) {
       unsigned char *pkt = repo_feed_read(fid, seq);
       if (pkt == NULL) break;
-      Serial.println(String("  have entry ") + to_hex(fid,10) + "." + String(seq));
+      // Serial.println(String("  have entry ") + to_hex(fid,10) + "." + String(seq));
+      v += "*";
       io_enqueue(pkt, TINYSSB_PKT_LEN);
       seq++;
       credit--;
     }
   }
-  Serial.println(" ]");
+  Serial.println("received log entry request: " + v + " ]");
   bipf_free(lptr);
 }
 
@@ -39,7 +40,7 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux)
 {
   struct bipf_s *lptr = bipf_loads(buf + DMX_LEN, len - DMX_LEN);
   if (lptr == NULL || lptr->typ != BIPF_LIST) return;
-  Serial.print("chunk handler: received vector is [");
+  String v = "";
   struct bipf_s **slpptr = lptr->u.list;
   int credit = 3;
   for (int i = 0; i < lptr->cnt; i++, slpptr++) {
@@ -49,7 +50,8 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux)
     int fNDX = (*slpptr)->u.list[0]->u.i;
     int seq = (*slpptr)->u.list[1]->u.i;
     int cnr = (*slpptr)->u.list[2]->u.i; // chunk nr
-    Serial.print(" " + String(fNDX) + "." + String(seq) + "." + String(cnr));
+    v += (v.length() == 0 ? "[ " : ", ") + String(fNDX) + "." + String(seq) + "." + String(cnr);
+    // Serial.printf(" %d.%d.%d", fNDX, seq, cnr);
     unsigned char *fid = theGOset->goset_keys + FID_LEN * fNDX;
     unsigned char *pkt = repo_feed_read(fid, seq);
     if (pkt == NULL || pkt[DMX_LEN] != PKTTYPE_chain20) continue;
@@ -62,27 +64,27 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux)
       unsigned char *chunk = repo_feed_read_chunk(fid, seq, cnr);
       if (chunk == NULL)
         break;
-      Serial.println(String("  have chunk ") + to_hex(fid,20) + "." + String(seq) + "." + String(cnr));
+      //Serial.println(String("  have chunk ") + to_hex(fid,20) + "." + String(seq) + "." + String(cnr));
+      v += "*";
       io_enqueue(chunk, TINYSSB_PKT_LEN);
       credit--;
       cnr++;
     }
   }
-  Serial.println(" ]");
+  Serial.println("received chunk request: " + v + " ]");
   bipf_free(lptr);
 }
 
 void incoming_pkt(unsigned char *buf, int len, unsigned char *fid)
 {
-  Serial.println("incoming pkt " + String(len));
+  // Serial.println("incoming pkt " + String(len));
   if (len != TINYSSB_PKT_LEN) return;
-  // Serial.println(to_hex(fid, FID_LEN));
   repo_feed_append(fid, buf);
 }
 
 void incoming_chunk(unsigned char *buf, int len, int blbt_ndx)
 {
-  Serial.println("received chunk");
+  // Serial.println("received chunk");
   if (len != TINYSSB_PKT_LEN) return;
   repo_sidechain_append(buf, blbt_ndx);
 }
@@ -97,11 +99,12 @@ void node_tick()
   if (theGOset->goset_len == 0)
     return;
 
-  Serial.print("|dmxt|=" + String(dmxt_cnt) + ", |blbt|=" + String(blbt_cnt));
-  Serial.println(", stats: |feeds|=" + String(feed_cnt) + ", |entries|=" + String(entry_cnt) + ", |chunks|=" + String(chunk_cnt));
+  Serial.printf("|dmxt|=%d, |blbt|=%d, |feeds|=%d, |entries|=%d, |chunks|=%d\n",
+                dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt);
 
   // FIXME: limit vector to 100B, rotate through set
   struct bipf_s *lptr = bipf_mkList();
+  String v = "";
   for (int i = 0; i < theGOset->goset_len; i++) {
     unsigned char *fid = theGOset->goset_keys + i*GOSET_KEY_LEN;
     struct feed_s *f = fid2feed(fid);
@@ -120,17 +123,19 @@ void node_tick()
     bipf_list_append(slptr, bipf_mkInt(i));
     bipf_list_append(slptr, bipf_mkInt(f->next_seq));
     bipf_list_append(lptr, slptr);
+    v += (v.length() == 0 ? "[ " : ", ") + String(i) + "." + String(f->next_seq);
   }
-
-  {
+  if (lptr->cnt > 0) {
     int sz = bipf_encodingLength(lptr);
     unsigned char buf[sz];
     bipf_encode(buf, lptr);
     io_enqueue(buf, sz, want_dmx);
     bipf_free(lptr);
+    Serial.printf(">> %dB log entry request: %s ]\n", sz, v.c_str());
   }
 
   // hunt for unfinished sidechains
+  v = "";
   lptr = bipf_mkList();
   File fdir = MyFS.open(FEED_DIR);
   File f = fdir.openNextFile("r");
@@ -171,11 +176,13 @@ void node_tick()
               int next_chunk = g.size() / TINYSSB_PKT_LEN;
               // FIXME: check if sidechain is already full, then swap '.' for '!' (e.g. after a crash)
               struct bipf_s *slptr = bipf_mkList();
-              bipf_list_append(slptr, bipf_mkInt(_key_index(theGOset,fid)));
+              int ki = _key_index(theGOset,fid);
+              bipf_list_append(slptr, bipf_mkInt(ki));
               bipf_list_append(slptr, bipf_mkInt(seq));
               bipf_list_append(slptr, bipf_mkInt(next_chunk));
               bipf_list_append(lptr, slptr);
               arm_blb(h, incoming_chunk, fid, seq, next_chunk);
+              v += (v.length() == 0 ? "[ " : ", ") + String(ki) + "." + String(seq) + "." + String(next_chunk);
             }
           }
           g.close();
@@ -193,6 +200,7 @@ void node_tick()
     bipf_encode(buf, lptr);
     io_enqueue(buf, sz, chnk_dmx);
     bipf_free(lptr);
+    Serial.printf(">> %dB chunk request: %s ]\n", sz, v.c_str());
   }
 
 }

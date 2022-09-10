@@ -6,7 +6,7 @@
 void cmd_rx(String cmd) {
   cmd.toLowerCase();
   cmd.trim();
-  Serial.println(String("CMD ") + cmd); 
+  Serial.printf("CMD %s\n\n", cmd.c_str()); 
   switch(cmd[0]) {
     case '?':
       Serial.println("  ?    help");
@@ -32,22 +32,19 @@ void cmd_rx(String cmd) {
       Serial.println("Installed feeds:");
       for (int i = 0; i < feed_cnt; i++) {
         unsigned char *key = theGOset->goset_keys + i*FID_LEN;
-        Serial.println(String("  ") + String(i) + " " + to_hex(key, 32)
-                       + ", next_seq=" + String(fid2feed(key)->next_seq));
+        Serial.printf("  %d %s, next_seq=%d\n", i, to_hex(key, 32), fid2feed(key)->next_seq);
       }
       Serial.println("DMX table:");
       for (int i = 0; i < dmxt_cnt; i++)
-        Serial.println(String("  ") + to_hex(dmxt[i].dmx, DMX_LEN));
-      Serial.println("CHK table:");
+        Serial.printf("  %s\n", to_hex(dmxt[i].dmx, DMX_LEN));
+      Serial.println("CHUNK table:");
       for (int i = 0; i < blbt_cnt; i++)
-        Serial.println(String("  ") + to_hex(blbt[i].h, HASH_LEN) + " "
-                       + String(_key_index(theGOset, blbt[i].fid))
-                       + "." + String(blbt[i].seq) + "." + String(blbt[i].bnr));
-      Serial.println();
+        Serial.printf("  %s %d.%d.%d\n", to_hex(blbt[i].h, HASH_LEN),
+                      _key_index(theGOset, blbt[i].fid), blbt[i].seq, blbt[i].bnr);
       break;
     case 'f': // Directory dump
-      Serial.println("\nFile system: " + String(MyFS.totalBytes(), DEC) + " total bytes, "
-                                 + String(MyFS.usedBytes(), DEC) + " used");
+      Serial.printf("File system: %d total bytes, %d used\n",
+                    MyFS.totalBytes(), MyFS.usedBytes());
       listDir(MyFS, FEED_DIR, 2);
       break;
     case 'r': // reset
@@ -69,4 +66,5 @@ void cmd_rx(String cmd) {
       Serial.println("unknown command");
       break;
   }
+  Serial.println();
 }

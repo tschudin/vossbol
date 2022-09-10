@@ -122,7 +122,7 @@ int on_rx(unsigned char *buf, int len)
 {
   unsigned char h[crypto_hash_sha256_BYTES];
   crypto_hash_sha256(h, buf, len);
-  Serial.print("<< buf " + String(len) + " " + to_hex(buf,16) + "... hash=");
+  Serial.printf("<< %dB %s..., hash=", len, to_hex(buf,16));
   Serial.println(to_hex(h, HASH_LEN));
 
   int rc = -1;
@@ -151,13 +151,13 @@ void set_want_dmx()
   memcpy(buf+4, theGOset->goset_state, GOSET_KEY_LEN);
   compute_dmx(want_dmx, buf, sizeof(buf));
   arm_dmx(want_dmx, incoming_want_request, NULL);
-  Serial.println(String("listening for WANT (request) protocol on ") + to_hex(want_dmx, DMX_LEN));
+  Serial.println(String("listening for WANT on ") + to_hex(want_dmx, DMX_LEN));
 
   memcpy(buf, "blob", 4); // FIXME: value is historic -- should be the string "chunk" for a next tinySSB protocol version 
   memcpy(buf+4, theGOset->goset_state, GOSET_KEY_LEN);
   compute_dmx(chnk_dmx, buf, sizeof(buf));
   arm_dmx(chnk_dmx, incoming_chnk_request, NULL);
-  Serial.println(String("listening for CHNK (request) protocol on ") + to_hex(chnk_dmx, DMX_LEN));
+  Serial.println(String("listening for CHNK on ") + to_hex(chnk_dmx, DMX_LEN));
 }
 
 // eof
