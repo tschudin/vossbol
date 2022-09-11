@@ -109,7 +109,6 @@ void node_tick()
   struct bipf_s *lptr = bipf_mkList();
   turn = 1 - turn;
   if (turn) {
-    // FIXME: limit vector to 100B, rotate through set
     log_offs = (log_offs+1) % theGOset->goset_len;
     bipf_list_append(lptr, bipf_mkInt(log_offs));
     int encoding_len = bipf_encodingLength(lptr);
@@ -140,7 +139,7 @@ void node_tick()
       }
     }
     log_offs = (log_offs+i) % theGOset->goset_len;
-    if (lptr->cnt > 0) {
+    if (lptr->cnt > 1) {
       int sz = bipf_encodingLength(lptr);
       unsigned char buf[sz];
       bipf_encode(buf, lptr);
