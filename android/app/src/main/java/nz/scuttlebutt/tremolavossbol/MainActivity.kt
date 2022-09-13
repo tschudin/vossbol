@@ -244,7 +244,7 @@ class MainActivity : Activity() {
             // val text = data.getStringExtra("text")
             val voice = data.getByteArrayExtra("codec2")
             if (voice != null)
-                wai.return_voice(voice) // public_post_voice(text, voice)
+                wai.return_voice(voice) // public_post_with_voice(text, voice)
             return
         }
         if (result != null) {

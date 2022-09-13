@@ -37,7 +37,7 @@ class LogTinyEntry(fid: ByteArray, seq: Int, mid: ByteArray, body: ByteArray) {
     val fid = fid // author
     val seq = seq
     val mid = mid // msg hash
-    val body = body // Bipf(XRF,APP,DATA)
+    val body = body // Bipf(APP,XRF,OTHERDATA)
 }
 
 class Repo(val context: MainActivity) {

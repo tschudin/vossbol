@@ -7,8 +7,8 @@ var overlayIsActive = false;
 var display_or_not = [
   'div:qr', 'div:back',
   'core', 'lst:chats', 'lst:posts', 'lst:contacts', 'lst:members', 'the:connex',
-  'div:footer', 'div:textarea', 'div:confirm-members', 'plus',
-  'div:settings'
+  'lst:kanban', 'div:footer', 'div:textarea', 'div:confirm-members', 'plus',
+  'div:settings', 'div:board'
 ];
 
 var prev_scenario = 'chats';
@@ -20,7 +20,9 @@ var scenarioDisplay = {
   'posts':    ['div:back', 'core', 'lst:posts', 'div:textarea'],
   'connex':   ['div:qr', 'core', 'the:connex', 'div:footer', 'plus'],
   'members':  ['div:back', 'core', 'lst:members', 'div:confirm-members'],
-  'settings': ['div:back', 'div:settings']
+  'settings': ['div:back', 'div:settings'],
+  'kanban':   ['div:qr', 'core','lst:kanban', 'div:footer', 'plus'],
+  'board':    ['div:back', 'core', 'div:board']
 }
 
 var scenarioMenu = {
@@ -55,7 +57,18 @@ var scenarioMenu = {
   'members' :  [['Settings', 'menu_settings'],
                 ['About', 'menu_about']],
 
-  'settings' : []
+  'settings' : [],
+
+  'kanban'   : [['New Kanban board', 'menu_new_board'],
+                ['Settings', 'menu_settings'],
+                ['About', 'menu_about']],
+
+  'board'    : [['Add list', 'menu_new_column'],
+                ['Rename Kanban Board', 'menu_rename_board'],
+                ['History', 'menu_history'],
+                ['Reload', 'reload_curr_board'],
+                ['(un)Forget', 'board_toggle_forget'],
+                ['Debug', 'ui_debug']],
 }
 
 function onBackPressed() {
@@ -63,9 +76,11 @@ function onBackPressed() {
     closeOverlay();
     return;
   }
-  if (['chats', 'contacts', 'connex'].indexOf(curr_scenario) >= 0) {
+  if (['chats', 'contacts', 'connex', 'board'].indexOf(curr_scenario) >= 0) {
     if (curr_scenario == 'chats')
       backend("onBackPressed");
+    else if (curr_scenario == 'board')
+      setScenario('kanban')
     else
       setScenario('chats')
   } else {
@@ -83,13 +98,13 @@ function setScenario(s) {
   var lst = scenarioDisplay[s];
   if (lst) {
     // if (s != 'posts' && curr_scenario != "members" && curr_scenario != 'posts') {
-    if (['chats', 'contacts', 'connex'].indexOf(curr_scenario) >= 0) {
+    if (['chats', 'contacts', 'connex', 'kanban'].indexOf(curr_scenario) >= 0) {
       var cl = document.getElementById('btn:'+curr_scenario).classList;
       cl.toggle('active', false);
       cl.toggle('passive', true);
     }
     // console.log(' l: ' + lst)
-    display_or_not.forEach(function(d){
+    display_or_not.forEach( function(d) {
         // console.log(' l+' + d);
         if (lst.indexOf(d) < 0) {
             document.getElementById(d).style.display = 'none';
@@ -99,7 +114,11 @@ function setScenario(s) {
         }
     })
     // console.log('s: ' + s)
-    if (s == "posts" || s == "settings") {
+    if(s != "board") {
+      document.getElementById('tremolaTitle').style.position = null;
+    }
+
+    if (s == "posts" || s == "settings" || s == "board") {
       document.getElementById('tremolaTitle').style.display = 'none';
       document.getElementById('conversationTitle').style.display = null;
       // document.getElementById('plus').style.display = 'none';
@@ -111,17 +130,21 @@ function setScenario(s) {
     }
     if (lst.indexOf('div:qr') >= 0) { prev_scenario = s; }
     curr_scenario = s;
-    if (['chats', 'contacts', 'connex'].indexOf(curr_scenario) >= 0) {
+    if (['chats', 'contacts', 'connex', 'kanban'].indexOf(curr_scenario) >= 0) {
       var cl = document.getElementById('btn:'+curr_scenario).classList;
       cl.toggle('active', true);
       cl.toggle('passive', false);
     }
+    if (s == 'board')
+      document.getElementById('core').style.height = 'calc(100% - 60px)';
+    else
+      document.getElementById('core').style.height = 'calc(100% - 118px)';
   }
 }
 
 function btnBridge(e) {
   var e = e.id, m = '';
-  if (['btn:chats','btn:posts','btn:contacts','btn:connex'].indexOf(e) >= 0)
+  if (['btn:chats','btn:posts','btn:contacts','btn:connex', 'btn:kanban'].indexOf(e) >= 0)
     { setScenario(e.substring(4)); }
   if (e == 'btn:menu') {
     if (scenarioMenu[curr_scenario].length == 0)
@@ -181,6 +204,16 @@ function closeOverlay(){
   document.getElementById('attach-menu').style.display = 'none';
   document.getElementById('div:modal_img').style.display = 'none';
 
+  /*
+  document.getElementById('div:menu_history').style.display = 'none';
+  document.getElementById('div:item_menu').style.display = 'none';
+  curr_item = null
+  close_board_context_menu()
+  document.getElementById('btn:item_menu_description_save').style.display = 'none'
+  document.getElementById('btn:item_menu_description_cancel').style.display = 'none'
+  document.getElementById('div:debug').style.display = 'none'
+  */
+
   overlayIsActive = false;
   if (curr_img_candidate != null) {
     backend('del:blob ' + curr_img_candidate);
@@ -220,6 +253,8 @@ function plus_button() {
     menu_new_contact();
   } else if (curr_scenario == 'connex') {
     menu_new_pub();
+  } else if (curr_scenario == 'kanban') {
+    menu_new_board();
   }
 }
 

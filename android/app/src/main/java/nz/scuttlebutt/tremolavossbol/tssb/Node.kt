@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import nz.scuttlebutt.tremolavossbol.MainActivity
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_INT
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_loads
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.varint_decode
@@ -22,22 +23,29 @@ import java.util.concurrent.locks.ReentrantLock
 
 class Node(val context: MainActivity) {
     val NODE_ROUND_LEN = 5000L
-    var rot = 0 // rotate the want and chunk lists
+    var log_offs = 0
+    var chunk_offs = 0
 
     fun incoming_want_request(buf: ByteArray, aux: ByteArray?) {
         Log.d("node", "incoming WANT ${buf.toHex()}")
         val vect = bipf_loads(buf.sliceArray(DMX_LEN..buf.lastIndex))
         if (vect == null || vect.typ != BIPF_LIST) return
+        val lst = vect.getList()
+        if (lst.size < 1 || lst[0].typ != BIPF_INT) {
+            Log.d("node", "incoming WANT error with offset")
+            return
+        }
+        val offs = lst[0].getInt()
         var v = "WANT vector=["
         var credit = 3
-        for (e in vect.getList()) {
+        for (i in 1..lst.lastIndex) {
             val fid: ByteArray
             var seq: Int
             try {
-                val lst = e.getList()
-                fid = context.tinyGoset.keys[lst[0].getInt()]
-                seq = lst[1].getInt()
-                v += " ${fid.sliceArray(0..9).toHex()}.${seq}"
+                val ndx = (offs + i - 1) % context.tinyGoset.keys.size
+                fid = context.tinyGoset.keys[ndx]
+                seq = lst[i].getInt()
+                v += " $ndx.${seq}"
             } catch (e: Exception) {
                 Log.d("node", "incoming WANT error ${e.toString()}")
                 continue
@@ -45,10 +53,8 @@ class Node(val context: MainActivity) {
             // Log.d("node", "want ${fid.toHex()}.${seq}")
             while (credit > 0) {
                 val pkt = context.tinyRepo.feed_read_pkt(fid, seq)
-                if (pkt == null) {
-                    // Log.d("node", "  no record at ${seq}")
+                if (pkt == null)
                     break
-                }
                 Log.d("node", "  have entry ${fid.toHex()}.${seq}")
                 context.tinyIO.enqueue(pkt)
                 seq++;
@@ -122,28 +128,41 @@ class Node(val context: MainActivity) {
         */
         Log.d("node", "beacon") // , stats: |feeds|=" + String(fcnt) + ", |entries|=" + String(ecnt) + ", |blobs|=" + String(bcnt));
 
-        // FIXME: limit vector to 100B, rotate through set
+        var v = ""
         val vect = Bipf.mkList()
+        var encoding_len = 0
+        log_offs = (log_offs + 1) % context.tinyGoset.keys.size
+        Bipf.list_append(vect, Bipf.mkInt(log_offs))
         var i = 0
-        for (k in context.tinyGoset.keys) {
-            val feed = context.tinyRepo.feeds[context.tinyRepo._feed_index(k)]
-            val e = Bipf.mkList()
-            Bipf.list_append(e, Bipf.mkInt(i))
-            Bipf.list_append(e, Bipf.mkInt(feed.next_seq))
-            Bipf.list_append(vect, e)
-            i++
-            // Log.d("node", "dmx for requested pkt: ${k.toHex()} ${feed.next_seq} ${feed.prev_hash.toHex()}")
-            val dmx = context.tinyDemux.compute_dmx(k + feed.next_seq.toByteArray()
-                                                           + feed.prev_hash)
+        while (i < context.tinyGoset.keys.size) {
+            val ndx = (log_offs + i) % context.tinyGoset.keys.size
+            val key = context.tinyGoset.keys[ndx]
+            val feed = context.tinyRepo.feeds[context.tinyRepo._feed_index(key)]
+            val bptr = Bipf.mkInt(feed.next_seq)
+            Bipf.list_append(vect, bptr)
+            val dmx = context.tinyDemux.compute_dmx(key + feed.next_seq.toByteArray()
+                    + feed.prev_hash)
             // Log.d("node", "dmx is ${dmx.toHex()}")
-            val fct = { buf: ByteArray, fid:ByteArray? -> context.tinyNode.incoming_pkt(buf, fid!!) }
-            context.tinyDemux.arm_dmx(dmx, fct, k)
+            val fct = { buf:ByteArray, fid:ByteArray? -> context.tinyNode.incoming_pkt(buf, fid!!) }
+            context.tinyDemux.arm_dmx(dmx, fct, key)
+            v += (if (v.length == 0) "[ " else ", ") + "$ndx.${feed.next_seq}"
+            i++
+            encoding_len += Bipf.encode(bptr)!!.size
+            if (encoding_len > 100)
+                break
         }
-        val buf = Bipf.encode(vect) // vect always has at least one element
-        if (buf != null)
-            context.tinyIO.enqueue(buf, context.tinyDemux.want_dmx)
+        log_offs = (log_offs + i) % context.tinyGoset.keys.size
+        if (vect.cnt > 1) {  // vect always has at least offs plus one element ?!
+            val buf = Bipf.encode(vect)
+            if (buf != null) {
+                context.tinyIO.enqueue(buf, context.tinyDemux.want_dmx)
+                Log.d("node", ">> sent WANT request ${v} ]")
+            }
+        }
 
         // hunt for unfinished sidechains
+        // FIXME: limit vector to 100B, rotate through set
+        v = ""
         val chunkReqList = Bipf.mkList()
         val fdir = File(context.getDir(context.tinyRepo.TINYSSB_DIR, Context.MODE_PRIVATE), context.tinyRepo.FEED_DIR)
         val r = context.tinyRepo
@@ -199,89 +218,19 @@ class Node(val context: MainActivity) {
                     Bipf.list_append(lst, Bipf.mkInt(nextChunk))
                     Bipf.list_append(chunkReqList, lst)
                     val fct = { pkt: ByteArray,x: Int -> context.tinyNode.incoming_chunk(pkt,x) }
-                    Log.d("node", "need chunk $fidNr.$seq.$nextChunk, armed for ${h.toHex()}, list now ${chunkReqList.cnt} (${lst.cnt})")
+                    v += (if (v.length == 0) "[ " else ", ") + "$fidNr.$seq.$nextChunk"
+                    // Log.d("node", "need chunk $fidNr.$seq.$nextChunk, armed for ${h.toHex()}, list now ${chunkReqList.cnt} (${lst.cnt})")
                     context.tinyDemux.arm_blb(h, fct, fid, seq, nextChunk)
                 }
             }
-
-            {
-            }
         }
         if (chunkReqList.cnt > 0) {
-            Log.d("node","send CHNK request for ${chunkReqList.cnt} chunks")
             val buf = Bipf.encode(chunkReqList)
-            if (buf != null)
+            if (buf != null) {
                 context.tinyIO.enqueue(buf, context.tinyDemux.chnk_dmx)
-        }
-
-        /*
-
-        // hunt for unfinished sidechains
-        lptr = bipf_mkList();
-        File fdir = MyFS.open(FEED_DIR);
-        File f = fdir.openNextFile("r");
-        while (f) {
-            if (f.isDirectory()) {
-                unsigned char *fid = from_hex(strrchr(f.name(), '/')+1, FID_LEN); // from_b64(pos, FID_LEN)
-                if (fid != NULL) {
-                    File ldir = MyFS.open(f.name());
-                    File g = ldir.openNextFile("r");
-                    while (g) {
-                        // Serial.println(String("looking at ") + g.name());
-                        char *pos = strchr(g.name(), '!');
-                        if (pos != NULL) {
-                            int seq = atoi(pos+1);
-                            unsigned char h[HASH_LEN];
-                            int sz = g.size();
-                            if (sz == 0) { // must fetch first ptr from log
-                                unsigned char *pkt = repo_feed_read(fid, seq);
-                                if (pkt != NULL)
-                                    memcpy(h, pkt+DMX_LEN+1+28, HASH_LEN);
-                                else
-                                    seq = -1;
-                            } else { // must fetch latest ptr from chain file
-                                g.seek(sz - HASH_LEN, SeekSet);
-                                if (g.read(h, HASH_LEN) != HASH_LEN) {
-                                    Serial.println("could not read() after seek");
-                                    seq = -1;
-                                } else {
-                                    int i;
-                                    for (i = 0; i < HASH_LEN; i++)
-                                    if (h[i] != 0)
-                                        break;
-                                    if (i == HASH_LEN) // reached end of chain
-                                        seq = -1;
-                                }
-                            }
-                            if (seq > 0) {
-                                int ndx = feed_index(fid);
-                                int next_blob = g.size() / TINYSSB_PKT_LEN;
-                                // FIXME: check if sidechain is already full, then swap '.' for '!' (e.g. after a crash)
-                                struct bipf_s* slptr = bipf_mkList();
-                                bipf_list_append(slptr, bipf_mkInt(ndx));
-                                bipf_list_append(slptr, bipf_mkInt(seq));
-                                bipf_list_append(slptr, bipf_mkInt(next_blob));
-                                bipf_list_append(lptr, slptr);
-                                arm_blb(h, incoming_chunk, feeds[ndx].fid, seq, next_blob);
-                            }
-                        }
-                        g.close();
-                        g = ldir.openNextFile("r");
-                    } // while (g)
-                }
+                Log.d("node", ">> sent CHUNK request ${v} ]")
             }
-            f.close();
-            f = fdir.openNextFile("r");
         }
-        fdir.close();
-        if (lptr->cnt > 0) {
-            int sz = bipf_encodingLength(lptr);
-            unsigned char buf[sz];
-            bipf_encode(buf, lptr);
-            io_enqueue(buf, sz, chnk_dmx);
-            bipf_free(lptr);
-        }
-        */
     }
 
     fun incoming_pkt(buf: ByteArray, fid: ByteArray) {

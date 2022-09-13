@@ -5,20 +5,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.core.content.ContextCompat.checkSelfPermission
-import androidx.core.content.FileProvider
 import com.google.zxing.integration.android.IntentIntegrator
 import org.json.JSONObject
-import java.io.File
-import java.util.*
 
 import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
@@ -26,6 +20,7 @@ import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
+import org.json.JSONArray
 
 
 // pt 3 in https://betterprogramming.pub/5-android-webview-secrets-you-probably-didnt-know-b23f8a8b5a0c
@@ -110,27 +105,40 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     return
             }
             */
-            "publ:post" -> { // publ:post txt voice
+            "publ:post" -> { // publ:post tips txt voice
+                val a = JSONArray(args[1])
+                val tips = ArrayList<String>(0)
+                for (i in 0..a.length()-1) {
+                    val s = (a[i] as JSONObject).toString()
+                    Log.d("publ:post", s)
+                    tips.add(s)
+                }
                 var t: String? = null
-                if (args[1] != "null")
-                    t = Base64.decode(args[1], Base64.NO_WRAP).decodeToString()
+                if (args[2] != "null")
+                    t = Base64.decode(args[2], Base64.NO_WRAP).decodeToString()
                 var v: ByteArray? = null
-                if (args.size > 2 && args[2] != "null")
-                    v = Base64.decode(args[2], Base64.NO_WRAP)
-                public_post_voice(t, v)
+                if (args.size > 3 && args[3] != "null")
+                    v = Base64.decode(args[3], Base64.NO_WRAP)
+                public_post_with_voice(tips, t, v)
                 return
             }
-            /* no pivate post (yet) in tyinTremola
-            "priv:post" -> { // atob(text) rcp1 rcp2 ...
-                val rawStr = tremolaState.msgTypes.mkPost(
-                                 Base64.decode(args[1], Base64.NO_WRAP).decodeToString(),
-                                 args.slice(2..args.lastIndex))
-                val evnt = tremolaState.msgTypes.jsonToLogEntry(rawStr,
-                                            rawStr.encodeToByteArray())
-                evnt?.let { rx_event(it) } // persist it, propagate horizontally and also up
+            "priv:post" -> { // priv:post tips atob(text) atob(voice) rcp1 rcp2 ...
+                val a = JSONObject(args[1]) as JSONArray
+                val tips = ArrayList<String>(0)
+                for (i in 0..a.length()-1) {
+                    val s = (a[i] as JSONObject).toString()
+                    Log.d("priv;post", s)
+                    tips.add(s)
+                }
+                var t: String? = null
+                if (args[2] != "null")
+                    t = Base64.decode(args[2], Base64.NO_WRAP).decodeToString()
+                var v: ByteArray? = null
+                if (args.size > 3 && args[3] != "null")
+                    v = Base64.decode(args[3], Base64.NO_WRAP)
+                private_post_with_voice(tips, t, v, args.slice(4..args.lastIndex))
                 return
             }
-            */
             "get:media" -> {
                 if (checkSelfPermission(act, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                     Toast.makeText(act, "No permission to access media files",
@@ -183,13 +191,32 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         return false
     }
 
-    fun public_post_voice(text: String?, voice: ByteArray?) {
+    fun public_post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?) {
         if (text != null)
             Log.d("wai", "post_voice t- ${text}/${text.length}")
         if (voice != null)
             Log.d("wai", "post_voice v- ${voice}/${voice.size}")
         val lst = Bipf.mkList()
         Bipf.list_append(lst, TINYSSB_APP_TEXTANDVOICE)
+        // add tips
+        Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
+        Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
+        val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
+        Log.d("wai", "send time is ${tst.getInt()}")
+        Bipf.list_append(lst, tst)
+        val body = Bipf.encode(lst)
+        if (body != null)
+            act.tinyNode.publish_public_content(body)
+    }
+
+    fun private_post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?, rcps: List<String>) {
+        if (text != null)
+            Log.d("wai", "post_voice t- ${text}/${text.length}")
+        if (voice != null)
+            Log.d("wai", "post_voice v- ${voice}/${voice.size}")
+        val lst = Bipf.mkList()
+        Bipf.list_append(lst, TINYSSB_APP_TEXTANDVOICE)
+        // add tips
         Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
         Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
         val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
