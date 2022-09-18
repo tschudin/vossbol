@@ -13,6 +13,10 @@ void cmd_rx(String cmd) {
       Serial.println("  a    add new random key");
       Serial.println("  d    dump DMXT and CHKT");
       Serial.println("  f    list file system");
+#if defined(LORA_LOG)
+      Serial.println("  l    list log file");
+      Serial.println("  m    empty log file");
+#endif
       Serial.println("  r    reset this repo to blank");
       Serial.println("  x    reboot");
       Serial.println("  z[N] zap (feed with index N) on all nodes");
@@ -47,6 +51,21 @@ void cmd_rx(String cmd) {
                     MyFS.totalBytes(), MyFS.usedBytes());
       listDir(MyFS, FEED_DIR, 2);
       break;
+#if defined(LORA_LOG)
+  case 'l': // list Log file
+      lora_log.close();
+      lora_log = MyFS.open("/lora_log.txt", FILE_READ);
+      while (lora_log.available()) {
+        Serial.write(lora_log.read());
+      }
+      lora_log.close();
+      lora_log = MyFS.open("/lora_log.txt", FILE_APPEND);
+      break;
+  case 'm': // empty Log file
+      lora_log.close();
+      lora_log = MyFS.open("/lora_log.txt", FILE_WRITE);
+      break;
+#endif
     case 'r': // reset
       repo_reset();
       Serial.println("reset done");

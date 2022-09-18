@@ -67,6 +67,8 @@ HardwareSerial GPS(1);
 AXP20X_Class axp;
 #endif
 
+unsigned char my_mac[6];
+
 // -------------------------------------------------------------------
 
 void hw_setup() // T-BEAM or Heltec LoRa32v2
@@ -136,7 +138,6 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
 
   // -------------------------------------------------------------------
 
-  unsigned char my_mac[6];
   esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
   Serial.println(String("mac   ") + to_hex(my_mac, 6, 1));
 

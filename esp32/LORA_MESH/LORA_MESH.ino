@@ -8,7 +8,10 @@
 #define LORA_BW     125000
 #define LORA_SF          7
 #define LORA_CR          5
-#define LORA_TXPOWER    17
+#define LORA_TXPOWER    20 // highpowermode, otherwise choose 17 or lower
+
+// #define LORA_LOG // uncomment macro for enabeling logging of recvd pkts
+#define LORA_LOG_FILENAME  "/lora_log.txt"
 
 #define FID_LEN         32
 #define HASH_LEN        20
@@ -100,8 +103,9 @@ void ble_init();
 #include "node.h"
 #include "ed25519.h"
 
-char lora_line[80];
-char gps_line[80];
+// char lora_line[80];
+char time_line[80];
+char loc_line[80];
 char goset_line[80];
 char refresh = 1;
 
@@ -109,6 +113,9 @@ int old_gps_sec, old_goset_c, old_goset_n, old_goset_len;
 int old_repo_sum;
 int lora_cnt = 0;
 int lora_bad_crc = 0;
+
+File lora_log;
+unsigned long int next_flush;
 
 #include "cmd.h"
 
@@ -134,7 +141,9 @@ void setup()
   
   repo_load();
 
-  strcpy(lora_line, "?");
+  // strcpy(lora_line, "?");
+  strcpy(time_line, "?");
+  strcpy(loc_line, "?");
   strcpy(goset_line, "?");
 
   Serial.println("\nFile system: " + String(MyFS.totalBytes(), DEC) + " total bytes, "
@@ -143,7 +152,15 @@ void setup()
   listDir(MyFS, FEED_DIR, 0);
   // ftpSrv.begin(".",".");
   
-  Serial.println("init done, starting loop now. Type '?' for list of commands\n");
+#if defined(LORA_LOG)
+  lora_log = MyFS.open(LORA_LOG_FILENAME, FILE_APPEND);
+  lora_log.printf("reboot\n");
+  lora_log.printf("millis,utc,mac,lat,lon,ele,plen,prssi,psnr,pfe,rssi\n");
+  next_flush = millis() + 10000;
+  Serial.printf("%s: %d bytes\n", LORA_LOG_FILENAME, lora_log.size());
+#endif
+
+  Serial.println("\ninit done, starting loop now. Type '?' for list of commands\n");
 
   delay(1500); // keep the screen for some time so the display headline can be read ..
 }
@@ -208,6 +225,32 @@ void loop()
       if (pkt_len < sizeof(pkt_buf))
         pkt_buf[pkt_len++] = c;
     }
+#if defined (LORA_LOG)
+    {
+      unsigned long int m = millis();
+      lora_log.printf("%d.%03d,%04d-%02d-%02dT%02d:%02d:%02dZ,%s",
+                      m/1000, m%1000,
+                      gps.date.year(), gps.date.month(), gps.date.day(),
+                      gps.time.hour(), gps.time.minute(), gps.time.second(),
+                      // gps.time.centisecond(),
+                      to_hex(my_mac,6,1));
+      if (gps.location.isValid())
+        lora_log.printf(",%.8g,%.8g,%g", gps.location.lat(),
+                        gps.location.lng(), gps.altitude.meters());
+      else
+        lora_log.printf(",0,0,0");
+
+      int prssi  = LoRa.packetRssi();
+      float psnr = LoRa.packetSnr();
+      long pfe   = LoRa.packetFrequencyError();
+      int rssi   = LoRa.rssi();
+      lora_log.printf(",%d,%d,%g,%ld,%d\n", pkt_len, prssi, psnr, pfe, rssi);
+      if (millis() > next_flush) {
+        lora_log.flush();
+        next_flush = millis() + 10000;
+      }
+    }
+#endif
     lora_cnt++;
     incoming(&lora_face, pkt_buf, pkt_len, 1);
     // sprintf(lora_line, "LoRa %d/%d: %dB, rssi=%d", lora_cnt, lora_bad_crc, pkt_len, LoRa.packetRssi());
@@ -240,7 +283,15 @@ void loop()
     gps.encode(GPS.read());
   if (gps.time.second() != old_gps_sec) {
     old_gps_sec = gps.time.second();
-    sprintf(gps_line, "%02d:%02d:%02d utc", gps.time.hour(), gps.time.minute(), old_gps_sec);
+    sprintf(time_line, "%02d:%02d:%02d utc", gps.time.hour(), gps.time.minute(),
+                                      old_gps_sec);
+    /*
+    if (gps.location.isValid())
+      sprintf(loc_line, "%.8g@%.8g@%g/%d", gps.location.lat(), gps.location.lng(),
+                                      gps.altitude.meters(), gps.satellites.value());
+    else
+      strcpy(loc_line, "-@-@-/-");
+    */
     refresh = 1;
   }
   if (old_goset_c != theGOset->pending_c_cnt || 
@@ -269,7 +320,7 @@ void loop()
     theDisplay.drawString(42, 0, ssid+8);
     theDisplay.setFont(ArialMT_Plain_10);
     
-    theDisplay.drawString(0, 18, gps_line);
+    theDisplay.drawString(0, 18, time_line);
     // theDisplay.drawString(0, 24, goset_line);
     theDisplay.drawString(0, 30, "W:" + String(wifi_clients) + \
                                  " E:" + String(ble_clients) + \
