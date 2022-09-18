@@ -122,7 +122,7 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   LoRa.setSpreadingFactor(LORA_SF);
   LoRa.setCodingRate4(LORA_CR);
   LoRa.setPreambleLength(8);
-  LoRa.setSyncWord(0x34);
+  LoRa.setSyncWord(LORA_SYNC_WORD);
   LoRa.receive();
 
   Serial.println("\n** Starting Scuttlebutt vPub (LoRa, WiFi, BLE) with GOset **\n");

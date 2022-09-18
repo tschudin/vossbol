@@ -9,6 +9,7 @@
 #define LORA_SF          7
 #define LORA_CR          5
 #define LORA_TXPOWER    20 // highpowermode, otherwise choose 17 or lower
+#define LORA_SYNC_WORD  0x58 // for "SB, Scuttlebutt". Discussion at https://blog.classycode.com/lora-sync-word-compatibility-between-sx127x-and-sx126x-460324d1787a
 
 // #define LORA_LOG // uncomment macro for enabeling logging of recvd pkts
 #define LORA_LOG_FILENAME  "/lora_log.txt"

@@ -152,7 +152,7 @@ void node_tick()
   
   // hunt for unfinished sidechains
   chunk_offs = (chunk_offs+1) % theGOset->goset_len;
-  Serial.printf("chunk_offs starting: %d\n", chunk_offs);
+  // Serial.printf("chunk_offs starting: %d\n", chunk_offs);
   int encoding_len = 0;
   int requested_first = -1; // in number of feeds requesting sthg
   for (int i = 0; i < theGOset->goset_len; i++) {
@@ -216,8 +216,8 @@ void node_tick()
   }
   if (requested_first != -1)
     chunk_offs = (chunk_offs+requested_first) % theGOset->goset_len;
-  Serial.printf("chunk_offs ending: %d, requested_first: %d\n",
-                chunk_offs, requested_first);
+  // Serial.printf("chunk_offs ending: %d, requested_first: %d\n",
+  //               chunk_offs, requested_first);
   
   if (lptr->cnt > 0) {
     int sz = bipf_encodingLength(lptr);
