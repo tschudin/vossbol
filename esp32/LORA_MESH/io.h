@@ -59,8 +59,9 @@ uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
 
 #if defined(MAIN_BLEDevice_H_)
 
-BLECharacteristic *TXChar = nullptr;
-BLECharacteristic *RXChar = nullptr;
+BLECharacteristic *RXChar = nullptr; // receive
+BLECharacteristic *TXChar = nullptr; // transmit (notify)
+BLECharacteristic *STChar = nullptr; // statistics
 bool bleDeviceConnected = 0;
 char txString[128] = {0};
 
@@ -126,14 +127,21 @@ void ble_init()
   UARTServer->setCallbacks(new UARTServerCallbacks());
   // Create the BLE Service
   BLEService *UARTService = UARTServer->createService(BLE_SERVICE_UUID);
-  // Create a BLE Characteristic
+
+  // Create our BLE Characteristics
   TXChar = UARTService->createCharacteristic(BLE_CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-  //  TXChar = UARTService->createCharacteristic(CHARACTERISTIC_UUID_TX, BLECharacteristic::PROPERTY_NOTIFY);
   TXChar->addDescriptor(new BLE2902());
   TXChar->setNotifyProperty(true);
   TXChar->setReadProperty(true);
+
+  STChar = UARTService->createCharacteristic(BLE_CHARACTERISTIC_UUID_ST, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  STChar->addDescriptor(new BLE2902());
+  STChar->setNotifyProperty(true);
+  STChar->setReadProperty(true);
+
   RXChar = UARTService->createCharacteristic(BLE_CHARACTERISTIC_UUID_RX, BLECharacteristic::PROPERTY_WRITE);
   RXChar->setCallbacks(new RXCallbacks());
+
   // Start the service
   UARTService->start();
   // Start advertising
@@ -199,7 +207,14 @@ void ble_send(unsigned char *buf, short len) {
   TXChar->setValue(buf, len);
   TXChar->notify();
   Serial.printf("BLE: sent %dB: %s..\n", len, to_hex(buf,8));
-  // , to_hex(buf + len - 6, 6));
+}
+
+void ble_send_stats(unsigned char *str, short len) {
+  if (bleDeviceConnected == 0) return;
+  // no CRC added, we rely on BLE's CRC
+  STChar->setValue(str, len);
+  STChar->notify();
+  Serial.printf("BLE: sent stat %dB: %s\n", len, str);
 }
 
 #endif // BLE

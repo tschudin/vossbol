@@ -42,6 +42,7 @@
 #define BLE_SERVICE_UUID           "6e400001-7646-4b5b-9a50-71becce51558"
 #define BLE_CHARACTERISTIC_UUID_RX "6e400002-7646-4b5b-9a50-71becce51558"
 #define BLE_CHARACTERISTIC_UUID_TX "6e400003-7646-4b5b-9a50-71becce51558"
+#define BLE_CHARACTERISTIC_UUID_ST "6e400004-7646-4b5b-9a50-71becce51558"
 
 #define BLE_RING_BUF_SIZE 3
 
@@ -322,9 +323,14 @@ void loop()
     
     theDisplay.drawString(0, 18, time_line);
     // theDisplay.drawString(0, 24, goset_line);
-    theDisplay.drawString(0, 30, "W:" + String(wifi_clients) + \
-                                 " E:" + String(ble_clients) + \
-                                 " L:" + wheel[lora_cnt % 4]);
+    char stat_line[30];
+    sprintf(stat_line, "W:%d E:%d L:%s",
+            wifi_clients, ble_clients, wheel[lora_cnt % 4]);
+    theDisplay.drawString(0, 30, stat_line);
+#if defined(MAIN_BLEDevice_H_)
+    sprintf(stat_line + strlen(stat_line)-1, "%d", lora_cnt);
+    ble_send_stats((unsigned char*) stat_line, strlen(stat_line));
+#endif
 
     theDisplay.setFont(ArialMT_Plain_16);
     right_aligned(feed_cnt,  'F', 0); 
