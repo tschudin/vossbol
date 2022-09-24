@@ -5,11 +5,14 @@
 
 // collect all external libraries here
 
-
 #if defined(WIFI_LoRa_32_V2) || defined(WIFI_LORA_32_V2)
 
 # include <heltec.h>
 # define theDisplay (*Heltec.display)
+
+// user button
+#define BUTTON_PIN KEY_BUILTIN  // for heltec?
+
 
 #else // ARDUINO_TBeam
 
@@ -30,8 +33,14 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 # define RST     14   // GPIO14 -- SX1278's RESET
 # define DI0     26   // GPIO26 -- SX1278's IRQ(Interrupt Request)
 
+// user button
+#define BUTTON_PIN 38 // this is for T_BEAM_V10; V7 used pin 39
+
 #endif // device specific
 
+
+// user button
+#include <Button2.h>
 
 // FS
 #include <littlefs_api.h>
@@ -67,7 +76,23 @@ HardwareSerial GPS(1);
 AXP20X_Class axp;
 #endif
 
+Button2 userButton;
 unsigned char my_mac[6];
+
+// -------------------------------------------------------------------
+
+static unsigned char OLED_state = HIGH;
+
+void OLED_toggle() {
+  OLED_state = OLED_state ? LOW : HIGH;
+  if (OLED_state == LOW) theDisplay.displayOff();
+  else                   theDisplay.displayOn();
+}
+
+void pressed(Button2& btn) {
+  // Serial.println("pressed");
+  OLED_toggle();
+}
 
 // -------------------------------------------------------------------
 
@@ -90,10 +115,13 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   theDisplay.setFont(ArialMT_Plain_10);
   theDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
 
+  /*
   pinMode(16,OUTPUT);
   digitalWrite(16, LOW);    // set GPIO16 low to reset OLED
   delay(50); 
-  digitalWrite(16, HIGH); // while OLED is running, must set GPIO16 in high、
+  // digitalWrite(16, HIGH); // while OLED is running, must set GPIO16 in high、
+  OLED_toggle();
+  */
 
   SPI.begin(SCK,MISO,MOSI,SS);
   LoRa.setPins(SS,RST,DI0);  
@@ -124,6 +152,10 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   LoRa.setPreambleLength(8);
   LoRa.setSyncWord(LORA_SYNC_WORD);
   LoRa.receive();
+
+  // pinMode(BUTTON_PIN, INPUT);
+  userButton.begin(BUTTON_PIN);
+  userButton.setPressedHandler(pressed);
 
   Serial.println("\n** Starting Scuttlebutt vPub (LoRa, WiFi, BLE) with GOset **\n");
   theDisplay.clear();

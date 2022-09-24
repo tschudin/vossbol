@@ -4,14 +4,15 @@
 // 2022-08-09 <christian.tschudin@unibas.ch>
 
 
-#define LORA_BAND    902E6 // USA
+// #define LORA_BAND    902E6 // USA
+#define LORA_BAND  865.5E6 // Europe
 #define LORA_BW     125000
 #define LORA_SF          7
 #define LORA_CR          5
 #define LORA_TXPOWER    20 // highpowermode, otherwise choose 17 or lower
 #define LORA_SYNC_WORD  0x58 // for "SB, Scuttlebutt". Discussion at https://blog.classycode.com/lora-sync-word-compatibility-between-sx127x-and-sx126x-460324d1787a
 
-// #define LORA_LOG // uncomment macro for enabeling logging of recvd pkts
+// #define LORA_LOG // enable macro for logging received pkts
 #define LORA_LOG_FILENAME  "/lora_log.txt"
 
 #define FID_LEN         32
@@ -165,6 +166,7 @@ void setup()
   Serial.println("\ninit done, starting loop now. Type '?' for list of commands\n");
 
   delay(1500); // keep the screen for some time so the display headline can be read ..
+  OLED_toggle(); // default is OLED off, use button to switch on
 }
 
 int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
@@ -211,7 +213,8 @@ void loop()
     refresh = 1;
   }
 #endif
-  
+
+  userButton.loop();
   io_dequeue();
   goset_tick(theGOset);
   node_tick();
@@ -230,6 +233,14 @@ void loop()
 #if defined (LORA_LOG)
     {
       unsigned long int m = millis();
+      long pfe = 0;
+      int rssi = 0;
+
+#if defined(WIFI_LoRa_32_V2) || defined(WIFI_LORA_32_V2)
+      lora_log.printf("%d.%03d,0000-00-00T00:00:00Z,%s,0,0,0",
+                      m/1000, m%1000,
+                      to_hex(my_mac,6,1));
+#else
       lora_log.printf("%d.%03d,%04d-%02d-%02dT%02d:%02d:%02dZ,%s",
                       m/1000, m%1000,
                       gps.date.year(), gps.date.month(), gps.date.day(),
@@ -241,11 +252,13 @@ void loop()
                         gps.location.lng(), gps.altitude.meters());
       else
         lora_log.printf(",0,0,0");
+      pfe   = LoRa.packetFrequencyError();
+      rssi   = LoRa.rssi();
+#endif
 
       int prssi  = LoRa.packetRssi();
       float psnr = LoRa.packetSnr();
-      long pfe   = LoRa.packetFrequencyError();
-      int rssi   = LoRa.rssi();
+
       lora_log.printf(",%d,%d,%g,%ld,%d\n", pkt_len, prssi, psnr, pfe, rssi);
       if (millis() > next_flush) {
         lora_log.flush();
