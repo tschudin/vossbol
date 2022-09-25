@@ -12,7 +12,7 @@
 #define LORA_TXPOWER    20 // highpowermode, otherwise choose 17 or lower
 #define LORA_SYNC_WORD  0x58 // for "SB, Scuttlebutt". Discussion at https://blog.classycode.com/lora-sync-word-compatibility-between-sx127x-and-sx126x-460324d1787a
 
-// #define LORA_LOG // enable macro for logging received pkts
+#define LORA_LOG // enable macro for logging received pkts
 #define LORA_LOG_FILENAME  "/lora_log.txt"
 
 #define FID_LEN         32
@@ -131,16 +131,29 @@ void setup()
   theDisplay.drawString(0 , 0, "SSB.virt.lora.pub");
   theDisplay.setFont(ArialMT_Plain_10);
   theDisplay.drawString(0 , 18, __DATE__ " " __TIME__);
+  int f = LORA_BAND / 10000;
+  char fr[30];
+  sprintf(fr, "%d.%02d MHz", f/100, f%100);
+  theDisplay.setFont(ArialMT_Plain_24);
+  theDisplay.drawString(0, 38, fr);
+
   theDisplay.display();
   
   io_init();
 
+  Serial.printf("File system: %d total bytes, %d used\n",
+                MyFS.totalBytes(), MyFS.usedBytes());
+  MyFS.mkdir(FEED_DIR);
+  listDir(MyFS, FEED_DIR, 0);
+  // ftpSrv.begin(".",".");
+
+  Serial.println();
   theGOset = goset_new();
   unsigned char h[32];
   crypto_hash_sha256(h, (unsigned char*) GOSET_DMX_STR, strlen(GOSET_DMX_STR));
   memcpy(goset_dmx, h, DMX_LEN);
   arm_dmx(goset_dmx, goset_rx, NULL);
-  Serial.println(String("listening for GOset protocol on ") + to_hex(goset_dmx, 7));
+  Serial.printf("listening for GOset protocol on %s\n", to_hex(goset_dmx, 7));
   
   repo_load();
 
@@ -149,25 +162,25 @@ void setup()
   strcpy(loc_line, "?");
   strcpy(goset_line, "?");
 
-  Serial.println("\nFile system: " + String(MyFS.totalBytes(), DEC) + " total bytes, "
-                                 + String(MyFS.usedBytes(), DEC) + " used");
-  MyFS.mkdir(FEED_DIR);
-  listDir(MyFS, FEED_DIR, 0);
-  // ftpSrv.begin(".",".");
-  
 #if defined(LORA_LOG)
   lora_log = MyFS.open(LORA_LOG_FILENAME, FILE_APPEND);
   lora_log.printf("reboot\n");
   lora_log.printf("millis,utc,mac,lat,lon,ele,plen,prssi,psnr,pfe,rssi\n");
   next_flush = millis() + 10000;
-  Serial.printf("%s: %d bytes\n", LORA_LOG_FILENAME, lora_log.size());
+  Serial.printf("\nlength of %s: %d bytes\n", LORA_LOG_FILENAME, lora_log.size());
 #endif
+
+  Serial.printf("\nHeap: %d total, %d free, %d min, %d maxAlloc\n",
+                 ESP.getHeapSize(), ESP.getFreeHeap(),
+                 ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
 
   Serial.println("\ninit done, starting loop now. Type '?' for list of commands\n");
 
   delay(1500); // keep the screen for some time so the display headline can be read ..
   OLED_toggle(); // default is OLED off, use button to switch on
 }
+
+// ----------------------------------------------------------------------
 
 int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
 {

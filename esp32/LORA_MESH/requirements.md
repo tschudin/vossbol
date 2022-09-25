@@ -22,6 +22,7 @@ LoRa                        0.8.0
 SPI                         1.0  
 TinyGPSPlus                 1.0.3
 AXP202X_Library-master      1.1.3
+Button2                     2.0.3
 LittleFS_esp32              1.0.6
 FS                          1.0  
 WiFi                        1.0  
@@ -44,6 +45,7 @@ Used library            Version
 Heltec_ESP32_Dev-Boards 1.1.1
 Wire                    1.0.1
 SPI                     1.0  
+Button2                 2.0.3
 LittleFS_esp32          1.0.6
 FS                      1.0  
 WiFi                    1.0  

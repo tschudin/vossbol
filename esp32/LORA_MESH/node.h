@@ -102,8 +102,8 @@ void node_tick()
   if (theGOset->goset_len == 0)
     return;
 
-  Serial.printf("|dmxt|=%d, |blbt|=%d, |feeds|=%d, |entries|=%d, |chunks|=%d\n",
-                dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt);
+  Serial.printf("|dmxt|=%d, |blbt|=%d, |feeds|=%d, |entries|=%d, |chunks|=%d, |freeHeap|=%d\n",
+                dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt, ESP.getFreeHeap());
 
   String v = "";
   struct bipf_s *lptr = bipf_mkList();
