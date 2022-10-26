@@ -30,7 +30,7 @@ struct face_s {
 struct face_s lora_face;
 struct face_s udp_face;
 struct face_s bt_face;
-#if defined(MAIN_BLEDevice_H_)
+#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
   struct face_s ble_face;
 #endif
 
@@ -38,7 +38,7 @@ struct face_s *faces[] = {
   &lora_face,
   &udp_face,
   &bt_face,
-#if defined(MAIN_BLEDevice_H_)
+#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
   &ble_face
 #endif
 };
@@ -57,7 +57,7 @@ uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
 
 // --------------------------------------------------------------------------------
 
-#if defined(MAIN_BLEDevice_H_)
+#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
 
 BLECharacteristic *RXChar = nullptr; // receive
 BLECharacteristic *TXChar = nullptr; // transmit (notify)
@@ -118,7 +118,6 @@ class RXCallbacks: public BLECharacteristicCallbacks {
 void ble_init()
 {
   // Create the BLE Device
-  BLEDevice::setMTU(128);
   BLEDevice::init("tinySSB virtual LoRa pub");
   BLEDevice::setMTU(128);
   // Create the BLE Server
@@ -157,7 +156,6 @@ void ble_init()
     pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
     pAdvertising->setMinPreferred(0x12);
     BLEDevice::startAdvertising();
-    Serial.println("Characteristic defined! Now you can read it in your phone!");
 }
 
 #endif // BLE
@@ -167,6 +165,7 @@ void ble_init()
 
 void lora_send(unsigned char *buf, short len)
 {
+#if !defined(NO_LORA)
   if (LoRa.beginPacket()) {
     uint32_t crc = crc32_ieee(buf, len);
     LoRa.write(buf, len);
@@ -177,10 +176,12 @@ void lora_send(unsigned char *buf, short len)
                    + to_hex(buf,8) + ".." + to_hex(buf + len - 6, 6));
   } else
     Serial.println("LoRa send failed");
+#endif
 }
 
 void udp_send(unsigned char *buf, short len)
 {
+#if !defined(NO_WIFI)
   if (udp.beginMulticastPacket()) {
     uint32_t crc = crc32_ieee(buf, len);
     udp.write(buf, len);
@@ -190,6 +191,7 @@ void udp_send(unsigned char *buf, short len)
                  + to_hex(buf,8) + ".." + to_hex(buf + len - 6, 6));
   } else
     Serial.println("udp send failed");
+#endif
   /*
   if (udp_sock >= 0 && udp_addr_len > 0) {
     if (lwip_sendto(udp_sock, buf, len, 0,
@@ -199,7 +201,7 @@ void udp_send(unsigned char *buf, short len)
   */
 }
 
-#if defined(MAIN_BLEDevice_H_)
+#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
 
 void ble_send(unsigned char *buf, short len) {
   if (bleDeviceConnected == 0) return;
@@ -221,6 +223,7 @@ void ble_send_stats(unsigned char *str, short len) {
 
 void bt_send(unsigned char *buf, short len)
 {
+#if !defined(NO_BT)
   if (BT.connected()) {
     uint32_t crc = crc32_ieee(buf, len);
     unsigned char *buf2 = (unsigned char*) malloc(len + sizeof(crc));
@@ -232,6 +235,7 @@ void bt_send(unsigned char *buf, short len)
 
   } // else
     // Serial.println("BT not connected");
+#endif
 }
 
 // --------------------------------------------------------------------------------
@@ -244,7 +248,7 @@ void io_init()
   udp_face.name = (char*) "udp";
   udp_face.next_delta = UDP_INTERPACKET_TIME;
   udp_face.send = udp_send;
-#if defined(MAIN_BLEDevice_H_)
+#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
   ble_face.name = (char*) "ble";
   ble_face.next_delta = UDP_INTERPACKET_TIME;
   ble_face.send = ble_send;

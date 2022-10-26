@@ -213,7 +213,9 @@ void repo_feed_append(unsigned char *fid, unsigned char *pkt)
   }
   // check signature
   memcpy(buf + strlen(DMX_PFX) + FID_LEN + 4 + HASH_LEN, pkt, TINYSSB_PKT_LEN);
+  cpu_set_fast();
   int b = crypto_sign_ed25519_verify_detached(pkt + 56, buf, strlen(DMX_PFX) + FID_LEN + 4 + HASH_LEN + 56, fid);
+  cpu_set_slow();
   if (b) {
     Serial.println("  ed25519 signature verification failed");
     return;

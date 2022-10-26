@@ -83,12 +83,14 @@ int _cmp_key32(const void *a, const void *b)
 unsigned char* _xor(struct goset_s *gp, int lo, int hi)
 {
   static unsigned char sum[GOSET_KEY_LEN];
+  cpu_set_fast();
   memset(sum, 0, GOSET_KEY_LEN);
   unsigned char *cp = gp->goset_keys + lo*GOSET_KEY_LEN;
   for (int i = lo; i <= hi; i++)
     for (int j = 0; j < GOSET_KEY_LEN; j++)
       sum[j] ^= *cp++;
-   return sum;  
+  cpu_set_slow();
+  return sum;  
 }
 
 int isZero(unsigned char *h, int len)

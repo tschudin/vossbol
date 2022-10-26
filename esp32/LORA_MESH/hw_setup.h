@@ -16,15 +16,22 @@
 
 #else // ARDUINO_TBeam
 
-# include <SSD1306.h> // display
-# include <Wire.h> 
-# include <LoRa.h>
+# include <axp20x.h>
+# include <Wire.h>
 
+# if !defined(NO_LORA)
+#  include <LoRa.h>
+# endif
+
+#if !defined(NO_OLED)
+# include <SSD1306.h> // display
 SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
+#endif
 
 // GPS
+#if !defined(NO_GPS)
 # include <TinyGPS++.h>
-# include <axp20x.h>
+#endif
 
 # define SCK     5    // GPIO5  -- SX1278's SCK
 # define MISO    19   // GPIO19 -- SX1278's MISO
@@ -38,6 +45,7 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 
 #endif // device specific
 
+// ----------------------------------------------------------------------
 
 // user button
 #include <Button2.h>
@@ -51,29 +59,44 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 #include <sodium/crypto_sign_ed25519.h>
 
 // WiFi and BT
-#include <WiFi.h>
-#include <WiFiAP.h>
-#include "BluetoothSerial.h"
+#if !defined(NO_WIFI)
+#  include <WiFi.h>
+#  include <WiFiAP.h>
+#endif
+#include <lwip/def.h> // htonl
+#if !defined(NO_BT)
+#  include <BluetoothSerial.h>
+#endif
 
 // BLE
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
-#include "esp_gatt_common_api.h"
+#if !defined(NO_BLE)
+# include <BLEDevice.h>
+# include <BLEServer.h>
+# include <BLEUtils.h>
+# include <BLE2902.h>
+# include "esp_gatt_common_api.h"
+#endif
 
 
 // create instances
 
 #define MyFS LITTLEFS
-WiFiUDP udp;
+#if !defined(NO_WIFI)
+  WiFiUDP udp;
+#endif
 IPAddress broadcastIP;
-BluetoothSerial BT;
+#if !defined(NO_BT)
+  BluetoothSerial BT;
+#endif
 
 #if defined(AXP_DEBUG)
+AXP20X_Class axp;
+unsigned long int next_log_battery;
+#endif
+
+#if !defined(NO_GPS)
 TinyGPSPlus gps;
 HardwareSerial GPS(1);
-AXP20X_Class axp;
 #endif
 
 Button2 userButton;
@@ -81,12 +104,24 @@ unsigned char my_mac[6];
 
 // -------------------------------------------------------------------
 
+#if defined(SLOW_CPU)
+  void cpu_set_slow() { setCpuFrequencyMhz(SLOW_CPU_MHZ); }
+  void cpu_set_fast() { setCpuFrequencyMhz(240); }
+#else
+# define cpu_set_slow() ;
+# define cpu_set_fast() ;
+#endif
+
+// -------------------------------------------------------------------
+
 static unsigned char OLED_state = HIGH;
 
 void OLED_toggle() {
   OLED_state = OLED_state ? LOW : HIGH;
+#if !defined(NO_OLED)
   if (OLED_state == LOW) theDisplay.displayOff();
   else                   theDisplay.displayOn();
+#endif
 }
 
 void pressed(Button2& btn) {
@@ -110,10 +145,12 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   Serial.begin(115200); while (!Serial);
   delay(100);
 
+#if !defined(NO_OLED)
   theDisplay.init();
   theDisplay.flipScreenVertically();
   theDisplay.setFont(ArialMT_Plain_10);
   theDisplay.setTextAlignment(TEXT_ALIGN_LEFT);
+#endif
 
   /*
   pinMode(16,OUTPUT);
@@ -123,6 +160,7 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   OLED_toggle();
   */
 
+#if !defined(NO_LORA)
   SPI.begin(SCK,MISO,MOSI,SS);
   LoRa.setPins(SS,RST,DI0);  
   if (!LoRa.begin(LORA_BAND)) {
@@ -130,36 +168,54 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
     while (1);
   }
   LoRa.setTxPower(LORA_TXPOWER);
+#endif
 
   Wire.begin(21, 22);
   if (!axp.begin(Wire, AXP192_SLAVE_ADDRESS)) {
     // Serial.println("AXP192 Begin PASS");
+#if defined(NO_LORA)
+    axp.setPowerOutPut(AXP192_LDO2, AXP202_OFF);
+#else
     axp.setPowerOutPut(AXP192_LDO2, AXP202_ON);
+#endif
+#if defined(NO_GPS)
+    axp.setPowerOutPut(AXP192_LDO3, AXP202_OFF);
+#else
     axp.setPowerOutPut(AXP192_LDO3, AXP202_ON);
+#endif
     axp.setPowerOutPut(AXP192_DCDC2, AXP202_ON);
     axp.setPowerOutPut(AXP192_EXTEN, AXP202_ON);
-    axp.setPowerOutPut(AXP192_DCDC1, AXP202_ON);
+#if defined(NO_OLED)
+    axp.setPowerOutPut(AXP192_DCDC1, AXP202_OFF); // OLED
+#else
+    axp.setPowerOutPut(AXP192_DCDC1, AXP202_ON); // OLED
+#endif
+#if !defined(NO_GPS)
     GPS.begin(9600, SERIAL_8N1, 34, 12);   //17-TX 18-RX
+#endif
   } else {
     Serial.println("AXP192 Begin FAIL");
   }
+#endif // T-Beam
 
-#endif
-
+#if !defined(NO_LORA)
   LoRa.setSignalBandwidth(LORA_BW);
   LoRa.setSpreadingFactor(LORA_SF);
   LoRa.setCodingRate4(LORA_CR);
   LoRa.setPreambleLength(8);
   LoRa.setSyncWord(LORA_SYNC_WORD);
   LoRa.receive();
+#endif
 
   // pinMode(BUTTON_PIN, INPUT);
   userButton.begin(BUTTON_PIN);
   userButton.setPressedHandler(pressed);
 
   Serial.println("\n** Starting Scuttlebutt vPub (LoRa, WiFi, BLE) with GOset **\n");
+#if !defined(NO_OLED)
   theDisplay.clear();
   theDisplay.display();
+#endif
 
 
   // -------------------------------------------------------------------
@@ -170,13 +226,19 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
 
   // -------------------------------------------------------------------
 
-  esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
+  // esp_read_mac(my_mac, ESP_MAC_WIFI_STA);
+  esp_efuse_mac_get_default(my_mac);
+#if defined(NO_WIFI)  // in case of no Wifi: display BT mac addr, instead
+  my_mac[5] += 2;
+  // https://docs.espressif.com/projects/esp-idf/en/release-v3.0/api-reference/system/base_mac_address.html
+#endif
   Serial.println(String("mac   ") + to_hex(my_mac, 6, 1));
+  sprintf(ssid, "%s-%s", tSSB_WIFI_SSID, to_hex(my_mac+4, 2));
 
+#if !defined(NO_WIFI)
   WiFi.disconnect(true);
   delay(500);
   WiFi.mode(WIFI_AP);
-  sprintf(ssid, "%s-%s", tSSB_WIFI_SSID, to_hex(my_mac+4, 2));
   Serial.println(String("wifi  ") + ssid + " / " + tSSB_WIFI_PW);
 
   WiFi.softAP(ssid, tSSB_WIFI_PW, 7, 0, 4); // limit to four clients
@@ -186,14 +248,17 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   } else {
     Serial.println("udp   " + broadcastIP.toString() + " / " + String(tSSB_UDP_PORT));
   }
+#endif
 
-#if defined(MAIN_BLEDevice_H_)
+#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
   ble_init();
 #endif
 
+#if !defined(NO_BT)
   BT.begin(ssid);
   BT.setPin("0000");
   BT.write(KISS_FEND);
+#endif
 
   Serial.println();
 }

@@ -4,6 +4,21 @@
 // 2022-08-09 <christian.tschudin@unibas.ch>
 
 
+// #define NO_BLE   // disable Bluetooth Low Energy
+// #define NO_BT    // disable Bluetooth
+// #define NO_GPS   // disable GPS
+// #define NO_LORA  // disable LoRa
+// #define NO_OLED  // disable OLED
+#define NO_WIFI  // disable WiFi
+
+#define SLOW_CPU
+#define SLOW_CPU_MHZ 80  // 40MHz is too low for handling the BLE protocol
+
+#define LOG_FLUSH_INTERVAL         10000 // millis
+#define LOG_BATTERY_INTERVAL  15*60*1000 // millis (15 minutes)
+
+// ----------------------------------------------------------------------
+
 // #define LORA_BAND    902E6 // USA
 #define LORA_BAND  865.5E6 // Europe
 #define LORA_BW     125000
@@ -118,7 +133,7 @@ int lora_cnt = 0;
 int lora_bad_crc = 0;
 
 File lora_log;
-unsigned long int next_flush;
+unsigned long int next_log_flush;
 
 #include "cmd.h"
 
@@ -127,6 +142,7 @@ void setup()
 {
   hw_setup();
 
+#if !defined(NO_OLED)
   theDisplay.setFont(ArialMT_Plain_16);
   theDisplay.drawString(0 , 0, "SSB.virt.lora.pub");
   theDisplay.setFont(ArialMT_Plain_10);
@@ -138,6 +154,7 @@ void setup()
   theDisplay.drawString(0, 38, fr);
 
   theDisplay.display();
+#endif
   
   io_init();
 
@@ -165,10 +182,16 @@ void setup()
 #if defined(LORA_LOG)
   lora_log = MyFS.open(LORA_LOG_FILENAME, FILE_APPEND);
   lora_log.printf("reboot\n");
-  lora_log.printf("millis,utc,mac,lat,lon,ele,plen,prssi,psnr,pfe,rssi\n");
-  next_flush = millis() + 10000;
-  Serial.printf("\nlength of %s: %d bytes\n", LORA_LOG_FILENAME, lora_log.size());
+#if defined(AXP_DEBUG)
+  unsigned long int m = millis();
+  lora_log.printf("t=%d.%03d battery=%.04gV\n", m/1000, m%1000,
+                                                axp.getBattVoltage()/1000);
+  next_log_battery = m + LOG_BATTERY_INTERVAL;
 #endif
+  lora_log.printf("millis,batt,utc,mac,lat,lon,ele,plen,prssi,psnr,pfe,rssi\n");
+  next_log_flush = millis() + LOG_FLUSH_INTERVAL;
+  Serial.printf("\nlength of %s: %d bytes\n", LORA_LOG_FILENAME, lora_log.size());
+#endif // LORA_LOG
 
   Serial.printf("\nHeap: %d total, %d free, %d min, %d maxAlloc\n",
                  ESP.getHeapSize(), ESP.getFreeHeap(),
@@ -178,6 +201,19 @@ void setup()
 
   delay(1500); // keep the screen for some time so the display headline can be read ..
   OLED_toggle(); // default is OLED off, use button to switch on
+
+  cpu_set_slow();
+
+/*
+  Serial.println("LIGHT SLEEP ENABLED FOR 5secs");
+  delay(100);
+ 
+  esp_sleep_enable_timer_wakeup(5 * 1000 * 1000);
+  esp_light_sleep_start();
+ 
+  Serial.println();
+  Serial.println("LIGHT SLEEP WAKE UP");
+*/
 }
 
 // ----------------------------------------------------------------------
@@ -201,10 +237,12 @@ int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
 
 void right_aligned(int cnt, char c, int y)
 {
+#if !defined(NO_OLED)
   char buf[20];
   sprintf(buf, "%d %c", cnt, c);
   int w = theDisplay.getStringWidth(buf);
   theDisplay.drawString(128-w, y, buf);
+#endif
 }
 
 const char *wheel[] = {"\\", "|", "/", "-"};
@@ -215,10 +253,12 @@ void loop()
   unsigned char pkt_buf[200], *cp;
   int packetSize, pkt_len;
 
+#if !defined(NO_WIFI)
   if (WiFi.softAPgetStationNum() != wifi_clients) {
     wifi_clients = WiFi.softAPgetStationNum();
     refresh = 1;
   }
+#endif
   
 #if defined(MAIN_BLEDevice_H_)
   if (bleDeviceConnected != ble_clients) {
@@ -235,6 +275,7 @@ void loop()
   if (Serial.available())
     cmd_rx(Serial.readString());
 
+#if !defined(NO_LORA)
   packetSize = LoRa.parsePacket();
   if (packetSize > 0) {
     pkt_len = 0;
@@ -254,6 +295,7 @@ void loop()
                       m/1000, m%1000,
                       to_hex(my_mac,6,1));
 #else
+# if !defined(NO_GPS)
       lora_log.printf("%d.%03d,%04d-%02d-%02dT%02d:%02d:%02dZ,%s",
                       m/1000, m%1000,
                       gps.date.year(), gps.date.month(), gps.date.day(),
@@ -265,6 +307,7 @@ void loop()
                         gps.location.lng(), gps.altitude.meters());
       else
         lora_log.printf(",0,0,0");
+#endif
       pfe   = LoRa.packetFrequencyError();
       rssi   = LoRa.rssi();
 #endif
@@ -273,9 +316,9 @@ void loop()
       float psnr = LoRa.packetSnr();
 
       lora_log.printf(",%d,%d,%g,%ld,%d\n", pkt_len, prssi, psnr, pfe, rssi);
-      if (millis() > next_flush) {
+      if (millis() > next_log_flush) {
         lora_log.flush();
-        next_flush = millis() + 10000;
+        next_log_flush = millis() + LOG_FLUSH_INTERVAL;
       }
     }
 #endif
@@ -284,7 +327,9 @@ void loop()
     // sprintf(lora_line, "LoRa %d/%d: %dB, rssi=%d", lora_cnt, lora_bad_crc, pkt_len, LoRa.packetRssi());
     refresh = 1;
   }
+#endif // NO_LORA
 
+#if !defined(NO_WIFI)
   packetSize = udp.parsePacket();
   if (packetSize) {
     // Serial.print("UDP " + String(packetSize) + "B from "); 
@@ -293,20 +338,36 @@ void loop()
     pkt_len = udp.read(pkt_buf, sizeof(pkt_buf));
     incoming(&udp_face, pkt_buf, pkt_len, 1);
   }
+#endif
 
+#if !defined(NO_BT)
   packetSize = kiss_read(BT, &bt_kiss);
   if (packetSize > 0) {
     incoming(&bt_face, bt_kiss.buf, packetSize, 1);
   }
+#endif
 
-#if defined(MAIN_BLEDevice_H_)
+#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
   cp = ble_fetch_received();
   if (cp != NULL) {
     incoming(&ble_face, cp+1, *cp, 0);
   }
 #endif
 
-#if defined(AXP_DEBUG)
+#if defined(LORA_LOG)
+
+  if (millis() > next_log_battery) {
+    unsigned long int now = millis();
+    lora_log.printf("t=%d.%03d ", now/1000, now%1000);
+# if defined(AXP_DEBUG)
+    lora_log.printf("battery=%.04gV ", axp.getBattVoltage()/1000);
+# endif
+    lora_log.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d\n",
+                dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt, ESP.getFreeHeap());
+    next_log_battery = millis() + LOG_BATTERY_INTERVAL;
+  }
+
+# if !defined(NO_GPS)
   while (GPS.available())
     gps.encode(GPS.read());
   if (gps.time.second() != old_gps_sec) {
@@ -322,6 +383,7 @@ void loop()
     */
     refresh = 1;
   }
+# endif
   if (old_goset_c != theGOset->pending_c_cnt || 
       old_goset_n != theGOset->pending_n_cnt ||
       old_goset_len != theGOset->goset_len) {
@@ -331,7 +393,7 @@ void loop()
     sprintf(goset_line, "GOS: len=%d, pn=%d, pc=%d", old_goset_len, old_goset_n, old_goset_c);
     refresh = 1;
   }
-#endif
+#endif // LORA_LOG
 
   int sum = feed_cnt + entry_cnt + chunk_cnt;
   if (sum != old_repo_sum) {
@@ -339,6 +401,7 @@ void loop()
     refresh = 1;
   }
 
+#if !defined(NO_OLED)
   if (refresh) {
     theDisplay.clear();
 
@@ -354,8 +417,14 @@ void loop()
     sprintf(stat_line, "W:%d E:%d L:%s",
             wifi_clients, ble_clients, wheel[lora_cnt % 4]);
     theDisplay.drawString(0, 30, stat_line);
+
 #if defined(MAIN_BLEDevice_H_)
+#if defined(WIFI_LoRa_32_V2) || defined(WIFI_LORA_32_V2)
     sprintf(stat_line + strlen(stat_line)-1, "%d", lora_cnt);
+#else
+    sprintf(stat_line + strlen(stat_line)-1, "%d, batt:%.04g",
+            lora_cnt, axp.getBattVoltage()/1000);
+#endif
     ble_send_stats((unsigned char*) stat_line, strlen(stat_line));
 #endif
 
@@ -374,8 +443,10 @@ void loop()
     theDisplay.display();
     refresh = 0;
   }
+#endif // NO_OLED
 
   delay(10);
+
   // ftpSrv.handleFTP();
 }
 

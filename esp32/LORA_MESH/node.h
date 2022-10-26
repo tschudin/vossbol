@@ -94,17 +94,21 @@ void node_tick()
   static unsigned char turn; // alternate between requesting log entries an chunks
   static unsigned int log_offs;
   static unsigned int chunk_offs;
+
   unsigned long now = millis();
   if (now < node_next_vector && (node_next_vector-now) < 2*NODE_ROUND_LEN) // FIXME: test whether wraparound works
     return;
-
   node_next_vector = now + NODE_ROUND_LEN + esp_random() % 1000;
-  if (theGOset->goset_len == 0)
-    return;
 
-  Serial.printf("|dmxt|=%d, |blbt|=%d, |feeds|=%d, |entries|=%d, |chunks|=%d, |freeHeap|=%d\n",
+  Serial.printf("t=%d.%03d ", now/1000, now%1000);
+#if defined(AXP_DEBUG)
+  Serial.printf("battery=%.04gV ", axp.getBattVoltage()/1000);
+#endif
+  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d\n",
                 dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt, ESP.getFreeHeap());
 
+  if (theGOset->goset_len == 0)
+    return;
   String v = "";
   struct bipf_s *lptr = bipf_mkList();
   turn = 1 - turn;
