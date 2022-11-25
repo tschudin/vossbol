@@ -18,6 +18,7 @@ import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_KANBAN
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
 import org.json.JSONArray
@@ -167,6 +168,32 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 act.startActivity(intent)
                 return
             }
+            "kanban" -> { // kanban bid atob(prev) atob(operation) atob(arg1) atob(arg2) atob(...)
+                /*var bid: String = args[1]
+                var prevs: List<String>? = null
+                if(args[2] != "null") // prevs == "null" for the first board event (create bord event)
+                    prevs = Base64.decode(args[2], Base64.NO_WRAP).decodeToString().split(" ")
+                var operation: String = Base64.decode(args[3], Base64.NO_WRAP).decodeToString()
+                var argList: List<String>? = null
+                if(args[4] != "null")
+                    argList = Base64.decode(args[4], Base64.NO_WRAP).decodeToString().split(" ")
+
+                 */
+                //var data = JSONObject(Base64.decode(args[1], Base64.NO_WRAP).decodeToString())
+                val bid: String? = if (args[1] != "null") args[1] else null
+                val prev: List<String>? = if (args[2] != "null") Base64.decode(args[2], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
+                val op: String = args[3]
+                val argsList: List<String>? = if(args[4] != "null") Base64.decode(args[4], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
+
+                if (bid != null) {
+                    Log.d("KanbanPostBID", bid)
+                    Log.d("KanbanPostPREV", prev.toString())
+                }
+                Log.d("KanbanPostOP", op)
+                Log.d("KanbanPostARGS", args.toString())
+
+                kanban(bid, prev , op, argsList)
+            }
             else -> {
                 Log.d("onFrontendRequest", "unknown")
             }
@@ -225,6 +252,47 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         val body = Bipf.encode(lst)
         if (body != null)
             act.tinyNode.publish_public_content(body)
+    }
+
+    fun kanban(bid: String?, prev: List<String>?, operation: String, args: List<String>?) {
+        val lst = Bipf.mkList()
+        Bipf.list_append(lst, TINYSSB_APP_KANBAN)
+        if (bid != null)
+            Bipf.list_append(lst, Bipf.mkString(bid))
+        else
+            Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
+
+        if(prev != null) {
+            val prevList = Bipf.mkList()
+            for(p in prev) {
+                Bipf.list_append(prevList, Bipf.mkString(p))
+            }
+            Bipf.list_append(lst, prevList)
+        } else {
+            Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
+        }
+
+        Bipf.list_append(lst, Bipf.mkString(operation))
+
+        if(args != null) {
+            for(arg in args) {
+                Bipf.list_append(lst, Bipf.mkString(arg))
+            }
+        }
+
+        val body = Bipf.encode(lst)
+
+        //val liste = Bipf.mkList()
+        //Bipf.list_append(liste,Bipf.mkString("Hallo Hallo Hallo Hallo Hallo Hallo Hallo"))
+        //val body = Bipf.encode(liste)
+        if (body != null)
+            act.tinyNode.publish_public_content(body)
+
+        //val body = Bipf.encode(lst)
+        //Log.d("KANBAN BIPF ENCODE", Bipf.bipf_list2JSON(Bipf.decode(body!!)!!).toString())
+        //if (body != null)
+            //act.tinyNode.publish_public_content(body)
+
     }
 
     fun return_voice(voice: ByteArray) {

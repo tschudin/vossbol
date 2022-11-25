@@ -64,11 +64,76 @@ class Timeline {
             lst.push(t.name);
         return lst;
     }
+
+    toJSON() {
+        var json = {}
+        json.cmds = this.cmds
+        json.linear = this.linear
+        json.notify = this.notify
+        json.pending = {}
+        for(let p in this.pending)
+            json.pending[p] = Object.values(Array.from(this.pending[p])).map(x => x.name)
+        json.tips = Object.values(Array.from(this.tips)).map(x => x.name)
+        return json
+    }
+
+    static fromJSON(json) {
+        var t = new Timeline()
+        var nodes = []
+        // name, cycl, indx, rank, vstd, prev, succ
+        for(let n of json.linear) {
+            var prev = []
+            for(let p of n.prev) {
+                let prevNode = nodes.find((key, indx) => {return key.name == p})
+                if(prevNode) {
+                    prev.push(prevNode)
+                } else {
+                    prev.push(p)
+                }
+            }
+            var sortNode = ScuttleSortNode.createSortNode(n.name, n.cycl, n.indx, n.rank, n.vstd, prev, [])
+            nodes.push(sortNode)
+            for(let p of prev) {
+                if(typeof p != "string")
+                    p.succ.push(sortNode)
+            }
+
+        }
+        t.linear = nodes
+
+        t.name2p = {}
+        for(let n of nodes) {
+            t.name2p[n.name] = n
+        }
+
+        t.pending = {}
+        for(let p in json.pending) {
+            t.pending[p] = []
+            for(let n of json.pending[p]) {
+                let node = nodes.find((key, indx) => {return key.name == n})
+                if(node)
+                  t.pending[p].push(node)
+            }
+        }
+
+        t.notify = json.notify
+        t.cmds = json.cmds
+
+        t.tips = new Set()
+        for(let tip of json.tips) {
+            let node = nodes.find((key, indx) => {return key.name == tip})
+            if(node)
+                t.tips.add(node)
+        }
+        return t
+    }
 }
 
 class ScuttleSortNode {
 
     constructor(name, timeline, after) {
+        if(!name)  // should only be true if called from createSortNode()
+            return
         if (name in timeline.name2p) // can add a name only once, must be unique
             throw new Error("KeyError");
         this.name = name;
@@ -87,7 +152,7 @@ class ScuttleSortNode {
             if (p) {
                 p.succ.push(this);
                 this.prev[i] = p; // replace str/bytes by respective node
-                if (p in timeline.tips)
+                if (timeline.tips.has(p))
                     timeline.tips.delete(p);
             } else {
                 if (!timeline.pending[c])
@@ -130,7 +195,7 @@ class ScuttleSortNode {
                         continue;
                     e.add_edge_to_the_past(timeline, this);
                     this.succ.push(e);
-                    if (this in timeline.tips)
+                    if (timeline.tips.has(this))
                         timeline.tips.delete(this);
                     e.prev[i] = this;
                 }
@@ -209,6 +274,46 @@ class ScuttleSortNode {
             pos += 1;
         if (si < pos)
             this._jump(timeline, pos);
+    }
+
+    static createSortNode(name, cycl, indx, rank, vstd, prev, succ) {
+        var node = new ScuttleSortNode()
+        node.name = name
+        node.cycl = cycl
+        node.indx = indx
+        node.rank = rank
+        node.vstd = vstd
+        node.prev = prev
+        node.succ = succ
+        return node
+    }
+
+    toJSON() {
+        var json = {}
+        json.cycl = this.cycl
+        json.indx = this.indx
+        json.name = this.name
+        json.rank = this.rank
+        json.vstd = this.vstd
+
+        json.prev = []
+        for (let p of this.prev) {
+            if(typeof p != "string") {
+                json.prev.push(p.name)
+            } else {
+                json.prev.push(p)
+            }
+        }
+
+        json.succ = []
+        for (let s of this.succ) {
+            if(typeof s != "string") {
+                json.succ.push(s.name)
+            } else {
+                json.succ.push(s)
+            }
+        }
+        return json
     }
 }
 

@@ -60,15 +60,18 @@ var scenarioMenu = {
   'settings' : [],
 
   'kanban'   : [['New Kanban board', 'menu_new_board'],
+                ['Invitations', 'menu_board_invitations'],
                 ['Settings', 'menu_settings'],
                 ['About', 'menu_about']],
 
   'board'    : [['Add list', 'menu_new_column'],
                 ['Rename Kanban Board', 'menu_rename_board'],
+                ['Invite Users', 'menu_board_invite'],
                 ['History', 'menu_history'],
                 ['Reload', 'reload_curr_board'],
+                ['Leave', 'leave_curr_board'],
                 ['(un)Forget', 'board_toggle_forget'],
-                ['Debug', 'ui_debug']],
+                ['Debug', 'ui_debug']]
 }
 
 function onBackPressed() {
@@ -204,17 +207,19 @@ function closeOverlay(){
   document.getElementById('attach-menu').style.display = 'none';
   document.getElementById('div:modal_img').style.display = 'none';
 
-  /*
+  // kanban overlays
   document.getElementById('div:menu_history').style.display = 'none';
   document.getElementById('div:item_menu').style.display = 'none';
+  document.getElementById("kanban-invitations-overlay").style.display = 'none';
   curr_item = null
   close_board_context_menu()
   document.getElementById('btn:item_menu_description_save').style.display = 'none'
   document.getElementById('btn:item_menu_description_cancel').style.display = 'none'
   document.getElementById('div:debug').style.display = 'none'
-  */
+  document.getElementById("div:invite_menu").style.display = 'none'
 
   overlayIsActive = false;
+
   if (curr_img_candidate != null) {
     backend('del:blob ' + curr_img_candidate);
     curr_img_candidate = null;

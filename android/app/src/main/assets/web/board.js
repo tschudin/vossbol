@@ -24,17 +24,21 @@ const Operation = {
   ITEM_POST_COMMENT: 'item/post',
   ITEM_ASSIGN: 'item/assign',
   ITEM_UNASSIGN: 'item/unassign',
-  ITEM_COLOR: 'item/color'
+  ITEM_COLOR: 'item/color',
+  INVITE: 'invite',
+  INVITE_ACCEPT: 'invite/accept',
+  INVITE_DECLINE: 'invite/decline',
+  LEAVE: 'leave'
 }
 
 
-function createBoard(name, recps) {
+function createBoard(name) {
   var data = {
                'bid': null,
                'cmd': [Operation.BOARD_CREATE, name],
                'prev': null
              }
-  board_send_to_backend(data, recps)
+  board_send_to_backend(data)
 }
 
 function renameBoard(bid, name) {
@@ -44,17 +48,18 @@ function renameBoard(bid, name) {
                  'cmd': [Operation.BOARD_RENAME, name],
                  'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function createColumn(bid, name) {
+  console.log("create column")
   var board = tremola.board[bid]
   var data = {
                 'bid': bid,
                 'cmd': [Operation.COLUMN_CREATE, name],
                 'prev': board.curr_prev
              }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function createColumnItem(bid, cid, name) {
@@ -64,7 +69,7 @@ function createColumnItem(bid, cid, name) {
                 'cmd': [Operation.ITEM_CREATE, cid, name],
                 'prev': board.curr_prev
              }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function removeColumn(bid, cid) {
@@ -74,7 +79,7 @@ function removeColumn(bid, cid) {
                   'cmd': [Operation.COLUMN_REMOVE, cid],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function renameColumn(bid, cid, newName) {
@@ -84,7 +89,7 @@ function renameColumn(bid, cid, newName) {
                   'cmd': [Operation.COLUMN_RENAME, cid, newName],
                   'prev': board.curr_prev
              }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function removeItem(bid, iid) {
@@ -94,7 +99,7 @@ function removeItem(bid, iid) {
                   'cmd': [Operation.ITEM_REMOVE, iid],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function renameItem(bid, iid, new_name) {
@@ -104,7 +109,7 @@ function renameItem(bid, iid, new_name) {
                   'cmd': [Operation.ITEM_RENAME, iid, new_name],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function moveItem(bid, iid, new_cid) {
@@ -114,7 +119,7 @@ function moveItem(bid, iid, new_cid) {
                   'cmd': [Operation.ITEM_MOVE, iid, new_cid],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function setItemDescription(bid, iid, description) {
@@ -124,7 +129,7 @@ function setItemDescription(bid, iid, description) {
                   'cmd': [Operation.ITEM_SET_DESCRIPTION, iid, description],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function postItemComment(bid, iid, comment) {
@@ -134,7 +139,7 @@ function postItemComment(bid, iid, comment) {
                   'cmd': [Operation.ITEM_POST_COMMENT, iid, comment],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function assignToItem(bid, iid, assigned) {
@@ -144,7 +149,7 @@ function assignToItem(bid, iid, assigned) {
                   'cmd': [Operation.ITEM_ASSIGN, iid, assigned],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function unassignFromItem(bid, iid, unassign) {
@@ -154,7 +159,7 @@ function unassignFromItem(bid, iid, unassign) {
                   'cmd': [Operation.ITEM_UNASSIGN, iid, unassign],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
 function setItemColor(bid, iid, color) {
@@ -164,19 +169,74 @@ function setItemColor(bid, iid, color) {
                   'cmd': [Operation.ITEM_COLOR, iid, color],
                   'prev': board.curr_prev
                }
-  board_send_to_backend(data, board.members)
+  board_send_to_backend(data)
 }
 
-function board_send_to_backend(data, recps) {
-  recps = recps.join(' ')
-  data = unicodeStringToTypedArray(JSON.stringify(data))
-  backend("priv:board " + btoa(data) + " " + recps);
+function inviteUser(bid, userID) {
+  var board = tremola.board[bid]
+  var data = {
+                  'bid': bid,
+                  'cmd': [Operation.INVITE, userID],
+                  'prev': board.curr_prev
+              }
+  board_send_to_backend(data)
+}
+
+function inviteAccept(bid, inviteID, prev) {
+  var board = tremola.board[bid]
+  var data = {
+                  'bid': bid,
+                  'cmd': [Operation.INVITE_ACCEPT, inviteID],
+                  'prev': [inviteID]
+              }
+  board_send_to_backend(data)
+}
+
+function inviteDecline(bid, inviteID, prev) {
+  var board = tremola.board[bid]
+  var data = {
+                  'bid': bid,
+                  'cmd': [Operation.INVITE_DECLINE, inviteID],
+                  'prev': [inviteID]
+              }
+  board_send_to_backend(data)
+}
+
+function leave(bid) {
+  var board = tremola.board[bid]
+    var data = {
+                    'bid': bid,
+                    'cmd': [Operation.LEAVE],
+                    'prev': board.curr_prev
+                }
+    board_send_to_backend(data)
+}
+
+function board_send_to_backend(data) {
+  var bid = data['bid'] != null ? data['bid'] : "null"
+  var prevs = data['prev'] != null ? btoa(data['prev'].map(btoa)) : "null"
+  var op = data['cmd'][0] //btoa(data['cmd'][0])
+  var args = data['cmd'].length > 1 ? btoa(data['cmd'].slice(1).map(unicodeStringToTypedArray).map(btoa)) : "null"
+  var to_backend = ['kanban', bid, prevs, op, args]
+  backend(to_backend.join(" "))
 }
 
 function updateCurrPrev(bid, e) {
   var board = tremola.board[bid]
   var event_prev = e.body.prev
 
+  board.curr_prev.push(e.key.toString())
+
+  if(event_prev) {
+    for(var i in event_prev) {
+      var indx = board.curr_prev.indexOf(event_prev[i])
+      if( indx >= 0) {
+        board.curr_prev.splice(indx, 1)
+      }
+    }
+  }
+
+  /*
   board.curr_prev[e.fid] = e.key.toString()
 
   if(event_prev) {
@@ -186,6 +246,7 @@ function updateCurrPrev(bid, e) {
       }
     }
   }
+  */
 }
 
 /*
@@ -193,7 +254,7 @@ function updateCurrPrev(bid, e) {
     https://github.com/tschudin/scuttlesort
 */
 
-function newOperation(bid, operationID) {
+/*function newOperation(bid, operationID) {
   var board = tremola.board[bid]
   var op = board.operations[operationID]
   var prev = op.body.prev
@@ -343,7 +404,7 @@ function moveOperation(bid, from, to) {
   let h = board.sortedOperations[from]
   board.sortedOperations.splice(from, 1);
   board.sortedOperations.splice(to, 0, h);
-}
+}*/
 
 
 
@@ -353,12 +414,16 @@ function reload_curr_board() {
 }
 
 function board_reload(bid) {
+  console.log("Board reload " + bid)
   var board = tremola.board[bid]
   board.columns = {}
   board.numOfActiveColumns = 0
   board.items = {}
   board.pendingOperations = {}
-  board.sortedOperations = []
+  board.pendingInvitations = {}
+  board.members = []
+  //board.sortedOperations = []
+  board.sortedOperations = new Timeline()
 
   for(var op in board.operations) {
     delete board.operations[op].indx
@@ -370,7 +435,9 @@ function board_reload(bid) {
   }
 
   for(var op in board.operations) {
-    newOperation(bid, op)
+    //newOperation(bid, op)
+    console.log("ADD op: " + op +", prev:" + board.operations[op].body.prev)
+    board.sortedOperations.add(op, board.operations[op].body.prev)
   }
   apply_all_operations(bid)
 
@@ -445,14 +512,34 @@ function apply_all_operations(bid) {
 
   var old_state = JSON.parse(JSON.stringify(board));
 
+  console.log("APPLY ALL")
+
   //execute operations and save results to local storage
-  for(var i in board.sortedOperations) {
-    apply_operation(bid, board.sortedOperations[i], false)
+  var validOps = helper_linear_timeline_without_pending_prevs(board.sortedOperations)
+  for(var i in validOps) {
+    apply_operation(bid, validOps[i], false)
   }
 
   if(curr_board == bid) { // update ui
     ui_update_Board(bid, old_state)
   }
+}
+
+// returns linear timeline that does not contain nodes which have only pending predecessors
+function helper_linear_timeline_without_pending_prevs(timeline) {
+  var lst = []
+  for (let n of timeline.linear) {
+    var validPrevs = 0
+    for (let p of n.prev) {
+      if((typeof p != "string") && !(p.name in timeline.pending))
+        validPrevs++
+    }
+    if(validPrevs > 0 || n.prev.length == 0) {
+      lst.push(n.name);
+    }
+  }
+
+  return lst;
 }
 
 /**
@@ -479,6 +566,7 @@ function apply_operation_from_pos(bid, pos) {
 }
 */
 function apply_operation(bid, operationID, apply_on_ui) {
+  console.log("Apply:" + operationID)
   var board = tremola.board[bid]
   var curr_op = board['operations'][operationID]
 
@@ -489,6 +577,13 @@ function apply_operation(bid, operationID, apply_on_ui) {
     case Operation.BOARD_CREATE:
       historyMessage += "created the board \"" + curr_op.body.cmd[1] + "\""
       board.name = curr_op.body.cmd[1]
+      if(board.members.indexOf(curr_op.fid) < 0)
+        board.members.push(curr_op.fid)
+      if(curr_op.fid == myId)
+        board.subscribed = true
+      /*if(board.members.indexOf(curr_op.fid) < 0)
+        board.members.push(curr_op.fid)
+      */
       break
     case Operation.BOARD_RENAME:
       historyMessage += "renamed the board \"" + board.name + "\" to \"" + curr_op.body.cmd[1] + "\""
@@ -507,18 +602,21 @@ function apply_operation(bid, operationID, apply_on_ui) {
       } else
         newPos = ++board.numOfActiveColumns
 
-      board.columns[curr_op.key] = {'name': curr_op.body.cmd[1],
-                                    'id': curr_op.key.toString(),
-                                    'item_ids': [],
-                                    'position': newPos,
-                                    'numOfActiveItems': 0,
-                                    'removed': false
-                                   }
+      board.columns[curr_op.key] = {
+        'name': curr_op.body.cmd[1],
+        'id': curr_op.key.toString(),
+        'item_ids': [],
+        'position': newPos,
+        'numOfActiveItems': 0,
+        'removed': false
+      }
 
       if(apply_on_ui)
         load_column(curr_op.key)
       break
     case Operation.COLUMN_REMOVE:
+      if(!(curr_op.body.cmd[1] in board.columns))
+        return
       historyMessage += "removed list \""+ board.columns[curr_op.body.cmd[1]].name + "\""
       board.columns[curr_op.body.cmd[1]].removed = true
 
@@ -537,19 +635,19 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_remove_column(curr_op.body.cmd[1])
       break
     case Operation.COLUMN_RENAME:
-      historyMessage += "renamed list \"" + board.columns[curr_op.body.cmd[1]].name + "\" to \"" + curr_op.body.cmd[2] + "\""
       if (!(curr_op.body.cmd[1] in board.columns))
         break
+      historyMessage += "renamed list \"" + board.columns[curr_op.body.cmd[1]].name + "\" to \"" + curr_op.body.cmd[2] + "\""
       board.columns[curr_op.body.cmd[1]].name = curr_op.body.cmd[2]
 
       if(apply_on_ui)
         ui_rename_column(curr_op.body.cmd[1], curr_op.body.cmd[2])
       break
     case Operation.ITEM_CREATE:
-      historyMessage += "created a card in list \""+ board.columns[curr_op.body.cmd[1]].name + "\" with the name: \"" + curr_op.body.cmd[2] + "\""
-      var newPos = 0
       if (!(curr_op.body.cmd[1] in board.columns))
         break
+      historyMessage += "created a card in list \""+ board.columns[curr_op.body.cmd[1]].name + "\" with the name: \"" + curr_op.body.cmd[2] + "\""
+      var newPos = 0
       if(curr_op.key in board.items) {
         if(board.items[curr_op.key].removed) {
           break
@@ -575,6 +673,8 @@ function apply_operation(bid, operationID, apply_on_ui) {
         load_item(curr_op.key)
       break
     case Operation.ITEM_REMOVE:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
       var item = board.items[curr_op.body.cmd[1]]
       var column = board.columns[item.curr_column]
       historyMessage += "removed card \"" + item.name + "\" from list \"" + column.name + "\""
@@ -595,6 +695,8 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_remove_item(curr_op.body.cmd[1])
       break
     case Operation.ITEM_RENAME:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
       var item = board.items[curr_op.body.cmd[1]]
       historyMessage += "renamed card \"" + item.name + "\" of list \""+ board.columns[item.curr_column].name +"\" to \"" + curr_op.body.cmd[2] + "\""
       item.name = curr_op.body.cmd[2]
@@ -603,6 +705,11 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_update_item_name(curr_op.body.cmd[1], curr_op.body.cmd[2])
       break
     case Operation.ITEM_MOVE:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
+      if (!(curr_op.body.cmd[2] in board.columns))
+        break
+
       var item = board.items[curr_op.body.cmd[1]]
       historyMessage += "moved card \"" + item.name + "\" of list \"" + board.columns[item.curr_column].name + "\" to list \"" + board.columns[curr_op.body.cmd[2]].name + "\""
 
@@ -625,6 +732,8 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_update_item_move_to_column(curr_op.body.cmd[1], curr_op.body.cmd[2], item.position)
       break
     case Operation.ITEM_SET_DESCRIPTION:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
       var item = board.items[curr_op.body.cmd[1]]
       historyMessage += "changed description of card \"" + item.name + "\" of list \"" + board.columns[item.curr_column].name +"\" from \"" + item.description + "\" to \"" + curr_op.body.cmd[2] + "\""
       item.description = curr_op.body.cmd[2]
@@ -633,6 +742,9 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_update_item_description(curr_op.body.cmd[1], curr_op.body.cmd[2])
       break
     case Operation.ITEM_POST_COMMENT:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
+
       var item = board.items[curr_op.body.cmd[1]]
       historyMessage += "posted \"" + curr_op.body.cmd[2] + "\" on card \"" + item.name + "\" of list \"" + board.columns[item.curr_column].name + "\""
       item.comments.push([curr_op.fid, curr_op.body.cmd[2]])
@@ -641,6 +753,11 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_item_update_chat(curr_op.body.cmd[1])
       break
     case Operation.ITEM_ASSIGN:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
+      if(!(curr_op.body.cmd[2] in tremola.contacts))
+        break
+
       var item = board.items[curr_op.body.cmd[1]]
       historyMessage += "assigned \"" + tremola.contacts[curr_op.body.cmd[2]].alias + "\" to card \"" + item.name + "\" of list \"" + board.columns[item.curr_column].name + "\""
       if(item.assignees.indexOf(curr_op.body.cmd[2]) < 0)
@@ -650,6 +767,10 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_update_item_assignees(curr_op.body.cmd[1])
       break
     case Operation.ITEM_UNASSIGN:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
+      if(!(curr_op.body.cmd[2] in tremola.contacts))
+        break
       var item = board.items[curr_op.body.cmd[1]]
       historyMessage += "unassigned \"" + tremola.contacts[curr_op.body.cmd[2]].alias + "\" from card \"" + item.name + "\" of list \"" + board.columns[item.curr_column].name + "\""
       if(item.assignees.indexOf(curr_op.body.cmd[2]) >= 0)
@@ -659,12 +780,65 @@ function apply_operation(bid, operationID, apply_on_ui) {
         ui_update_item_assignees(curr_op.body.cmd[1])
       break
     case Operation.ITEM_COLOR:
+      if (!(curr_op.body.cmd[1] in board.items))
+        break
       var item = board.items[curr_op.body.cmd[1]]
       historyMessage += "changed color of card \"" + item.name + "\" to " + curr_op.body.cmd[2]
       item.color = curr_op.body.cmd[2]
 
       if(apply_on_ui)
         ui_update_item_color(curr_op.body.cmd[1], curr_op.body.cmd[2])
+      break
+    case Operation.INVITE:
+      historyMessage += "invited " + curr_op.body.cmd[1] + "."
+
+      console.log("IDX: "+ board.members.indexOf(curr_op.body.cmd[1]))
+      console.log("INVITE USER: " + curr_op.body.cmd[1])
+      console.log("PENDING: " +  board.pendingInvitations)
+
+      if (board.members.indexOf(curr_op.body.cmd[1]) < 0) {
+        if(!(curr_op.body.cmd[1] in board.pendingInvitations))
+          board.pendingInvitations[curr_op.body.cmd[1]] = []
+        console.log("PENDING: " +  board.pendingInvitations)
+        board.pendingInvitations[curr_op.body.cmd[1]].push(curr_op.key)
+      }
+
+
+      break
+    case Operation.INVITE_ACCEPT:
+      if (curr_op.fid in board.pendingInvitations) { // check if the invite accept operation is valid
+        if(board.pendingInvitations[curr_op.fid].indexOf(curr_op.body.cmd[1]) >= 0) {
+          historyMessage += "accepted invitation"
+          delete board.pendingInvitations[curr_op.fid]
+          if(board.members.indexOf(curr_op.fid) < 0) { //should always be the case
+            board.members.push(curr_op.fid)
+            console.log("MEMBERS" + board.members)
+          }
+          if(curr_op.fid == myId)
+            board.subscribed = true
+        }
+      }
+      break
+    case Operation.INVITE_DECLINE:
+      if (curr_op.fid in board.pendingInvitations) { // check if the invite accept operation is valid
+        if(board.pendingInvitations[curr_op.fid].indexOf(curr_op.body.cmd[1]) >= 0 ) {
+          historyMessage += "declined invitation"
+          delete board.pendingInvitations[curr_op.fid]
+          var idx = board.members.indexOf(curr_op.fid)
+          if( idx >= 0) { // should never be the case
+            board.members.splice(idx, 1)
+          }
+        }
+      }
+      break
+    case Operation.LEAVE:
+      historyMessage += "leaved"
+      var idx = board.members.indexOf(curr_op.fid)
+      if( idx >= 0) {
+        board.members.splice(idx, 1)
+      }
+      delete board.pendingInvitations[curr_op.fid]
+
       break
   }
   //historyMessage += ",  " + curr_op.key // debug
@@ -694,15 +868,20 @@ function ui_debug() {
 }
 
 function debug_toDot() {
+  var board = tremola.board[curr_board]
   var exportStr = "digraph {\n"
   exportStr += "  rankdir=RL;\n"
   exportStr += "  splines=true;\n"
   exportStr += "  subgraph dag {\n"
   exportStr += "    node[shape=Mrecord];\n"
-  for (var p in tremola.board[curr_board].sortedOperations) {
-      exportStr += '    ' + '"' + tremola.board[curr_board].sortedOperations[p] + '"' +  ' [label="hash=' + tremola.board[curr_board].sortedOperations[p] + '\\nop=' + tremola.board[curr_board].operations[tremola.board[curr_board].sortedOperations[p]].body.cmd +'\\nr=' + tremola.board[curr_board].operations[tremola.board[curr_board].sortedOperations[p]].rank + '\\nindx=' + tremola.board[curr_board].operations[tremola.board[curr_board].sortedOperations[p]].indx +'"]\n'
-      for (var c in tremola.board[curr_board].operations[tremola.board[curr_board].sortedOperations[p]].body.prev) {
-          exportStr += '    "' + tremola.board[curr_board].sortedOperations[p] +'" -> "' + tremola.board[curr_board].operations[tremola.board[curr_board].sortedOperations[p]].body.prev[c] + '"\n'
+
+  if(!(board.sortedOperations instanceof Timeline)) { // deserialize ScuttleSort-Timeline
+      board.sortedOperations = Timeline.fromJSON(board.sortedOperations)
+  }
+  for (var sortNode of board.sortedOperations.linear) {
+      exportStr += '    ' + '"' + sortNode.name + '"' +  ' [label="hash=' + sortNode.name + '\\nop=' + tremola.board[curr_board].operations[sortNode.name].body.cmd +'\\nr=' + sortNode.rank + '\\nindx=' + sortNode.indx +'"]\n'
+      for (var prev of sortNode.prev) {
+          exportStr += '    "' + sortNode.name +'" -> "' + prev.name + '"\n'
     }
   }
   exportStr += "  }\n"

@@ -69,7 +69,7 @@ if(CMAKE_CROSSCOMPILING)
        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..
        BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/codec2_native
        BUILD_COMMAND ${CMAKE_COMMAND} --build . --target generate_codebook
-       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/codec2_native/src/generate_codebook.exe ${CMAKE_CURRENT_BINARY_DIR}
        BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook
     )
     add_executable(generate_codebook IMPORTED)

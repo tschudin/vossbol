@@ -66,41 +66,38 @@ function dragDrop(ev) {
 
 function load_board_list() {
   document.getElementById('lst:kanban').innerHTML = '';
-  var bidTimestamp = Object.keys(tremola.board).map(function(key) {return [key, tremola.board[key].lastUpdate]}) // [0] = bid, [1] = timestamp
-  bidTimestamp.sort(function(a, b) { return b[1] - a[1]; })
-  for (var i in bidTimestamp) {
-    var bid =  bidTimestamp[i][0]
-    var board = tremola.board[bid]
-    var date = new Date(bidTimestamp[i][1])
-    date = date.toDateString() + ' ' + date.toTimeString().substring(0,5);
-    if(board.forgotten && tremola.settings.hide_forgotten_boards)
-      continue
-    var cl, mem, item, bg, row, badge, badgeId, cnt;
-    cl = document.getElementById('lst:kanban');
-    mem = recps2display(board.members)
-    item = document.createElement('div');
-    item.setAttribute('style', "padding: 0px 5px 10px 5px; margin: 3px 3px 6px 3px;");
-    if (board.forgotten) bg = ' gray'; else bg = ' light';
-  /* cft stashed
-  var bid;
-  for (bid in tremola.board) {
-    var cl, mem, item, bg, row, badge, badgeId, cnt;
-    cl = document.getElementById('lst:kanban');
-    mem = recps2display(tremola.board[bid].members)
-    item = document.createElement('div');
-    item.setAttribute('style', "padding: 0px 5px 10px 5px; margin: 3px 3px 6px 3px;");
-    if (tremola.board[bid].forgotten) bg = ' gray'; else bg = ' light';
-  */
-    row  = "<button class='board_item_button w100" + bg + "' onclick='load_board(\"" + bid + "\");' style='overflow: hidden; position: relative;'>";
-    row += "<div style='white-space: nowrap;'><div style='text-overflow: ellipsis; overflow: hidden;'>" + board.name + "</div>";
-    row += "<div style='text-overflow: clip; overflow: ellipsis;'><font size=-2>" + escapeHTML(mem) + ", </font><font size=-3>last changed: " + date +"</font> </div></div>";
-    badgeId = bid + "-badge_board"
-    badge= "<div id='" + badgeId + "' style='display: none; position: absolute; right: 0.5em; bottom: 0.9em; text-align: center; border-radius: 1em; height: 2em; width: 2em; background: var(--red); color: white; font-size: small; line-height:2em;'>&gt;9</div>";
-    row += badge + "</button>";
-    row += ""
-    item.innerHTML = row;
-    cl.appendChild(item);
-    ui_set_board_list_badge(bid)
+  if(Object.keys(tremola.board).length === 0 )
+    return
+  var subBoardIds = Object.keys(tremola.board).filter( key => tremola.board[key].subscribed).map(key => ({ [key]: tremola.board[key] }) )
+  if(subBoardIds.length > 0) {
+    var subscribedBoards = Object.assign(...subBoardIds)
+    var bidTimestamp = Object.keys(subscribedBoards).map(function(key) {return [key, subscribedBoards[key].lastUpdate]}) // [0] = bid, [1] = timestamp
+    bidTimestamp.sort(function(a, b) { return b[1] - a[1]; })
+
+    for (var i in bidTimestamp) {
+      var bid =  bidTimestamp[i][0]
+      var board = tremola.board[bid]
+      var date = new Date(bidTimestamp[i][1])
+      date = date.toDateString() + ' ' + date.toTimeString().substring(0,5);
+      if(board.forgotten && tremola.settings.hide_forgotten_boards)
+        continue
+      var cl, mem, item, bg, row, badge, badgeId, cnt;
+      cl = document.getElementById('lst:kanban');
+      mem = recps2display(board.members)
+      item = document.createElement('div');
+      item.setAttribute('style', "padding: 0px 5px 10px 5px; margin: 3px 3px 6px 3px;");
+      if (board.forgotten) bg = ' gray'; else bg = ' light';
+      row  = "<button class='board_item_button w100" + bg + "' onclick='load_board(\"" + bid + "\");' style='overflow: hidden; position: relative;'>";
+      row += "<div style='white-space: nowrap;'><div style='text-overflow: ellipsis; overflow: hidden;'>" + board.name + "</div>";
+      row += "<div style='text-overflow: clip; overflow: ellipsis;'><font size=-2>" + escapeHTML(mem) + ", </font><font size=-3>last changed: " + date +"</font> </div></div>";
+      badgeId = bid + "-badge_board"
+      badge= "<div id='" + badgeId + "' style='display: none; position: absolute; right: 0.5em; bottom: 0.9em; text-align: center; border-radius: 1em; height: 2em; width: 2em; background: var(--red); color: white; font-size: small; line-height:2em;'>&gt;9</div>";
+      row += badge + "</button>";
+      row += ""
+      item.innerHTML = row;
+      cl.appendChild(item);
+      ui_set_board_list_badge(bid)
+    }
   }
 }
 
@@ -258,6 +255,70 @@ function menu_history() {
   document.getElementById('div:menu_history').style.display = 'initial'
 }
 
+function menu_board_invitations() {
+  closeOverlay()
+  document.getElementById("kanban-invitations-overlay").style.display = 'initial';
+  document.getElementById("overlay-bg").style.display = 'initial';
+  document.getElementById("kanban_invitations_list").innerHTML = ""
+  for(var bid in tremola.board) {
+    var board = tremola.board[bid]
+    if(board.subscribed) // already subscribed
+      continue
+
+    if(!(myId in board.pendingInvitations)) // not invited
+      continue
+
+     /*
+     <div id='kanban_invitation_1 w100' class='kanban_invitation_container'>
+             <div class='kanban_invitation_text_container'>
+               <div style="grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px">Name</div>
+               <div style="grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px">Author</div>
+             </div>
+
+             <div style="grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;">
+               <div style="padding-right:8px;">
+                 <button class="flat passive buttontext" style="height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px" onclick="">&nbsp;</button>
+                 <button class="flat passive buttontext" style="height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;" onclick="">&nbsp;</button>
+               </div>
+             </div>
+           </div>
+           */
+
+    var invitationId = board.pendingInvitations[myId][0]
+    var inviteUserId = board.operations[invitationId].fid
+    var inviteUserName = tremola.contacts[inviteUserId].alias
+    var board_name = board.name
+
+
+    var invHTML = "<div id='kanban_invitation_" + invitationId + "' class='kanban_invitation_container'>"
+    invHTML += "<div class='kanban_invitation_text_container'>"
+    invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + board_name + "</div>"
+    invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>From: " + inviteUserName + "</div></div>"
+
+    invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
+    invHTML += "<div style='padding-right:8px;'>"
+    //invHTML += "<div style='padding-right:10px;'>"
+    invHTML += "<button class='flat passive buttontext' style=\"height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px;background-color: var(--passive)\" onclick='btn_invite_accept(\"" + invitationId +"\", \"" + bid +"\")'>&nbsp;</button>"//</div>"
+    invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;background-color: var(--passive)\" onclick='btn_invite_decline(\"" + invitationId +"\", \"" + bid +"\")'>&nbsp;</button>"
+    invHTML += "</div></div></div>"
+
+    document.getElementById("kanban_invitations_list").innerHTML += invHTML
+   }
+}
+
+function btn_invite_accept (invitationId, bid) {
+  inviteAccept(bid, invitationId, tremola.board[bid].curr_prev)
+  delete tremola.board[bid].pendingInvitations[myId]
+  menu_board_invitations()
+  closeOverlay()
+}
+
+function btn_invite_decline (invitationId, bid) {
+  inviteDecline(bid, invitationId, tremola.board[bid].curr_prev)
+  delete tremola.board[bid].pendingInvitations[myId]
+  closeOverlay()
+}
+
 function menu_new_board() {
   fill_members();
   prev_scenario = 'kanban';
@@ -268,22 +329,12 @@ function menu_new_board() {
   document.getElementById("tremolaTitle").style.display = 'none';
   var c = document.getElementById("conversationTitle");
   c.style.display = null;
-  c.innerHTML = "<font size=+1><strong>Create New Board</strong></font><br>Select up to 7 members";
+  c.innerHTML = "<font size=+1><strong>Create New Board</strong></font><br>Select members to invite";
   document.getElementById('plus').style.display = 'none';
 }
 
-function new_board() {
-  var recps = []
-  for (var m in tremola.contacts) {
-    if (document.getElementById(m).checked)
-      recps.push(m);
-  }
-  if (recps.indexOf(myId) < 0)
-    recps.push(myId);
-  if (recps.length > 7) {
-    launch_snackbar("Too many recipients");
-    return;
-  }
+
+function menu_new_board_name() {
   menu_edit('new_board', 'Enter the name of the new board', '')
 }
 
@@ -312,6 +363,56 @@ function board_toggle_forget() {
   board.forgotten = !board.forgotten
   persist()
   load_board_list()
+  setScenario('kanban')
+}
+
+function menu_board_invite() {
+  var board = tremola.board[curr_board]
+  closeOverlay()
+  document.getElementById("div:invite_menu").style.display = 'initial';
+  document.getElementById("overlay-bg").style.display = 'initial';
+
+  document.getElementById("menu_invite_content").innerHTML = ''
+
+  for(var c in tremola.contacts) {
+    if(c == myId)
+      continue
+
+    if(board.members.indexOf(c) >= 0)
+      continue
+
+    var isAlreadyInvited = c in board.pendingInvitations
+    var bg = isAlreadyInvited ? ' gray' : ' light'
+
+    var invHTML = "<div id='invite_" + c + "' class='kanban_invitation_container " + bg + "' style='width:99%; margin: 5px 0px 7px 5px;' >"
+    invHTML += "<div class='kanban_invitation_text_container' >"
+    invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + tremola.contacts[c].alias + "</div>"
+
+    if(isAlreadyInvited)
+      invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>Already Invited</div></div>"
+    else
+      invHTML += "</div>"
+
+    invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
+    invHTML += "<div style='padding-right:8px;'>"
+    if(!isAlreadyInvited)
+      invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/send.svg');width: 35px;\" onclick='btn_invite(\"" + c +"\", \"" + curr_board +"\")'>&nbsp;</button>"
+    invHTML += "</div></div></div>"
+
+    document.getElementById("menu_invite_content").innerHTML += invHTML
+  }
+}
+
+function btn_invite(userId, bid) {
+  console.log("INVITE: " + userId + ", bid: " + bid)
+  inviteUser(bid, userId)
+  menu_board_invite()
+  launch_snackbar("User invited")
+}
+
+function leave_curr_board() {
+  closeOverlay()
+  leave(curr_board)
   setScenario('kanban')
 }
 
@@ -527,9 +628,9 @@ function item_menu(itemID) {
   document.getElementById('btn:item_menu_description_save').style.display = 'none'
   document.getElementById('btn:item_menu_description_cancel').style.display = 'none'
   document.getElementById('item_menu_comment_text').value = ''
-  document.getElementById('item_menu_title').innerHTML = "<font color='" + item.color + "'>" + item.name + "</font"
+  document.getElementById('item_menu_title').innerHTML = "<font color='" + item.color + "'>" + item.name + "</font>"
   // console.log(item)
-  document.getElementById('item_menu_title').innerHTML = "<font id='"+ itemID +"-itemMenuHdr' color='" + item.color + "'>" + item.name + "</font"
+  document.getElementById('item_menu_title').innerHTML = "<font id='"+ itemID +"-itemMenuHdr' color='" + item.color + "'>" + item.name + "</font>"
 
   //load description
   var descDiv = document.getElementById('div:item_menu_description')
@@ -591,6 +692,7 @@ function item_menu_cancel_description() {
   document.getElementById('btn:item_menu_description_cancel').style.display = 'none'
 }
 
+
 function contextmenu_change_column() {
   close_board_context_menu()
   document.getElementById("overlay-trans").style.display = 'initial';
@@ -622,7 +724,6 @@ function contextmenu_change_column() {
 
 function btn_move_item(item, new_column) {
   moveItem(curr_board, item, new_column)
-
   close_board_context_menu()
 }
 
