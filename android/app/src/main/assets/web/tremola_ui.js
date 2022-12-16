@@ -66,7 +66,7 @@ var scenarioMenu = {
 
   'board'    : [['Add list', 'menu_new_column'],
                 ['Rename Kanban Board', 'menu_rename_board'],
-                ['Invite Users', 'menu_board_invite'],
+                ['Invite Users', 'menu_invite'],
                 ['History', 'menu_history'],
                 ['Reload', 'reload_curr_board'],
                 ['Leave', 'leave_curr_board'],

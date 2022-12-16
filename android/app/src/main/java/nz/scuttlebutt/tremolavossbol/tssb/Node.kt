@@ -95,8 +95,8 @@ class Node(val context: MainActivity) {
             val pkt = context.tinyRepo.feed_read_pkt(fid, seq)
             if (pkt == null || pkt[DMX_LEN].toInt() != PKTTYPE_chain20) continue;
             val (sz, szlen) = varint_decode(pkt, DMX_LEN + 1, DMX_LEN + 4)
-            if (sz <= 48 - szlen) continue;
-            val maxChunks    = (sz - (48 - szlen) + 99) / 100
+            if (sz <= 28 - szlen) continue;
+            val maxChunks    = (sz - (28 - szlen) + 99) / 100
             Log.d("node", "maxChunks is ${maxChunks}")
             if (cnr > maxChunks) continue
             while (cnr <= maxChunks && credit-- > 0) {
@@ -250,6 +250,7 @@ class Node(val context: MainActivity) {
         Log.d("node", "publish_public_content ${content.size}B")
         val pkt = repo.mk_contentLogEntry(content)
         Log.d("node", "publish_public_content --> pkt ${if (pkt == null) 0 else pkt.size}B")
+        Log.d("node", "publish_public_content --> content ${if (pkt == null) 0 else pkt.toHex()}B")
         if (pkt == null) return false
         return repo.feed_append(context.idStore.identity.verifyKey, pkt)
     }

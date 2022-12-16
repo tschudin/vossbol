@@ -101,6 +101,13 @@ function menu_edit(target, title, text) {
   edit_target = target;
 }
 
+function edit_checkEnter(ev) {
+  console.log(ev.key)
+  if(ev.key == "Enter") {
+    edit_confirmed()
+  }
+}
+
 function menu_edit_convname() {
   menu_edit('convNameTarget', "Edit conversation name:<br>(only you can see this name)", tremola.chats[curr_chat].alias);
 }
@@ -704,8 +711,8 @@ function backend(cmdStr) { // send this to Kotlin (or simulate in case of browse
     }
     b2f_new_event(e)
   } else if (cmdStr[0] == 'kanban') {
-    var prev = cmdStr[2] == "null" ? null : cmdStr[2]
-    if(prev != null) {
+    var prev = cmdStr[2] //== "null" ? null : cmdStr[2]
+    if(prev != "null") {
       prev = atob(cmdStr[2])
       prev = prev.split(",").map(atob)
     }
@@ -846,6 +853,7 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
 
       // add new entry if it is a new board
       if(!(bid in tremola.board)) {
+        console.log("new board name: " + args[0])
         tremola.board[bid] = {
           "operations": {}, // all received operations for this board
           "sortedOperations": new Timeline(), // "linear timeline", sorted list of operationIds
@@ -934,7 +942,7 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
           //updateCurrPrev(bid, p) // prepare "previous pointer" for future operation
           board.curr_prev = board.sortedOperations.get_tips()
 
-          // updating the local timestamp + counter for sorting the bord list
+          // updating the local timestamp + counter for sorting the board list
           board.lastUpdate = Date.now()
           if(curr_scenario != 'board' || curr_board != bid)
             board.unreadEvents++

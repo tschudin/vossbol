@@ -182,21 +182,21 @@ function inviteUser(bid, userID) {
   board_send_to_backend(data)
 }
 
-function inviteAccept(bid, inviteID, prev) {
+function inviteAccept(bid, prev) {
   var board = tremola.board[bid]
   var data = {
                   'bid': bid,
-                  'cmd': [Operation.INVITE_ACCEPT, inviteID],
-                  'prev': [inviteID]
+                  'cmd': [Operation.INVITE_ACCEPT],
+                  'prev': prev
               }
   board_send_to_backend(data)
 }
 
-function inviteDecline(bid, inviteID, prev) {
+function inviteDecline(bid, prev) {
   var board = tremola.board[bid]
   var data = {
                   'bid': bid,
-                  'cmd': [Operation.INVITE_DECLINE, inviteID],
+                  'cmd': [Operation.INVITE_DECLINE],
                   'prev': [inviteID]
               }
   board_send_to_backend(data)
@@ -425,6 +425,7 @@ function board_reload(bid) {
   //board.sortedOperations = []
   board.sortedOperations = new Timeline()
 
+  /*
   for(var op in board.operations) {
     delete board.operations[op].indx
     delete board.operations[op].succ
@@ -433,6 +434,7 @@ function board_reload(bid) {
     delete board.operations[op].cycl
     board.operations[op].sorted = false
   }
+  */
 
   for(var op in board.operations) {
     //newOperation(bid, op)
@@ -512,8 +514,6 @@ function apply_all_operations(bid) {
 
   var old_state = JSON.parse(JSON.stringify(board));
 
-  console.log("APPLY ALL")
-
   //execute operations and save results to local storage
   var validOps = helper_linear_timeline_without_pending_prevs(board.sortedOperations)
   for(var i in validOps) {
@@ -590,7 +590,7 @@ function apply_operation(bid, operationID, apply_on_ui) {
       board.name = curr_op.body.cmd[1]
 
       if(apply_on_ui)
-        ui_update_board_name(bid, curr_op.body.cmd[1])
+        ui_update_board_title(bid)
       break
     case Operation.COLUMN_CREATE:
       historyMessage += "created the list \"" + curr_op.body.cmd[1] +"\""
@@ -803,11 +803,14 @@ function apply_operation(bid, operationID, apply_on_ui) {
         board.pendingInvitations[curr_op.body.cmd[1]].push(curr_op.key)
       }
 
+      if(apply_on_ui)
+        menu_invite_create_entry(curr_op.body.cmd[1])
 
       break
     case Operation.INVITE_ACCEPT:
       if (curr_op.fid in board.pendingInvitations) { // check if the invite accept operation is valid
-        if(board.pendingInvitations[curr_op.fid].indexOf(curr_op.body.cmd[1]) >= 0) {
+        // check if one of the prevs of the accept message is actual a valid invitation
+        if(board.pendingInvitations[curr_op.fid].filter(op => board.operations[curr_op.key].body.prev.includes(op)).length  > 0) {
           historyMessage += "accepted invitation"
           delete board.pendingInvitations[curr_op.fid]
           if(board.members.indexOf(curr_op.fid) < 0) { //should always be the case
@@ -817,11 +820,13 @@ function apply_operation(bid, operationID, apply_on_ui) {
           if(curr_op.fid == myId)
             board.subscribed = true
         }
+        if(apply_on_ui)
+          ui_update_board_title(bid)
       }
       break
     case Operation.INVITE_DECLINE:
       if (curr_op.fid in board.pendingInvitations) { // check if the invite accept operation is valid
-        if(board.pendingInvitations[curr_op.fid].indexOf(curr_op.body.cmd[1]) >= 0 ) {
+        if(board.pendingInvitations[curr_op.fid].filter(op => board.operations[curr_op.key].body.prev.includes(op)).length  > 0 ) {
           historyMessage += "declined invitation"
           delete board.pendingInvitations[curr_op.fid]
           var idx = board.members.indexOf(curr_op.fid)
@@ -829,15 +834,20 @@ function apply_operation(bid, operationID, apply_on_ui) {
             board.members.splice(idx, 1)
           }
         }
+        if(apply_on_ui)
+          menu_invite_create_entry(curr_op.body.cmd[1])
       }
       break
     case Operation.LEAVE:
-      historyMessage += "leaved"
+      historyMessage += "left"
       var idx = board.members.indexOf(curr_op.fid)
-      if( idx >= 0) {
+      if(idx >= 0) {
         board.members.splice(idx, 1)
       }
       delete board.pendingInvitations[curr_op.fid]
+
+      if(apply_on_ui)
+        ui_update_board_title(bid)
 
       break
   }

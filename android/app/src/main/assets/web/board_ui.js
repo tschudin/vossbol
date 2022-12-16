@@ -149,8 +149,14 @@ function ui_update_Board(bid, old_state) {
   var board = tremola.board[bid]
 
   // board
-  if(board.name != old_state.name)
-    ui_update_board_name(bid, board.name)
+  if(board.name != old_state.name || !equalArrays(board.members, old_state.members)) {
+    ui_update_board_title(bid)
+    var changed_members = board.members.filter(member => !old_state.members.includes(member))
+    changed_members.concat(old_state.members.filter(member => !board.members.includes(member)))
+    for(var member of changed_members)
+      menu_invite_create_entry(member)
+  }
+
 
   // columns
   for(var i in board.columns) {
@@ -307,16 +313,19 @@ function menu_board_invitations() {
 }
 
 function btn_invite_accept (invitationId, bid) {
-  inviteAccept(bid, invitationId, tremola.board[bid].curr_prev)
+  inviteAccept(bid, tremola.board[bid].pendingInvitations[myId])
   delete tremola.board[bid].pendingInvitations[myId]
-  menu_board_invitations()
-  closeOverlay()
+  var inv = document.getElementById("kanban_invitation_" + invitationId)
+  if(inv)
+    inv.outerHTML = ""
 }
 
 function btn_invite_decline (invitationId, bid) {
-  inviteDecline(bid, invitationId, tremola.board[bid].curr_prev)
+  inviteDecline(bid, tremola.board[bid].pendingInvitations[myId])
   delete tremola.board[bid].pendingInvitations[myId]
-  closeOverlay()
+  var inv = document.getElementById("kanban_invitation_" + invitationId)
+  if(inv)
+    inv.outerHTML = ""
 }
 
 function menu_new_board() {
@@ -343,9 +352,9 @@ function menu_rename_board() {
   menu_edit('board_rename', 'Enter a new name for this board', board.name)
 }
 
-function ui_update_board_name(bid, new_name) {
+function ui_update_board_title(bid) {
   var board = tremola.board[bid]
-  // update boardlist
+  // update board list
   load_board_list()
   // update title name
   if(curr_board == bid) {
@@ -362,11 +371,12 @@ function board_toggle_forget() {
   var board = tremola.board[curr_board]
   board.forgotten = !board.forgotten
   persist()
+  closeOverlay()
   load_board_list()
   setScenario('kanban')
 }
 
-function menu_board_invite() {
+function menu_invite() {
   var board = tremola.board[curr_board]
   closeOverlay()
   document.getElementById("div:invite_menu").style.display = 'initial';
@@ -375,38 +385,46 @@ function menu_board_invite() {
   document.getElementById("menu_invite_content").innerHTML = ''
 
   for(var c in tremola.contacts) {
-    if(c == myId)
-      continue
-
-    if(board.members.indexOf(c) >= 0)
-      continue
-
-    var isAlreadyInvited = c in board.pendingInvitations
-    var bg = isAlreadyInvited ? ' gray' : ' light'
-
-    var invHTML = "<div id='invite_" + c + "' class='kanban_invitation_container " + bg + "' style='width:99%; margin: 5px 0px 7px 5px;' >"
-    invHTML += "<div class='kanban_invitation_text_container' >"
-    invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + tremola.contacts[c].alias + "</div>"
-
-    if(isAlreadyInvited)
-      invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>Already Invited</div></div>"
-    else
-      invHTML += "</div>"
-
-    invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
-    invHTML += "<div style='padding-right:8px;'>"
-    if(!isAlreadyInvited)
-      invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/send.svg');width: 35px;\" onclick='btn_invite(\"" + c +"\", \"" + curr_board +"\")'>&nbsp;</button>"
-    invHTML += "</div></div></div>"
-
-    document.getElementById("menu_invite_content").innerHTML += invHTML
+    menu_invite_create_entry(c)
   }
+}
+
+// adds an entry to the invite menu or updates an already existing entry
+function menu_invite_create_entry(id) {
+  var board = tremola.board[curr_board]
+
+  // remove already existing entry
+  if (document.getElementById('invite_' + id))
+    document.getElementById('invite_' + id).outerHTML = ''
+
+
+  if(id == myId || board.members.indexOf(id) >= 0)
+    return
+
+  var isAlreadyInvited = id in board.pendingInvitations
+  var bg = isAlreadyInvited ? ' gray' : ' light'
+
+  var invHTML = "<div id='invite_" + id + "' class='kanban_invitation_container " + bg + "' style='width:95%; margin: 5px 0px 7px 5px;' >"
+  invHTML += "<div class='kanban_invitation_text_container' >"
+  invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + tremola.contacts[id].alias + "</div>"
+
+  if(isAlreadyInvited)
+    invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>Already Invited</div></div>"
+  else
+    invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'></div></div>"
+
+  invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
+  invHTML += "<div style='padding-right:8px;'>"
+  if(!isAlreadyInvited)
+    invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/send.svg');width: 35px;\" onclick='btn_invite(\"" + id +"\", \"" + curr_board +"\")'>&nbsp;</button>"
+  invHTML += "</div></div></div>"
+
+   document.getElementById("menu_invite_content").innerHTML += invHTML
 }
 
 function btn_invite(userId, bid) {
   console.log("INVITE: " + userId + ", bid: " + bid)
   inviteUser(bid, userId)
-  menu_board_invite()
   launch_snackbar("User invited")
 }
 

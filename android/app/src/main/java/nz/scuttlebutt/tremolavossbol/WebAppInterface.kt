@@ -282,12 +282,10 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
 
         val body = Bipf.encode(lst)
 
-        //val liste = Bipf.mkList()
-        //Bipf.list_append(liste,Bipf.mkString("Hallo Hallo Hallo Hallo Hallo Hallo Hallo"))
-        //val body = Bipf.encode(liste)
-        if (body != null)
+        if (body != null) {
+            Log.d("kanban", "published bytes: " + Bipf.decode(body))
             act.tinyNode.publish_public_content(body)
-
+        }
         //val body = Bipf.encode(lst)
         //Log.d("KANBAN BIPF ENCODE", Bipf.bipf_list2JSON(Bipf.decode(body!!)!!).toString())
         //if (body != null)
@@ -309,7 +307,10 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     fun sendToFrontend(fid: ByteArray, seq: Int, mid: ByteArray, payload: ByteArray) {
         Log.d("wai", "sendToFrontend seq=${seq} ${payload.toHex()}")
         val bodyList = Bipf.decode(payload)
-        if (bodyList == null || bodyList.typ != BIPF_LIST) return
+        if (bodyList == null || bodyList.typ != BIPF_LIST) {
+            Log.d("sendToFrontend", "decoded payload == null")
+            return
+        }
         val param = Bipf.bipf_list2JSON(bodyList)
         var hdr = JSONObject()
         hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
