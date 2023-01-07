@@ -252,7 +252,7 @@
 
   <div id='edit-overlay' class='qr-overlay'>
     <div id="edit_title" style='margin-bottom: 25px;'>Edit X:</div>
-    <input type="text" id="edit_text" minlength="1" size="64" style="width: calc(100% - 10px); height: 30px;">&nbsp;
+    <input type="text" id="edit_text" onkeypress="edit_checkEnter(event)" minlength="1" size="64" style="width: calc(100% - 10px); height: 30px;">&nbsp;
     <div style='text-align: right;'><button class="passive buttontext" onclick="edit_confirmed();" style="background-image: url('img/checked.svg'); margin-right: 5px; border: 0pt; height: 30px; width: 30px;">&nbsp;</button></div>
   </div>
 

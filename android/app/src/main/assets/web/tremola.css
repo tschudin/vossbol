@@ -381,7 +381,7 @@ input:checked + .slider:before {
 .columns_container {
   position: relative;
   width: 100%;
-  height: 100%;
+  /*height: 100%;*/
   display: flex;
   flex-direction: row;
   justify-content: flex-start;

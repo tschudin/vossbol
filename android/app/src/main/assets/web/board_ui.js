@@ -29,6 +29,7 @@ function dragStart(ev) {
 
 function dragDrop(ev) {
   ev.preventDefault();
+  console.log("event", ev)
   console.log('dragDrop', ev.target);
   console.log(ev.target);
   var s = ev.dataTransfer.getData("text").split('-');
@@ -39,8 +40,10 @@ function dragDrop(ev) {
       t = ev.target.parentNode.parentNode.id.split('-');
   }
   console.log(s, t);
-  if (s[1] == 'item') {
-    if (t[1] == 'item') {
+
+  var itemTargets = ['item', 'itemDescr', 'itemAssignees']
+  if (itemTargets.indexOf(s[1]) >= 0) {
+    if (itemTargets.indexOf(t[1]) >= 0) {
       var oldColID = tremola.board[curr_board].items[s[0]].curr_column;
       var newColID = tremola.board[curr_board].items[t[0]].curr_column;
       var newPos = tremola.board[curr_board].items[t[0]].position;
@@ -55,7 +58,7 @@ function dragDrop(ev) {
     var colID;
     if (t[1] == 'columnWrapper' || t[1] == 'columnHdr')
       colID = t[0];
-    else if (t[1] == 'item')
+    else if (itemTargets.indexOf(t[1]) >= 0)
       colID = tremola.board[curr_board].items[t[0]].curr_column;
     // console.log('colID', colID);
     var targetPos = tremola.board[curr_board].columns[colID].position;
@@ -145,14 +148,24 @@ function load_board(bid) { //switches scene to board and changes title to board 
  * @param {string} bid - Id of the kanban board
  * @param {object} old_state - Previous snapshot of the kanban board
  */
-function ui_update_Board(bid, old_state) {
+function ui_update_board(bid, old_state) {
   var board = tremola.board[bid]
 
-  // board
+  // board title (name + members)
   if(board.name != old_state.name || !equalArrays(board.members, old_state.members)) {
     ui_update_board_title(bid)
     var changed_members = board.members.filter(member => !old_state.members.includes(member))
     changed_members.concat(old_state.members.filter(member => !board.members.includes(member)))
+    console.log("Changed members: " + changed_members)
+    for(var member of changed_members)
+      menu_invite_create_entry(member)
+  }
+
+  // invite menu
+  if(!equalArrays(Object.keys(board.pendingInvitations), Object.keys(old_state.pendingInvitations))) {
+    var changed_members = board.members.filter(member => !old_state.members.includes(member))
+    changed_members.concat(old_state.members.filter(member => !board.members.includes(member)))
+    console.log("Changed members (invite):" + changed_members)
     for(var member of changed_members)
       menu_invite_create_entry(member)
   }
@@ -266,64 +279,81 @@ function menu_board_invitations() {
   document.getElementById("kanban-invitations-overlay").style.display = 'initial';
   document.getElementById("overlay-bg").style.display = 'initial';
   document.getElementById("kanban_invitations_list").innerHTML = ""
+
   for(var bid in tremola.board) {
-    var board = tremola.board[bid]
-    if(board.subscribed) // already subscribed
-      continue
-
-    if(!(myId in board.pendingInvitations)) // not invited
-      continue
-
-     /*
-     <div id='kanban_invitation_1 w100' class='kanban_invitation_container'>
-             <div class='kanban_invitation_text_container'>
-               <div style="grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px">Name</div>
-               <div style="grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px">Author</div>
-             </div>
-
-             <div style="grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;">
-               <div style="padding-right:8px;">
-                 <button class="flat passive buttontext" style="height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px" onclick="">&nbsp;</button>
-                 <button class="flat passive buttontext" style="height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;" onclick="">&nbsp;</button>
-               </div>
-             </div>
-           </div>
-           */
-
-    var invitationId = board.pendingInvitations[myId][0]
-    var inviteUserId = board.operations[invitationId].fid
-    var inviteUserName = tremola.contacts[inviteUserId].alias
-    var board_name = board.name
-
-
-    var invHTML = "<div id='kanban_invitation_" + invitationId + "' class='kanban_invitation_container'>"
-    invHTML += "<div class='kanban_invitation_text_container'>"
-    invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + board_name + "</div>"
-    invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>From: " + inviteUserName + "</div></div>"
-
-    invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
-    invHTML += "<div style='padding-right:8px;'>"
-    //invHTML += "<div style='padding-right:10px;'>"
-    invHTML += "<button class='flat passive buttontext' style=\"height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px;background-color: var(--passive)\" onclick='btn_invite_accept(\"" + invitationId +"\", \"" + bid +"\")'>&nbsp;</button>"//</div>"
-    invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;background-color: var(--passive)\" onclick='btn_invite_decline(\"" + invitationId +"\", \"" + bid +"\")'>&nbsp;</button>"
-    invHTML += "</div></div></div>"
-
-    document.getElementById("kanban_invitations_list").innerHTML += invHTML
-   }
+    menu_board_invitation_create_entry(bid)
+  }
 }
 
-function btn_invite_accept (invitationId, bid) {
+// creates new entry in invitation or updates existing entry
+function menu_board_invitation_create_entry(bid) {
+  var board = tremola.board[bid]
+
+  if(document.getElementById("kanban_invitation_" + bid)) {
+    if(board.subscribed || !(myId in board.pendingInvitations))
+      document.getElementById("kanban_invitation_" + bid).outerHTML = ""
+
+    return
+  }
+
+
+
+  if(board.subscribed) // already subscribed
+    return
+
+  if(!(myId in board.pendingInvitations)) // not invited
+    return
+
+   /*
+   <div id='kanban_invitation_1 w100' class='kanban_invitation_container'>
+     <div class='kanban_invitation_text_container'>
+       <div style="grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px">Name</div>
+       <div style="grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px">Author</div>
+     </div>
+
+     <div style="grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;">
+       <div style="padding-right:8px;">
+         <button class="flat passive buttontext" style="height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px" onclick="">&nbsp;</button>
+         <button class="flat passive buttontext" style="height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;" onclick="">&nbsp;</button>
+       </div>
+     </div>
+   </div>
+   */
+
+  var invitationId = board.pendingInvitations[myId][0]
+  var inviteUserId = board.operations[invitationId].fid
+  var inviteUserName = tremola.contacts[inviteUserId].alias
+  var board_name = board.name
+
+
+  var invHTML = "<div id='kanban_invitation_" + bid + "' class='kanban_invitation_container'>"
+  invHTML += "<div class='kanban_invitation_text_container'>"
+  invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + board_name + "</div>"
+  invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>From: " + inviteUserName + "</div></div>"
+
+  invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
+  invHTML += "<div style='padding-right:8px;'>"
+  //invHTML += "<div style='padding-right:10px;'>"
+  invHTML += "<button class='flat passive buttontext' style=\"height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px;background-color: var(--passive)\" onclick='btn_invite_accept(\"" + bid + "\")'>&nbsp;</button>"//</div>"
+  invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;background-color: var(--passive)\" onclick='btn_invite_decline(\"" + bid + "\")'>&nbsp;</button>"
+  invHTML += "</div></div></div>"
+
+  document.getElementById("kanban_invitations_list").innerHTML += invHTML
+
+}
+
+function btn_invite_accept (bid) {
   inviteAccept(bid, tremola.board[bid].pendingInvitations[myId])
   delete tremola.board[bid].pendingInvitations[myId]
-  var inv = document.getElementById("kanban_invitation_" + invitationId)
+  var inv = document.getElementById("kanban_invitation_" + bid)
   if(inv)
     inv.outerHTML = ""
 }
 
-function btn_invite_decline (invitationId, bid) {
+function btn_invite_decline (bid) {
   inviteDecline(bid, tremola.board[bid].pendingInvitations[myId])
   delete tremola.board[bid].pendingInvitations[myId]
-  var inv = document.getElementById("kanban_invitation_" + invitationId)
+  var inv = document.getElementById("kanban_invitation_" + bid)
   if(inv)
     inv.outerHTML = ""
 }
@@ -393,10 +423,16 @@ function menu_invite() {
 function menu_invite_create_entry(id) {
   var board = tremola.board[curr_board]
 
-  // remove already existing entry
-  if (document.getElementById('invite_' + id))
-    document.getElementById('invite_' + id).outerHTML = ''
+  if (document.getElementById('invite_' + id)) {
+    if(board.members.indexOf(id) >= 0)
+      document.getElementById('invite_' + id).outerHTML = ''
+    else if(id in board.pendingInvitations)
+      document.getElementById('invite_' + id).classList.add("bg")
+    else
+      document.getElementById('invite_' + id).classList.remove("bg")
 
+    return
+  }
 
   if(id == myId || board.members.indexOf(id) >= 0)
     return
@@ -409,9 +445,9 @@ function menu_invite_create_entry(id) {
   invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + tremola.contacts[id].alias + "</div>"
 
   if(isAlreadyInvited)
-    invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>Already Invited</div></div>"
+    invHTML += "<div id='invite_author_" + id + "' style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>Already Invited</div></div>"
   else
-    invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'></div></div>"
+    invHTML += "<div id='invite_author_" + id + "' style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'></div></div>"
 
   invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
   invHTML += "<div style='padding-right:8px;'>"

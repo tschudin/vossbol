@@ -521,7 +521,7 @@ function apply_all_operations(bid) {
   }
 
   if(curr_board == bid) { // update ui
-    ui_update_Board(bid, old_state)
+    ui_update_board(bid, old_state)
   }
 }
 
@@ -561,7 +561,7 @@ function apply_operation_from_pos(bid, pos) {
   }
 
   if(curr_board == bid) { // update ui
-      ui_update_Board(bid, old_state)
+      ui_update_board(bid, old_state)
    }
 }
 */
@@ -820,8 +820,11 @@ function apply_operation(bid, operationID, apply_on_ui) {
           if(curr_op.fid == myId)
             board.subscribed = true
         }
-        if(apply_on_ui)
+        if(apply_on_ui) {
           ui_update_board_title(bid)
+          menu_invite_create_entry(bid)
+        }
+
       }
       break
     case Operation.INVITE_DECLINE:
