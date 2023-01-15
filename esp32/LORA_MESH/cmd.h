@@ -18,6 +18,7 @@ void cmd_rx(String cmd) {
       Serial.println("  m    empty log file");
 #endif
       Serial.println("  r    reset this repo to blank");
+      Serial.println("  w    who is alive");
       Serial.println("  x    reboot");
       Serial.println("  z[N] zap (feed with index N) on all nodes");
       break;
@@ -69,6 +70,10 @@ void cmd_rx(String cmd) {
     case 'r': // reset
       repo_reset();
       Serial.println("reset done");
+      break;
+    case 'w': // who-is-alive
+      Serial.println("looking who else is out there ...\n");
+      mgmt_whoIsAlive();
       break;
     case 'x': // reboot
       Serial.println("rebooting ...\n");

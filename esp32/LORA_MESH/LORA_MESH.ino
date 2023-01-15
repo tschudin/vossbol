@@ -39,6 +39,7 @@
 
 #define DMX_LEN          7
 #define GOSET_DMX_STR    "tinySSB-0.1 GOset 1"
+#define MGMT_DMX_STR     "tinySSB-0.1 mgmt 1"
 
 #define TINYSSB_PKT_LEN   120
 
@@ -120,6 +121,7 @@ void ble_init();
 #include "repo.h"
 #include "node.h"
 #include "ed25519.h"
+#include "mgmt.h"
 
 // char lora_line[80];
 char time_line[80];
@@ -171,6 +173,12 @@ void setup()
   memcpy(goset_dmx, h, DMX_LEN);
   arm_dmx(goset_dmx, goset_rx, NULL);
   Serial.printf("listening for GOset protocol on %s\n", to_hex(goset_dmx, 7));
+
+  // initialize mgmt_dmx
+  crypto_hash_sha256(h, (unsigned char*) MGMT_DMX_STR, strlen(MGMT_DMX_STR));
+  memcpy(mgmt_dmx, h, DMX_LEN);
+  arm_dmx(mgmt_dmx, mgmt_rx, NULL);
+  Serial.printf("listening for mgmt protocol on %s\n", to_hex(mgmt_dmx, DMX_LEN));
   
   repo_load();
 
