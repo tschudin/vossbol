@@ -148,3 +148,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# dev stuff
+esp32/LORA_MESH/debug.cfg
+esp32/LORA_MESH/debug_custom.json
+esp32/LORA_MESH/esp32.svd
