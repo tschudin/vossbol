@@ -13,14 +13,18 @@ struct status_s {
   int entries;
   int chunks;
   int free;
-  unsigned long int received_on; // no need to send over network but there is enough space in the packet for now
   unsigned long int uptime;
+};
+
+struct statust_entry_s {
+  status_s state;
+  unsigned long int received_on;
 };
 
 #define STATUS_LEN   sizeof(struct status_s)
 
 
-struct status_s statust[STATUST_SIZE];
+struct statust_entry_s statust[STATUST_SIZE];
 int statust_cnt;
 
 
@@ -71,25 +75,25 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
   if (pkt[0] == 's' && len == STATUS_LEN) {
     struct status_s *status = (struct status_s*) calloc(1, STATUS_LEN);
     memcpy(status, pkt, STATUS_LEN);
-    status->received_on = millis();
+    unsigned long int received_on = millis();
     Serial.println(String("mgmt_rx received status response from ") + to_hex(status->id, 2, 0));
     int ndx = -1;
     for (int i = 0; i < statust_cnt; i++) {
-      if (!memcmp(status->id, statust[i].id, MGMT_ID_LEN)) {
+      if (!memcmp(status->id, statust[i].state.id, MGMT_ID_LEN)) {
         ndx = i;
       }
     }
     if (ndx == -1) {
       ndx = statust_cnt++;
     }
-    memcpy(statust[ndx].id, status->id, MGMT_ID_LEN);
-    statust[ndx].voltage = status->voltage;
-    statust[ndx].feeds = status->feeds;
-    statust[ndx].entries = status->entries;
-    statust[ndx].chunks = status->chunks;
-    statust[ndx].free = status->free;
-    statust[ndx].uptime = status->uptime;
-    statust[ndx].received_on = status->received_on;
+    memcpy(statust[ndx].state.id, status->id, MGMT_ID_LEN);
+    statust[ndx].state.voltage = status->voltage;
+    statust[ndx].state.feeds = status->feeds;
+    statust[ndx].state.entries = status->entries;
+    statust[ndx].state.chunks = status->chunks;
+    statust[ndx].state.free = status->free;
+    statust[ndx].state.uptime = status->uptime;
+    statust[ndx].received_on = received_on;
     return;
   }
   // unknown typ
@@ -107,7 +111,7 @@ void mgmt_print_statust()
 {
   Serial.println("  id   | battery | feeds | entries | chunks | free | lastSeen | uptime");
   Serial.printf("  ");
-  for (int i = 0; i < 5; i++) { Serial.printf("-"); } // id
+  for (int i = 0; i < 4; i++) { Serial.printf("-"); } // id
   for (int i = 0; i < 10; i++) { Serial.printf("-"); } // voltage
   for (int i = 0; i < 27; i++) { Serial.printf("-"); } // FEC
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // free
@@ -116,13 +120,16 @@ void mgmt_print_statust()
   Serial.printf("\n");
   for (int i = 0; i < statust_cnt; i++) {
     // id
-    Serial.printf("  %s", to_hex(statust[i].id, MGMT_ID_LEN, 0));
+    Serial.printf("  %s", to_hex(statust[i].state.id, MGMT_ID_LEN, 0));
     // voltage
-    Serial.printf(" | %6dV", statust[i].voltage);
+    Serial.printf(" | %6dV", statust[i].state.voltage);
     // feeds, entries & chunks
-    Serial.printf(" | %5d | %7d | %6d", statust[i].feeds, statust[i].entries, statust[i].chunks);
+    int feeds = statust[i].state.feeds;
+    int entries = statust[i].state.entries;
+    int chunks = statust[i].state.chunks;
+    Serial.printf(" | %5d | %7d | %6d", feeds, entries, chunks);
     // MyFS
-    Serial.printf(" | %3d%%", statust[i].free);
+    Serial.printf(" | %3d%%", statust[i].state.free);
     // lastSeen
     int l = millis() - statust[i].received_on;
     int ls = (l / 1000) % 60;
@@ -130,7 +137,7 @@ void mgmt_print_statust()
     int lh = (l / 1000 / 60 / 60) % 24;
     Serial.printf(" | %02d:%02d:%02d", lh, lm ,ls);
     // uptime
-    int u = statust[i].uptime;
+    int u = statust[i].state.uptime;
     int us = (u / 1000) % 60;
     int um = (u / 1000 / 60) % 60;
     int uh = (u / 1000 / 60 / 60) % 24;
