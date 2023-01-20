@@ -5,6 +5,12 @@ unsigned char mgmt_dmx[DMX_LEN];
 #define MGMT_ID_LEN  2
 #define STATUST_SIZE 42
 
+struct request_s {
+  unsigned char typ;
+  unsigned char cmd;
+  unsigned char id[MGMT_ID_LEN];
+};
+
 struct status_s {
   unsigned char typ;
   unsigned char id[MGMT_ID_LEN];
@@ -21,7 +27,8 @@ struct statust_entry_s {
   unsigned long int received_on;
 };
 
-#define STATUS_LEN   sizeof(struct status_s)
+#define MGMT_REQUEST_LEN  sizeof(struct request_s)
+#define MGMT_STATUS_LEN   sizeof(struct status_s)
 
 
 struct statust_entry_s statust[STATUST_SIZE];
@@ -29,15 +36,30 @@ int statust_cnt;
 
 
 // forward declaration
-void whoIsAlive();
+void mgmt_send_status();
 
 //------------------------------------------------------------------------------
 
-// fill buffer with status packet
-unsigned char* _mkStatus(unsigned char typ)
+// fill buffer with request packet
+unsigned char* _mkRequest(unsigned char cmd)
 {
-  struct status_s *status = (struct status_s*) calloc(1, STATUS_LEN);
-  status->typ = typ;
+  struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+  request->typ = 'r';
+  request->cmd = cmd;
+  request->id[0] = my_mac[4];
+  request->id[1] = my_mac[5];
+
+  static unsigned char pkt[DMX_LEN + MGMT_REQUEST_LEN];
+  memcpy(pkt, mgmt_dmx, DMX_LEN);
+  memcpy(pkt + DMX_LEN, request, MGMT_REQUEST_LEN);
+  return pkt;
+}
+
+// fill buffer with status packet
+unsigned char* _mkStatus()
+{
+  struct status_s *status = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
+  status->typ = 's';
   status->id[0] = my_mac[4];
   status->id[1] = my_mac[5];
   status->voltage = axp.getBattVoltage()/1000;
@@ -49,9 +71,9 @@ unsigned char* _mkStatus(unsigned char typ)
   status->free = avail / (total/100);
   status->uptime = millis();
   
-  static unsigned char pkt[DMX_LEN + STATUS_LEN];
+  static unsigned char pkt[DMX_LEN + MGMT_STATUS_LEN];
   memcpy(pkt, mgmt_dmx, DMX_LEN);
-  memcpy(pkt + DMX_LEN, status, STATUS_LEN);
+  memcpy(pkt + DMX_LEN, status, MGMT_STATUS_LEN);
   return pkt;
 }
 
@@ -64,17 +86,17 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
   len -= DMX_LEN;
 
   // receive status request
-  if (pkt[0] == 'q' && len == STATUS_LEN) {
-    struct status_s *status = (struct status_s*) calloc(1, STATUS_LEN);
-    memcpy(status, pkt, STATUS_LEN);
-    Serial.println(String("mgmt_rx received status request from ") + to_hex(status->id, 2, 0));
-    io_send(_mkStatus('s'), DMX_LEN + STATUS_LEN, NULL);
+  if (pkt[0] == 'r' && pkt[1] == 's' && len == MGMT_REQUEST_LEN) {
+    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+    memcpy(request, pkt, MGMT_REQUEST_LEN);
+    Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, 2, 0));
+    mgmt_send_status();
     return;
   }
   // receive status response
-  if (pkt[0] == 's' && len == STATUS_LEN) {
-    struct status_s *status = (struct status_s*) calloc(1, STATUS_LEN);
-    memcpy(status, pkt, STATUS_LEN);
+  if (pkt[0] == 's' && len == MGMT_STATUS_LEN) {
+    struct status_s *status = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
+    memcpy(status, pkt, MGMT_STATUS_LEN);
     unsigned long int received_on = millis();
     Serial.println(String("mgmt_rx received status response from ") + to_hex(status->id, 2, 0));
     int ndx = -1;
@@ -101,9 +123,15 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
 }
 
 // send status request to see what other nodes are out there
-void mgmt_status_request()
+void mgmt_request_status()
 {
-  io_send(_mkStatus('q'), DMX_LEN + STATUS_LEN, NULL);
+  io_send(_mkRequest('s'), DMX_LEN + MGMT_REQUEST_LEN, NULL);
+}
+
+// send status response (sent periodically or after request)
+void mgmt_send_status()
+{
+  io_send(_mkStatus(), DMX_LEN + MGMT_STATUS_LEN, NULL);
 }
 
 // print the status table
@@ -128,7 +156,7 @@ void mgmt_print_statust()
     int entries = statust[i].state.entries;
     int chunks = statust[i].state.chunks;
     Serial.printf(" | %5d | %7d | %6d", feeds, entries, chunks);
-    // MyFS
+    // free
     Serial.printf(" | %3d%%", statust[i].state.free);
     // lastSeen
     int l = millis() - statust[i].received_on;

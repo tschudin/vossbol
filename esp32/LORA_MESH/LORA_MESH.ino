@@ -17,6 +17,8 @@
 #define LOG_FLUSH_INTERVAL         10000 // millis
 #define LOG_BATTERY_INTERVAL  15*60*1000 // millis (15 minutes)
 
+#define MGMT_SEND_STATUS_INTERVAL  5*60*1000 // millis (5 minutes)
+
 // ----------------------------------------------------------------------
 
 // #define LORA_BAND    902E6 // USA
@@ -137,6 +139,8 @@ int lora_bad_crc = 0;
 File lora_log;
 unsigned long int next_log_flush;
 
+unsigned long int next_mgmt_send_status;
+
 #include "cmd.h"
 
 // ----------------------------------------------------------------------------
@@ -179,6 +183,9 @@ void setup()
   memcpy(mgmt_dmx, h, DMX_LEN);
   arm_dmx(mgmt_dmx, mgmt_rx, NULL);
   Serial.printf("listening for mgmt protocol on %s\n", to_hex(mgmt_dmx, DMX_LEN));
+
+  // set time for next send-status-event
+  next_mgmt_send_status = MGMT_SEND_STATUS_INTERVAL;
   
   repo_load();
 
@@ -452,6 +459,12 @@ void loop()
     refresh = 0;
   }
 #endif // NO_OLED
+
+  // periodically send status
+  if (millis() > next_mgmt_send_status) {
+    mgmt_send_status();
+    next_mgmt_send_status = millis() + MGMT_SEND_STATUS_INTERVAL;
+  }
 
   delay(10);
 

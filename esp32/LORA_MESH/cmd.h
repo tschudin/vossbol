@@ -73,7 +73,7 @@ void cmd_rx(String cmd) {
       Serial.println("reset done");
       break;
     case 's': // send status request
-      mgmt_status_request();
+      mgmt_request_status();
       Serial.println("sent status request");
       break;
     case 'w': // who is alive
