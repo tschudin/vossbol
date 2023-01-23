@@ -43,38 +43,30 @@ void mgmt_send_status();
 // fill buffer with request packet
 unsigned char* _mkRequest(unsigned char cmd)
 {
-  struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
-  request->typ = 'r';
-  request->cmd = cmd;
-  request->id[0] = my_mac[4];
-  request->id[1] = my_mac[5];
-
-  static unsigned char pkt[DMX_LEN + MGMT_REQUEST_LEN];
-  memcpy(pkt, mgmt_dmx, DMX_LEN);
-  memcpy(pkt + DMX_LEN, request, MGMT_REQUEST_LEN);
-  return pkt;
+  static struct request_s request;
+  request.typ = 'r';
+  request.cmd = cmd;
+  request.id[0] = my_mac[4];
+  request.id[1] = my_mac[5];
+  return (unsigned char*) &request;
 }
 
 // fill buffer with status packet
 unsigned char* _mkStatus()
 {
-  struct status_s *status = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
-  status->typ = 's';
-  status->id[0] = my_mac[4];
-  status->id[1] = my_mac[5];
-  status->voltage = axp.getBattVoltage()/1000;
-  status->feeds = feed_cnt;
-  status->entries = entry_cnt;
-  status->chunks = chunk_cnt;
+  static struct status_s status;
+  status.typ = 's';
+  status.id[0] = my_mac[4];
+  status.id[1] = my_mac[5];
+  status.voltage = axp.getBattVoltage()/1000;
+  status.feeds = feed_cnt;
+  status.entries = entry_cnt;
+  status.chunks = chunk_cnt;
   int total = MyFS.totalBytes();
   int avail = total - MyFS.usedBytes();
-  status->free = avail / (total/100);
-  status->uptime = millis();
-  
-  static unsigned char pkt[DMX_LEN + MGMT_STATUS_LEN];
-  memcpy(pkt, mgmt_dmx, DMX_LEN);
-  memcpy(pkt + DMX_LEN, status, MGMT_STATUS_LEN);
-  return pkt;
+  status.free = avail / (total/100);
+  status.uptime = millis();
+  return (unsigned char*) &status;
 }
 
 //------------------------------------------------------------------------------
@@ -125,13 +117,13 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
 // send status request to see what other nodes are out there
 void mgmt_request_status()
 {
-  io_send(_mkRequest('s'), DMX_LEN + MGMT_REQUEST_LEN, NULL);
+  io_enqueue(_mkRequest('s'), MGMT_REQUEST_LEN, mgmt_dmx, NULL);
 }
 
 // send status response (sent periodically or after request)
 void mgmt_send_status()
 {
-  io_send(_mkStatus(), DMX_LEN + MGMT_STATUS_LEN, NULL);
+  io_enqueue(_mkStatus(), MGMT_STATUS_LEN, mgmt_dmx, NULL);
 }
 
 // print the status table
