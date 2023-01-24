@@ -123,6 +123,9 @@ void mgmt_request_status()
 // send status response (sent periodically or after request)
 void mgmt_send_status()
 {
+  unsigned long int now = millis();
+  unsigned long int rand = random(1000);
+  while (true) { if (millis() - now > rand) { break; } }
   io_enqueue(_mkStatus(), MGMT_STATUS_LEN, mgmt_dmx, NULL);
 }
 
