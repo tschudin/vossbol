@@ -429,8 +429,8 @@ void loop()
     theDisplay.drawString(0, 18, time_line);
     // theDisplay.drawString(0, 24, goset_line);
     char stat_line[30];
-    sprintf(stat_line, "W:%d E:%d L:%s",
-            wifi_clients, ble_clients, wheel[lora_cnt % 4]);
+    sprintf(stat_line, "W:%d E:%d G:%d L:%s",
+            wifi_clients, ble_clients, gps.location.isValid() ? 1 : 0, wheel[lora_cnt % 4]);
     theDisplay.drawString(0, 30, stat_line);
 
 #if defined(MAIN_BLEDevice_H_)
