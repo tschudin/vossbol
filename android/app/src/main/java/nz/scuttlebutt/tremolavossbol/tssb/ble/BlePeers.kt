@@ -1,14 +1,22 @@
 package nz.scuttlebutt.tremolavossbol.tssb.ble
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.bluetooth.BluetoothGatt.GATT_SUCCESS
+import android.bluetooth.BluetoothGatt.STATE_CONNECTED
 import android.bluetooth.BluetoothProfile.STATE_CONNECTED
+import android.bluetooth.BluetoothProfile.STATE_DISCONNECTED
+import android.bluetooth.le.BluetoothLeAdvertiser
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.bluetooth.le.ScanSettings.MATCH_MODE_STICKY
+import android.bluetooth.BluetoothGattServer
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationManager
@@ -30,7 +38,13 @@ class BlePeers(val act: MainActivity) {
     private val bluetoothManager = act.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     private val bluetoothAdapter = bluetoothManager.adapter
     private val bleScanner = bluetoothAdapter.bluetoothLeScanner
-    val peers = HashMap<BluetoothDevice,BluetoothGatt>(0)
+    private var gattServer: BluetoothGattServer? = null
+    private var advertiser: BluetoothLeAdvertiser? = null
+    private val connectedDevices = mutableSetOf<BluetoothDevice>()
+    private var pending = mutableMapOf<BluetoothDevice,BluetoothGatt>()
+    var peers = mutableMapOf<BluetoothDevice,BluetoothGatt>()
+    private var pendingList = mutableSetOf<BluetoothDevice>()
+    private var peerList = mutableSetOf<BluetoothDevice>()
     var isScanning = false
 
     private val scanSettings = ScanSettings.Builder()
@@ -51,19 +65,7 @@ class BlePeers(val act: MainActivity) {
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
     }
 
-    fun write(buf: ByteArray) {
-        for (p in peers) {
-            // Log.d("ble", "sending (rx char) ${buf.size} bytes")
-            val service = p.value.getService(TINYSSB_BLE_REPL_SERVICE_2022)
-            val ch = service.getCharacteristic(TINYSSB_BLE_RX_CHARACTERISTIC)
-            ch.value = buf
-            p.value.writeCharacteristic(ch)
-        }
-    }
-
-    fun startBleScan() {
-        if (isScanning)
-            return
+    fun startBluetooth() {
         val pm: PackageManager = act.getPackageManager()
         if (!pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(act, "this device does NOT have Bluetooth LE - user Wifi to sync",
@@ -89,6 +91,44 @@ class BlePeers(val act: MainActivity) {
             ActivityCompat.requestPermissions(act, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 555)
             return
         }
+        startBleScan()
+        startServer()
+    }
+
+    @SuppressLint("MissingPermission")
+    fun stopBluetooth() {
+        stopBleScan()
+        for (p in peers) {
+            p.value.close()
+        }
+        stopServer()
+    }
+
+    @SuppressLint("MissingPermission")
+    fun write(buf: ByteArray) {
+        for (p in peers) {
+            Log.d("ble_rx", "sending (rx char) ${buf.size} bytes")
+            val service = p.value.getService(TINYSSB_BLE_REPL_SERVICE_2022)
+            if(service == null) {
+                Log.d("ble_rx", "service not available")
+                return
+            }
+            Log.d("ble_rx", "Service: $service")
+            //Log.d("ble_rx", "Available chs: ${service.characteristics.get(0).uuid}")
+            //Log.d("ble_rx", "expected: $TINYSSB_BLE_RX_CHARACTERISTIC")
+            //Log.d("ble_rx", "Check? ${service.characteristics.get(0).uuid.toString() == TINYSSB_BLE_RX_CHARACTERISTIC.toString()}")
+            val ch = service.getCharacteristic(TINYSSB_BLE_RX_CHARACTERISTIC)
+            Log.d("ble_rx", "Characteristic: ${ch}")
+            ch.value = buf
+            Log.d("ble_rx", "send $buf")
+            p.value.writeCharacteristic(ch)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startBleScan() {
+        if (isScanning)
+            return
         Log.d("ble", "starting scan")
             // scanResults.clear()
             // scanResultAdapter.notifyDataSetChanged()
@@ -98,16 +138,22 @@ class BlePeers(val act: MainActivity) {
         }
     }
 
-    fun stopBleScan() {
+    @SuppressLint("MissingPermission")
+    private fun stopBleScan() {
         if (bleScanner != null)
             bleScanner.stopScan(scanCallback)
         isScanning = false
     }
 
+    fun addPeer(gatt: BluetoothGatt) {
+        peers[gatt.device] = gatt
+    }
+
+    @SuppressLint("MissingPermission")
     private val gattCallback = object : BluetoothGattCallback() {
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt?, ch: BluetoothGattCharacteristic?) {
-            // Log.d("ble", "change..")
+            Log.d("ble", "change..")
             super.onCharacteristicChanged(gatt, ch)
             if (ch != null) {
                 // Log.d("ble", "${ch.uuid.toString()} changed: ${ch.value.toHex()}, ${ch.value.size}")
@@ -121,12 +167,17 @@ class BlePeers(val act: MainActivity) {
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
+            Log.d("ble", "Connection change!")
             if (status == GATT_SUCCESS && newState == STATE_CONNECTED) {
                 Log.d("ble", "connected! ${gatt.device.address.toString()}")
+                //Log.d("ble", "updated client list: ${peers.get(gatt.device)!!.device.address}")
                 val rc = gatt.requestMtu(128)
                 Log.d("ble mtu", "request rc=$rc")
-            } else if (gatt != null && gatt.device in peers)
+            } else if (newState == STATE_DISCONNECTED) {
+                Log.d("ble", "disconnected")
                 peers.remove(gatt.device)
+                pending.remove(gatt.device)
+            }
         }
 
         override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
@@ -151,6 +202,8 @@ class BlePeers(val act: MainActivity) {
                             val descr = lst.get(0); // there should be only one descriptor
                             descr.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                             gatt.writeDescriptor(descr); //apply these changes to the ble chip to tell it we are ready for the data
+                            pending.remove(gatt.device)
+                            peers[gatt.device] = gatt
                         }
                     } else
                         Log.d("ble", "hm, service is ${s.uuid.toString()} vs ${TINYSSB_BLE_REPL_SERVICE_2022.toString()}")
@@ -168,6 +221,7 @@ class BlePeers(val act: MainActivity) {
 
         override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
             super.onMtuChanged(gatt, mtu, status)
+            Log.d("TEST_T", peers.size.toString())
             Log.d("ble mtu", "status=$status, mtu=$mtu")
             if (status == GATT_SUCCESS && gatt != null) {
                 Log.d("ble gatt", "${gatt.discoverServices()}")
@@ -185,15 +239,37 @@ class BlePeers(val act: MainActivity) {
                     Log.d("ble", "service is null")
             }
         }
+
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?,
+            status: Int
+        ) {
+            super.onCharacteristicWrite(gatt, characteristic, status)
+            Log.d("gatt", "Write success status: $status")
+        }
     }
 
+    @SuppressLint("MissingPermission")
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
-            if (!(result.device in peers)) {
-                Log.d("ble", "Found BLE tinySSB device! adding address: ${result.device.address}")
-                val g = result.device.connectGatt(act, true, gattCallback)
-                peers[result.device] = g
+            if (!(result.device in peers) and !(result.device in pending)) {
+            //if (!(result.device in peerList) and !(result.device in pendingList)) {
+                Log.d("ble_scan_callback", "Found BLE tinySSB device! adding address: ${result.device.address}")
+                Log.d("ble_scan_callback", "current pending: ${pendingList}")
+                Log.d("ble_scan_callback", "current peers: ${peerList}")
+                /*if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+
+                }
+                 */
+                val g = result.device.connectGatt(act, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+                //pendingList.add(result.device)
+                pending[result.device] = g
+                //val g = result.device.connectGatt(act, true, gattCallback)
+                //peers[result.device] = g
+
+
             }
         }
 
@@ -202,4 +278,136 @@ class BlePeers(val act: MainActivity) {
         }
     }
 
+    @SuppressLint("MissingPermission")
+    private fun startServer() {
+        val gattService = BluetoothGattService(TINYSSB_BLE_REPL_SERVICE_2022, BluetoothGattService.SERVICE_TYPE_PRIMARY)
+        val chRX = BluetoothGattCharacteristic(
+            TINYSSB_BLE_RX_CHARACTERISTIC,
+            BluetoothGattCharacteristic.PROPERTY_WRITE,
+            BluetoothGattCharacteristic.PERMISSION_WRITE)
+
+        // chTX characteristic not actively used (provided for backward compatibility (android to esp32 ble implementation))
+        val chTX = BluetoothGattCharacteristic(
+            TINYSSB_BLE_TX_CHARACTERISTIC,
+            BluetoothGattCharacteristic.PROPERTY_NOTIFY,
+            BluetoothGattCharacteristic.PERMISSION_READ
+        )
+        val descriptor = BluetoothGattDescriptor(TINYSSB_BLE_TX_CHARACTERISTIC, BluetoothGattDescriptor.PERMISSION_WRITE)
+        chTX.addDescriptor(descriptor)
+
+        gattService.addCharacteristic(chRX)
+        gattService.addCharacteristic(chTX)
+        gattServer = bluetoothManager.openGattServer(act, gattServerCallback).apply { addService(gattService)}
+        startAdvertising()
+        Log.d("GATT_Server", "Server started")
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun startAdvertising() {
+        advertiser = bluetoothAdapter.bluetoothLeAdvertiser
+
+        val advertiseSettings = AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED).setTimeout(0).setConnectable(true).build()
+        val advertiseData = AdvertiseData.Builder().addServiceUuid(ParcelUuid(TINYSSB_BLE_REPL_SERVICE_2022)).setIncludeDeviceName(false).build()
+        //advertiser.startAdvertising(advertiseSettings, advertiseData, advertiseCallback)
+        advertiser?.let { it.startAdvertising(advertiseSettings,advertiseData,advertiseCallback)}
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun stopAdvertising() {
+        advertiser?.let { it.stopAdvertising(advertiseCallback) }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun stopServer() {
+        stopAdvertising()
+        gattServer?.close()
+        Log.d("GATT_Server", "Server stopped")
+    }
+
+    private val advertiseCallback = object : AdvertiseCallback() {
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
+            Log.i("GATT_Advertiser", "GATT Advertise Started.")
+        }
+
+        override fun onStartFailure(errorCode: Int) {
+            Log.w("GATT_Advertiser", "GATT Advertise Failed: $errorCode")
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private val gattServerCallback = object : BluetoothGattServerCallback() {
+        override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
+            Log.d("GATT_Server", "Connection changed")
+            super.onConnectionStateChange(device, status, newState)
+                if( status == GATT_SUCCESS && newState == STATE_CONNECTED) {
+                    Log.d("GATT_Server", "Device connected: $device")
+                } else if (newState == STATE_DISCONNECTED) {
+                    connectedDevices.remove(device)
+                    Log.d("GATT_Server", "Device disconnected: $device")
+                }
+        }
+
+
+
+        override fun onCharacteristicWriteRequest(
+            device: BluetoothDevice?,
+            requestId: Int,
+            characteristic: BluetoothGattCharacteristic?,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            super.onCharacteristicWriteRequest(
+                device,
+                requestId,
+                characteristic,
+                preparedWrite,
+                responseNeeded,
+                offset,
+                value
+            )
+            Log.d("GATT_Server", "Characteristic Write Request! ${characteristic?.uuid}, $responseNeeded")
+            if (characteristic != null) {
+                if(characteristic.uuid == TINYSSB_BLE_RX_CHARACTERISTIC) {
+                    Log.d("GATT_Server", "Received characteristic: ${value}")
+                    gattServer?.sendResponse(device, requestId, GATT_SUCCESS,0, null)
+//                    if (value != null) {
+                        try {
+                            act.ioLock.lock()
+                            val rc = act.tinyDemux.on_rx(value!!)
+                            act.ioLock.unlock()
+                            if (!rc)
+                                Log.d("ble rx", "not dmx entry for ${value}")
+                        } catch (e: Exception) {
+                            Log.e("GATT_Server", "error on tinyDemux: ${e.stackTrace}")
+                        }
+//                    }
+                }
+            }
+        }
+
+        // only for backward compatibility (android to esp32 ble implementation)
+        override fun onDescriptorWriteRequest(
+            device: BluetoothDevice?,
+            requestId: Int,
+            descriptor: BluetoothGattDescriptor?,
+            preparedWrite: Boolean,
+            responseNeeded: Boolean,
+            offset: Int,
+            value: ByteArray?
+        ) {
+            Log.d("GATT_Server","DescriptorWriteRequest")
+            super.onDescriptorWriteRequest(
+                device,
+                requestId,
+                descriptor,
+                preparedWrite,
+                responseNeeded,
+                offset,
+                value
+            )
+            gattServer?.sendResponse(device, requestId, GATT_SUCCESS,0,null)
+        }
+    }
 }

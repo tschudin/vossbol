@@ -197,7 +197,7 @@ function inviteDecline(bid, prev) {
   var data = {
                   'bid': bid,
                   'cmd': [Operation.INVITE_DECLINE],
-                  'prev': [inviteID]
+                  'prev': prev
               }
   board_send_to_backend(data)
 }
@@ -520,8 +520,9 @@ function apply_all_operations(bid) {
     apply_operation(bid, validOps[i], false)
   }
 
-  if(curr_board == bid) { // update ui
+  if(curr_scenario == 'board' && curr_board == bid) { // update ui
     ui_update_board(bid, old_state)
+    console.log("UP CURR")
   }
 }
 
@@ -819,13 +820,16 @@ function apply_operation(bid, operationID, apply_on_ui) {
           }
           if(curr_op.fid == myId)
             board.subscribed = true
+          if(apply_on_ui) {
+            ui_update_board_title(bid)
+            menu_invite_create_entry(curr_op.fid)
+            if(curr_op.fid != myId)
+              launch_snackbar("A new user joined the kanban board")
+          }
+          break
         }
-        if(apply_on_ui) {
-          ui_update_board_title(bid)
-          menu_invite_create_entry(bid)
-        }
-
       }
+      console.log("WRONG INVITATION")
       break
     case Operation.INVITE_DECLINE:
       if (curr_op.fid in board.pendingInvitations) { // check if the invite accept operation is valid
@@ -838,7 +842,7 @@ function apply_operation(bid, operationID, apply_on_ui) {
           }
         }
         if(apply_on_ui)
-          menu_invite_create_entry(curr_op.body.cmd[1])
+          menu_invite_create_entry(curr_op.fid)
       }
       break
     case Operation.LEAVE:
@@ -849,8 +853,13 @@ function apply_operation(bid, operationID, apply_on_ui) {
       }
       delete board.pendingInvitations[curr_op.fid]
 
-      if(apply_on_ui)
+      if(apply_on_ui) {
         ui_update_board_title(bid)
+        menu_invite_create_entry(curr_op.fid)
+        if(curr_op.fid != myId)
+          launch_snackbar("A user has left the kanban board")
+      }
+
 
       break
   }

@@ -150,6 +150,15 @@ function load_board(bid) { //switches scene to board and changes title to board 
  */
 function ui_update_board(bid, old_state) {
   var board = tremola.board[bid]
+  console.log("DEBUG UPDATE")
+
+  if(curr_board != bid)
+    return
+
+  console.log("DEBUG UPDATE NOT INTERUPPTED")
+
+  console.log("DEBUG oldstate members: " + String(old_state.members))
+  console.log("DEBUG curr members: " + String(board.members))
 
   // board title (name + members)
   if(board.name != old_state.name || !equalArrays(board.members, old_state.members)) {
@@ -285,7 +294,7 @@ function menu_board_invitations() {
   }
 }
 
-// creates new entry in invitation or updates existing entry
+// creates new entry in invitation (to accept or reject invitations) or updates existing entry
 function menu_board_invitation_create_entry(bid) {
   var board = tremola.board[bid]
 
@@ -346,6 +355,7 @@ function btn_invite_accept (bid) {
   inviteAccept(bid, tremola.board[bid].pendingInvitations[myId])
   delete tremola.board[bid].pendingInvitations[myId]
   var inv = document.getElementById("kanban_invitation_" + bid)
+  launch_snackbar("Invitation accepted")
   if(inv)
     inv.outerHTML = ""
 }
@@ -354,6 +364,7 @@ function btn_invite_decline (bid) {
   inviteDecline(bid, tremola.board[bid].pendingInvitations[myId])
   delete tremola.board[bid].pendingInvitations[myId]
   var inv = document.getElementById("kanban_invitation_" + bid)
+  launch_snackbar("Invitation declined")
   if(inv)
     inv.outerHTML = ""
 }
@@ -423,13 +434,24 @@ function menu_invite() {
 function menu_invite_create_entry(id) {
   var board = tremola.board[curr_board]
 
+  if (document.getElementById("div:invite_menu").style.display == 'none')
+    return
+
   if (document.getElementById('invite_' + id)) {
     if(board.members.indexOf(id) >= 0)
       document.getElementById('invite_' + id).outerHTML = ''
-    else if(id in board.pendingInvitations)
-      document.getElementById('invite_' + id).classList.add("bg")
-    else
-      document.getElementById('invite_' + id).classList.remove("bg")
+    else if(id in board.pendingInvitations) {
+      document.getElementById('invite_' + id).classList.add("gray")
+      document.getElementById('invite_author_' + id).innerHTML = 'Already Invited'
+      document.getElementById('invite_btn_' + id).style.display = 'none'
+    }
+    else {
+      console.log("enable invite for" + id)
+      document.getElementById('invite_' + id).classList.remove("gray")
+      document.getElementById('invite_author_' + id).innerHTML = ''
+      document.getElementById('invite_btn_' + id).style.display = 'initial'
+    }
+
 
     return
   }
@@ -452,7 +474,7 @@ function menu_invite_create_entry(id) {
   invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
   invHTML += "<div style='padding-right:8px;'>"
   if(!isAlreadyInvited)
-    invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/send.svg');width: 35px;\" onclick='btn_invite(\"" + id +"\", \"" + curr_board +"\")'>&nbsp;</button>"
+    invHTML += "<button id='invite_btn_" + id + "' class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/send.svg');width: 35px;\" onclick='btn_invite(\"" + id +"\", \"" + curr_board +"\")'>&nbsp;</button>"
   invHTML += "</div></div></div>"
 
    document.getElementById("menu_invite_content").innerHTML += invHTML

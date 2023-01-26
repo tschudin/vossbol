@@ -899,8 +899,16 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
         if(op == Operation.INVITE && !board.subscribed && body.cmd[1] == myId) { // received invitation to board
           if(board.pendingInvitations[myId])
             board.pendingInvitations[myId].push(e.header.ref)
-          else
+          else {
             board.pendingInvitations[myId] = [e.header.ref]
+            launch_snackbar('New invitation received')
+            if (document.getElementById('kanban-invitations-overlay').style.display != 'none') {
+              menu_board_invitation_create_entry(bid)
+              console.log("create invite NAME:" + tremola.board['bid'].name)
+
+            }
+
+          }
         }
 
         if(op == Operation.INVITE_ACCEPT && e.header.fid == myId) { // invitation accepted -> start sorting all events
@@ -928,7 +936,7 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
           //newOperation(bid, e.header.ref) // insert Operation in sorted linear timeline via ScuttleSort
           board.sortedOperations.add(e.header.ref, prev)
 
-          var independentOPs = [Operation.COLUMN_CREATE, Operation.ITEM_CREATE, Operation.COLUMN_REMOVE, Operation.ITEM_REMOVE] // these operations cannot be overwritten; their position in the linear timeline does not affect the resulting board
+          var independentOPs = [Operation.COLUMN_CREATE, Operation.ITEM_CREATE, Operation.COLUMN_REMOVE, Operation.ITEM_REMOVE, Operation.LEAVE] // these operations cannot be overwritten; their position in the linear timeline does not affect the resulting board
 
           //  Ui update + update optimization // board.operations[e.header.ref].indx == board.sortedOperations.length -1
           if( board.sortedOperations.name2p[e.header.ref].indx == board.sortedOperations.linear.length - 1 || independentOPs.indexOf(board.operations[e.header.ref].body.cmd[0]) >= 0 ) { //if the new event is inserted at the end of the linear timeline or the position is irrelevant for this operation
@@ -936,8 +944,11 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
               apply_operation(bid, e.header.ref, true) // the board is currently displayed; additionally perform operation on UI
             else
               apply_operation(bid, e.header.ref, false)
-          } else
+          } else {
+            console.log("DEBUG APPLYALL")
             apply_all_operations(bid)
+          }
+
 
           //updateCurrPrev(bid, p) // prepare "previous pointer" for future operation
           board.curr_prev = board.sortedOperations.get_tips()

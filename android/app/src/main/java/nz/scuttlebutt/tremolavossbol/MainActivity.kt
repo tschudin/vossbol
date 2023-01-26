@@ -277,7 +277,9 @@ class MainActivity : Activity() {
             tremolaState.wai.eval("b2f_new_voice('${voice}')")
         */
         }  else if (requestCode == 555 && resultCode == RESULT_OK) { // enable fine grained location
-            ble!!.startBleScan()
+            ble!!.startBluetooth()
+
+
         }
 
         super.onActivityResult(requestCode, resultCode, data)
@@ -294,14 +296,16 @@ class MainActivity : Activity() {
         */
 
         ble = BlePeers(this)
-        ble!!.startBleScan()
+        ble!!.startBluetooth()
+
     }
 
     override fun onPause() {
         Log.d("onPause", "")
         super.onPause()
-        if (ble != null)
-            ble!!.stopBleScan()
+        if (ble != null) {
+            ble!!.stopBluetooth()
+        }
         /*
         try {
             (getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
@@ -326,6 +330,9 @@ class MainActivity : Activity() {
         server_socket = null
         */
         super.onDestroy()
+        if (ble != null) {
+            ble!!.stopBluetooth()
+        }
         unregisterReceiver(broadcastReceiver);
     }
 
