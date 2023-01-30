@@ -20,7 +20,7 @@ void cmd_rx(String cmd) {
       Serial.println("  r       reset this repo to blank");
       Serial.println("  s       send status request");
       Serial.println("  w       who is alive");
-      Serial.println("  x[id/*] reboot self/other/all");
+      Serial.println("  x[id|*] reboot self/other/all");
       Serial.println("  z[N]    zap (feed with index N) on all nodes");
       break;
     case 'a': { // inject new key
@@ -73,7 +73,7 @@ void cmd_rx(String cmd) {
       Serial.println("reset done");
       break;
     case 's': // send status request
-      mgmt_request_status();
+      mgmt_request('s');
       Serial.println("sent status request");
       break;
     case 'w': // who is alive
@@ -83,13 +83,13 @@ void cmd_rx(String cmd) {
     case 'x': // reboot
       if (cmd[1] == '*') {
         Serial.printf("sending reboot request to all\n");
-        mgmt_request_reboot_all();
+        mgmt_request('x');
       } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
 	char idHex[2 * MGMT_ID_LEN];
 	for (int i = 0; i < 2 * MGMT_ID_LEN; i++) { idHex[i] = cmd[i+1]; }
 	unsigned char *id = from_hex(idHex, 4);
         Serial.printf("sending reboot request to %s\n", to_hex(id, MGMT_ID_LEN, 0));
-        mgmt_request_reboot(id);
+        mgmt_request('x', id);
       } else {
         Serial.println("rebooting ...\n");
         esp_restart();
