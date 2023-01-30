@@ -9,6 +9,8 @@ struct request_s {
   unsigned char typ;
   unsigned char cmd;
   unsigned char id[MGMT_ID_LEN];
+  unsigned char dst[MGMT_ID_LEN];
+  bool all = false;
 };
 
 struct status_s {
@@ -48,6 +50,18 @@ unsigned char* _mkRequest(unsigned char cmd)
   request.cmd = cmd;
   request.id[0] = my_mac[4];
   request.id[1] = my_mac[5];
+  request.all = true;
+  return (unsigned char*) &request;
+}
+unsigned char* _mkRequestFor(unsigned char cmd, unsigned char* id)
+{
+  static struct request_s request;
+  request.typ = 'r';
+  request.cmd = cmd;
+  request.id[0] = my_mac[4];
+  request.id[1] = my_mac[5];
+  request.dst[0] = id[0];
+  request.dst[1] = id[1];
   return (unsigned char*) &request;
 }
 
@@ -110,6 +124,26 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
     statust[ndx].received_on = received_on;
     return;
   }
+  // receive reboot request
+  if (pkt[0] == 'r' && pkt[1] == 'x' && len == MGMT_REQUEST_LEN) {
+    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+    memcpy(request, pkt, MGMT_REQUEST_LEN);
+    Serial.println(String("mgmt_rx received reboot request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
+    if (request->all == true) {
+      Serial.println("rebooting ...");
+      esp_restart();
+    } else {
+      Serial.println(String("mgmt_rx received reboot request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
+      for (int i = 0; i < MGMT_ID_LEN; i++) {
+        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
+	  return;
+	}
+      }
+      Serial.println("rebooting ...");
+      esp_restart();
+    }
+    return;
+  }
   // unknown typ
   Serial.printf("mgmt_rx t=%c ??\n", pkt[0]);
 }
@@ -169,6 +203,18 @@ void mgmt_print_statust()
     // newline
     Serial.printf("\n");
   }
+}
+
+// send reboot request to specific node
+void mgmt_request_reboot(unsigned char* id)
+{
+  io_enqueue(_mkRequestFor('x', id), MGMT_REQUEST_LEN, mgmt_dmx, NULL);
+}
+
+// send reboot request to all nodes
+void mgmt_request_reboot_all()
+{
+  io_enqueue(_mkRequest('x'), MGMT_REQUEST_LEN, mgmt_dmx, NULL);
 }
 
 // eof

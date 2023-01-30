@@ -9,19 +9,19 @@ void cmd_rx(String cmd) {
   Serial.printf("CMD %s\n\n", cmd.c_str()); 
   switch(cmd[0]) {
     case '?':
-      Serial.println("  ?    help");
-      Serial.println("  a    add new random key");
-      Serial.println("  d    dump DMXT and CHKT");
-      Serial.println("  f    list file system");
+      Serial.println("  ?       help");
+      Serial.println("  a       add new random key");
+      Serial.println("  d       dump DMXT and CHKT");
+      Serial.println("  f       list file system");
 #if defined(LORA_LOG)
-      Serial.println("  l    list log file");
-      Serial.println("  m    empty log file");
+      Serial.println("  l       list log file");
+      Serial.println("  m       empty log file");
 #endif
-      Serial.println("  r    reset this repo to blank");
-      Serial.println("  s    send status request");
-      Serial.println("  w    who is alive");
-      Serial.println("  x    reboot");
-      Serial.println("  z[N] zap (feed with index N) on all nodes");
+      Serial.println("  r       reset this repo to blank");
+      Serial.println("  s       send status request");
+      Serial.println("  w       who is alive");
+      Serial.println("  x[id/*] reboot self/other/all");
+      Serial.println("  z[N]    zap (feed with index N) on all nodes");
       break;
     case 'a': { // inject new key
       unsigned char key[GOSET_KEY_LEN];
@@ -81,8 +81,20 @@ void cmd_rx(String cmd) {
       mgmt_print_statust();
       break;
     case 'x': // reboot
-      Serial.println("rebooting ...\n");
-      esp_restart();  
+      if (cmd[1] == '*') {
+        Serial.printf("sending reboot request to all\n");
+        mgmt_request_reboot_all();
+      } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
+	char idHex[2 * MGMT_ID_LEN];
+	for (int i = 0; i < 2 * MGMT_ID_LEN; i++) { idHex[i] = cmd[i+1]; }
+	unsigned char *id = from_hex(idHex, 4);
+        Serial.printf("sending reboot request to %s\n", to_hex(id, MGMT_ID_LEN, 0));
+        mgmt_request_reboot(id);
+      } else {
+        Serial.println("rebooting ...\n");
+        esp_restart();
+      }
+      break;
     case 'z': { // zap
       Serial.println("zap protocol started ...\n");
       int ndx = -1;
