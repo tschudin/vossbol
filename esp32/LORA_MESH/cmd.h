@@ -11,6 +11,7 @@ void cmd_rx(String cmd) {
     case '?':
       Serial.println("  ?       help");
       Serial.println("  a       add new random key");
+      Serial.println("  b[id|*] send beacon / request beacon from id/all");
       Serial.println("  d       dump DMXT and CHKT");
       Serial.println("  f       list file system");
 #if defined(LORA_LOG)
@@ -20,7 +21,7 @@ void cmd_rx(String cmd) {
       Serial.println("  r       reset this repo to blank");
       Serial.println("  s       send status request");
       Serial.println("  w       who is alive");
-      Serial.println("  x[id|*] reboot self/other/all");
+      Serial.println("  x[id|*] reboot / request reboot from id/all");
       Serial.println("  z[N]    zap (feed with index N) on all nodes");
       break;
     case 'a': { // inject new key
@@ -33,6 +34,21 @@ void cmd_rx(String cmd) {
       goset_dump(theGOset);
       break;
     }
+    case 'b': // beacon
+      if (cmd[1] == '*') {
+        Serial.printf("sending beacon request to all\n");
+        mgmt_send_request('b');
+      } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
+	char idHex[2 * MGMT_ID_LEN];
+	for (int i = 0; i < 2 * MGMT_ID_LEN; i++) { idHex[i] = cmd[i+1]; }
+	unsigned char *id = from_hex(idHex, 4);
+        Serial.printf("sending beacon request to %s\n", to_hex(id, MGMT_ID_LEN, 0));
+        mgmt_send_request('b', id);
+      } else {
+        Serial.println("sending out beacon ...\n");
+        mgmt_send_beacon();
+      }
+      break;
     case 'd': // dump
       // goset_dump(theGOset);
       Serial.println("Installed feeds:");
@@ -73,7 +89,7 @@ void cmd_rx(String cmd) {
       Serial.println("reset done");
       break;
     case 's': // send status request
-      mgmt_request('s');
+      mgmt_send_request('s');
       Serial.println("sent status request");
       break;
     case 'w': // who is alive
@@ -83,13 +99,13 @@ void cmd_rx(String cmd) {
     case 'x': // reboot
       if (cmd[1] == '*') {
         Serial.printf("sending reboot request to all\n");
-        mgmt_request('x');
+        mgmt_send_request('x');
       } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
 	char idHex[2 * MGMT_ID_LEN];
 	for (int i = 0; i < 2 * MGMT_ID_LEN; i++) { idHex[i] = cmd[i+1]; }
 	unsigned char *id = from_hex(idHex, 4);
         Serial.printf("sending reboot request to %s\n", to_hex(id, MGMT_ID_LEN, 0));
-        mgmt_request('x', id);
+        mgmt_send_request('x', id);
       } else {
         Serial.println("rebooting ...\n");
         esp_restart();

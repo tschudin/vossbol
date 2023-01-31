@@ -29,8 +29,14 @@ struct statust_entry_s {
   unsigned long int received_on;
 };
 
+struct beacon_s {
+  unsigned char typ;
+  unsigned char id[MGMT_ID_LEN];
+};
+
 #define MGMT_REQUEST_LEN  sizeof(struct request_s)
 #define MGMT_STATUS_LEN   sizeof(struct status_s)
+#define MGMT_BEACON_LEN   sizeof(struct beacon_s)
 
 
 struct statust_entry_s statust[STATUST_SIZE];
@@ -39,6 +45,7 @@ int statust_cnt;
 
 // forward declaration
 void mgmt_send_status();
+void mgmt_send_beacon();
 
 //------------------------------------------------------------------------------
 
@@ -77,6 +84,16 @@ unsigned char* _mkStatus()
   return (unsigned char*) &status;
 }
 
+// fill buffer with beacon packet
+unsigned char* _mkBeacon()
+{
+  static struct beacon_s beacon;
+  beacon.typ = 'b';
+  beacon.id[0] = my_mac[4];
+  beacon.id[1] = my_mac[5];
+  return (unsigned char*) &beacon;
+}
+
 //------------------------------------------------------------------------------
 
 // incoming packet with mgmt_dmx
@@ -85,11 +102,38 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
   pkt += DMX_LEN;
   len -= DMX_LEN;
 
+  // receive beacon
+  if (pkt[0] == 'b' && len == MGMT_BEACON_LEN) {
+    struct beacon_s *beacon = (struct beacon_s*) calloc(1, MGMT_BEACON_LEN);
+    memcpy(beacon, pkt, MGMT_BEACON_LEN);
+    Serial.println(String("mgmt_rx received beacon from ") + to_hex(beacon->id, MGMT_ID_LEN, 0));
+    return;
+  }
+  // receive beacon request
+  if (pkt[0] == 'r' && pkt[1] == 'b' && len == MGMT_REQUEST_LEN) {
+    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+    memcpy(request, pkt, MGMT_REQUEST_LEN);
+    Serial.println(String("mgmt_rx received beacon request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
+    if (request->all == true) {
+      Serial.println("sending beacon ...");
+      mgmt_send_beacon();
+    } else {
+      Serial.println(String("mgmt_rx received beacon request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
+      for (int i = 0; i < MGMT_ID_LEN; i++) {
+        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
+	  return;
+	}
+      }
+      Serial.println("sending beacon ...");
+      mgmt_send_beacon();
+    }
+    return;
+  }
   // receive status request
   if (pkt[0] == 'r' && pkt[1] == 's' && len == MGMT_REQUEST_LEN) {
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
-    Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, 2, 0));
+    Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
     mgmt_send_status();
     return;
   }
@@ -194,9 +238,15 @@ void mgmt_print_statust()
 }
 
 // send request to specified node (all if none)
-void mgmt_request(unsigned char cmd, unsigned char* id=NULL)
+void mgmt_send_request(unsigned char cmd, unsigned char* id=NULL)
 {
   io_enqueue(_mkRequest(cmd, id), MGMT_REQUEST_LEN, mgmt_dmx, NULL);
+}
+
+// send beacon
+void mgmt_send_beacon()
+{
+  io_enqueue(_mkBeacon(), MGMT_BEACON_LEN, mgmt_dmx, NULL);
 }
 
 // eof
