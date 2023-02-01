@@ -195,9 +195,43 @@ void mgmt_send_status()
   io_enqueue(_mkStatus(), MGMT_STATUS_LEN, mgmt_dmx, NULL);
 }
 
+// print status table entry
+void _print_status(status_s* status, unsigned long int received_on = NULL)
+{
+  // id
+  Serial.printf("  %s", to_hex(status->id, MGMT_ID_LEN, 0));
+  // voltage
+  Serial.printf(" | %6dV", status->voltage);
+  // feeds, entries & chunks
+  int feeds = status->feeds;
+  int entries = status->entries;
+  int chunks = status->chunks;
+  Serial.printf(" | %5d | %7d | %6d", feeds, entries, chunks);
+  // free
+  Serial.printf(" | %3d%%", status->free);
+  // lastSeen
+  int l = received_on == NULL ? 0 : millis() - received_on;
+  int ls = (l / 1000) % 60;
+  int lm = (l / 1000 / 60) % 60;
+  int lh = (l / 1000 / 60 / 60) % 24;
+  Serial.printf(" | %02d:%02d:%02d", lh, lm ,ls);
+  // uptime
+  int u = status->uptime;
+  int us = (u / 1000) % 60;
+  int um = (u / 1000 / 60) % 60;
+  int uh = (u / 1000 / 60 / 60) % 24;
+  int ud = u / 1000 / 60 / 60 / 24;
+  Serial.printf(" | %4dd %2dh %2dm %2ds", ud, uh, um ,us);
+  // self
+  if (received_on == NULL) { Serial.printf(" (self)"); }
+  // newline
+  Serial.printf("\n");
+}
+
 // print the status table
 void mgmt_print_statust()
 {
+  // header
   Serial.println("  id   | battery | feeds | entries | chunks | free | lastSeen | uptime");
   Serial.printf("  ");
   for (int i = 0; i < 4; i++) { Serial.printf("-"); } // id
@@ -207,33 +241,16 @@ void mgmt_print_statust()
   for (int i = 0; i < 11; i++) { Serial.printf("-"); } // lastSeen
   for (int i = 0; i < 20; i++) { Serial.printf("-"); } // uptime
   Serial.printf("\n");
+
+  // self
+  struct status_s *own = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
+  memcpy(own, _mkStatus(), MGMT_STATUS_LEN);
+  _print_status(own);
+  free(own);
+
+  // table entries
   for (int i = 0; i < statust_cnt; i++) {
-    // id
-    Serial.printf("  %s", to_hex(statust[i].state.id, MGMT_ID_LEN, 0));
-    // voltage
-    Serial.printf(" | %6dV", statust[i].state.voltage);
-    // feeds, entries & chunks
-    int feeds = statust[i].state.feeds;
-    int entries = statust[i].state.entries;
-    int chunks = statust[i].state.chunks;
-    Serial.printf(" | %5d | %7d | %6d", feeds, entries, chunks);
-    // free
-    Serial.printf(" | %3d%%", statust[i].state.free);
-    // lastSeen
-    int l = millis() - statust[i].received_on;
-    int ls = (l / 1000) % 60;
-    int lm = (l / 1000 / 60) % 60;
-    int lh = (l / 1000 / 60 / 60) % 24;
-    Serial.printf(" | %02d:%02d:%02d", lh, lm ,ls);
-    // uptime
-    int u = statust[i].state.uptime;
-    int us = (u / 1000) % 60;
-    int um = (u / 1000 / 60) % 60;
-    int uh = (u / 1000 / 60 / 60) % 24;
-    int ud = u / 1000 / 60 / 60 / 24;
-    Serial.printf(" | %4dd %2dh %2dm %2ds", ud, uh, um ,us);
-    // newline
-    Serial.printf("\n");
+    _print_status(&statust[i].state, statust[i].received_on);
   }
 }
 
