@@ -17,9 +17,9 @@ struct status_s {
   unsigned char typ;
   unsigned char id[MGMT_ID_LEN];
   long voltage;
-  int feeds;
-  int entries;
-  int chunks;
+  int feeds:10;
+  int entries:10;
+  int chunks:10;
   int free;
   unsigned long int uptime;
 };
