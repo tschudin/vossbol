@@ -759,6 +759,7 @@ function resetTremola() { // wipes browser-side content
                              "members":["ALL"], "touched": Date.now(), "lastRead": 0,
                              "timeline": new Timeline() };
     tremola.contacts[myId] = {"alias":"me", "initial": "M", "color": "#bd7578", "forgotten":false};
+    createBoard('Personal Board', [FLAG.PERSONAL])
     persist();
 }
 
@@ -870,7 +871,8 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
           "unreadEvents": 0,
           "subscribed": false,
           "pendingInvitations": {}, // User: [inviteIds]
-          "key": bid.toString()
+          "key": bid.toString(),
+          "flags": args.slice(1)
         }
       }
 
@@ -968,7 +970,22 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
                 console.log("Invited: " + m)
               }
             }
-            load_board(bid)
+            if(curr_scenario == 'members')
+              load_board(bid)
+          }
+
+          // creates Personal Board
+          if (board.flags.includes(FLAG.PERSONAL)) {
+            if(op == Operation.BOARD_CREATE)
+              createColumn(bid, 'Welcome')
+            else if (Object.values(board.columns)[0].item_ids.length == 0)
+              createColumnItem(bid, Object.values(board.columns)[0].id, 'Welcome!')
+            else if (board.items[Object.values(board.columns)[0].item_ids[0]].description == "") {
+              setItemDescription(bid, Object.values(board.columns)[0].item_ids[0], "You can create/edit cards and lists to organize your projects")
+              board.unreadEvents = 1
+            }
+
+
           }
 
 

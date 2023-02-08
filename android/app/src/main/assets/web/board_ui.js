@@ -420,6 +420,12 @@ function board_toggle_forget() {
 function menu_invite() {
   var board = tremola.board[curr_board]
   closeOverlay()
+
+  if(board.flags.includes(FLAG.PERSONAL)) {
+    launch_snackbar("You can't invite other people to your personal board!")
+    return
+  }
+
   document.getElementById("div:invite_menu").style.display = 'initial';
   document.getElementById("overlay-bg").style.display = 'initial';
 
@@ -488,6 +494,12 @@ function btn_invite(userId, bid) {
 
 function leave_curr_board() {
   closeOverlay()
+
+  if(tremola.board[curr_board].flags.includes(FLAG.PERSONAL)) {
+    launch_snackbar("You can't leave your personal board!")
+    return
+  }
+
   leave(curr_board)
   setScenario('kanban')
 }

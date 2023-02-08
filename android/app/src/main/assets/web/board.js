@@ -31,11 +31,19 @@ const Operation = {
   LEAVE: 'leave'
 }
 
+const FLAG = {
+  PERSONAL: 'personal'
+}
 
-function createBoard(name) {
+
+function createBoard(name, flags) {
+  var cmd = [Operation.BOARD_CREATE, name]
+  if(flags != null)
+    cmd = cmd.concat(flags)
+
   var data = {
                'bid': null,
-               'cmd': [Operation.BOARD_CREATE, name],
+               'cmd': cmd,
                'prev': null
              }
   board_send_to_backend(data)
