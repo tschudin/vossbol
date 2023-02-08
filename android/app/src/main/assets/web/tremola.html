@@ -147,7 +147,14 @@
       <div class="menu_history_hdr" style="overflow:auto;padding-bottom: 10px;">
         <b style="float: left;">History</b>
       </div>
-      <div id="menu_history_content" style="overflow-x: hidden;overflow-y: scroll;max-height: 70vh;"></div>
+      <div>
+        <label for='history_sort_select'>Sort by:</label>
+        <select id='history_sort_select' onchange="history_sort_select(this)">
+          <option value='latest_first'>Latest event first</option>
+          <option value='oldest_first'>Oldest event first</option>
+        </select>
+      </div>
+      <div id="menu_history_content" style="overflow-x: hidden;overflow-y: scroll;max-height: 70vh;display: flex;flex-direction: column;margin-top: 10px;"></div>
     </div>
 
     <div id="div:invite_menu" class="qr-overlay">

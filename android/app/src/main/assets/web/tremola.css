@@ -530,6 +530,7 @@ input:checked + .slider:before {
   box-shadow: 0 0 5px rgba(0,0,0,0.7);
   border-radius: 4pt;
   height: 3em;
+  margin-top: 5px;
 }
 
 .kanban_invitation_text_container {

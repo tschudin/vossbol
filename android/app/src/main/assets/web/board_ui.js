@@ -283,6 +283,20 @@ function menu_history() {
   document.getElementById('div:menu_history').style.display = 'initial'
 }
 
+function history_sort_select(obj) {
+  var history = document.getElementById('menu_history_content')
+  switch(obj.value) {
+    case('latest_first'):
+      if(history.style.flexDirection != 'column')
+        history.style.flexDirection = 'column'
+      break
+    case('oldest_first'):
+      if(history.style.flexDirection != 'column-reverse')
+        history.style.flexDirection = 'column-reverse'
+      break
+  }
+}
+
 function menu_board_invitations() {
   closeOverlay()
   document.getElementById("kanban-invitations-overlay").style.display = 'initial';
@@ -296,6 +310,7 @@ function menu_board_invitations() {
 
 // creates new entry in invitation (to accept or reject invitations) or updates existing entry
 function menu_board_invitation_create_entry(bid) {
+
   var board = tremola.board[bid]
 
   if(document.getElementById("kanban_invitation_" + bid)) {
@@ -343,12 +358,11 @@ function menu_board_invitation_create_entry(bid) {
   invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
   invHTML += "<div style='padding-right:8px;'>"
   //invHTML += "<div style='padding-right:10px;'>"
-  invHTML += "<button class='flat passive buttontext' style=\"height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px;background-color: var(--passive)\" onclick='btn_invite_accept(\"" + bid + "\")'>&nbsp;</button>"//</div>"
+  invHTML += "<button class='flat passive buttontext' style=\"height: 40px; background-image: url('img/checked.svg'); width: 35px;margin-right:10px;background-color: var(--passive)\" onclick='btn_invite_accept(\"" + bid + "\")'>&nbsp;</button>"//</div>"
   invHTML += "<button class='flat passive buttontext' style=\"height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;background-color: var(--passive)\" onclick='btn_invite_decline(\"" + bid + "\")'>&nbsp;</button>"
   invHTML += "</div></div></div>"
 
   document.getElementById("kanban_invitations_list").innerHTML += invHTML
-
 }
 
 function btn_invite_accept (bid) {
