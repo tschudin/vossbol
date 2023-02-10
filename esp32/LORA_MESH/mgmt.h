@@ -23,6 +23,7 @@ struct status_s {
   int chunks:10;
   int free;
   unsigned long int uptime;
+  unsigned long int lastSeen;
 };
 
 struct statust_entry_s {
@@ -106,6 +107,7 @@ unsigned char* _mkStatus()
     status[i].chunks = statust[ndxNeighbor].state.chunks;
     status[i].free = statust[ndxNeighbor].state.free;
     status[i].uptime = statust[ndxNeighbor].state.uptime;
+    status[i].lastSeen = millis() - statust[ndxNeighbor].received_on;
   }
 
   return (unsigned char*) &status;
@@ -235,6 +237,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
       statust[ndx].neighbors[ndxNeighbor].chunks = neighbor->chunks;
       statust[ndx].neighbors[ndxNeighbor].free = neighbor->free;
       statust[ndx].neighbors[ndxNeighbor].uptime = neighbor->uptime;
+      statust[ndx].neighbors[ndxNeighbor].lastSeen = neighbor->lastSeen;
       free(neighbor);
     }
 
@@ -281,6 +284,19 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
   Serial.printf("  %s", to_hex(status->id, MGMT_ID_LEN, 0));
   // src
   Serial.printf(" | %s", src == NULL ? "self" : to_hex(src, MGMT_ID_LEN, 0));
+  // when was this information received
+  int r = received_on == NULL ? 0 : millis() - received_on;
+  int rs = (r / 1000) % 60;
+  int rm = (r / 1000 / 60) % 60;
+  int rh = (r / 1000 / 60 / 60) % 24;
+  Serial.printf(" | %02d:%02d:%02d", rh, rm ,rs);
+  // when was the node seen for the last time
+  int l = received_on == NULL ? 0 : millis() - received_on;
+  l += status->lastSeen;
+  int ls = (l / 1000) % 60;
+  int lm = (l / 1000 / 60) % 60;
+  int lh = (l / 1000 / 60 / 60) % 24;
+  Serial.printf(" | %02d:%02d:%02d", lh, lm ,ls);
   // beacon
   Serial.printf(" | %6s", status->beacon == true ? "on" : "off");
   // voltage
@@ -292,13 +308,7 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
   Serial.printf(" | %5d | %7d | %6d", feeds, entries, chunks);
   // free
   Serial.printf(" | %3d%%", status->free);
-  // lastSeen
-  int l = received_on == NULL ? 0 : millis() - received_on;
-  int ls = (l / 1000) % 60;
-  int lm = (l / 1000 / 60) % 60;
-  int lh = (l / 1000 / 60 / 60) % 24;
-  Serial.printf(" | %02d:%02d:%02d", lh, lm ,ls);
-  // uptime
+  // what uptime did it report when it was last seen
   int u = status->uptime;
   int us = (u / 1000) % 60;
   int um = (u / 1000 / 60) % 60;
@@ -315,15 +325,16 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
 void mgmt_print_statust()
 {
   // header
-  Serial.println("  id   | src  | beacon | battery | feeds | entries | chunks | free | lastSeen | uptime");
+  Serial.println("  id   | src  | received | lastSeen | beacon | battery | feeds | entries | chunks | free | uptime");
   Serial.printf("  ");
   for (int i = 0; i < 4; i++) { Serial.printf("-"); } // id
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // src
+  for (int i = 0; i < 11; i++) { Serial.printf("-"); } // received
+  for (int i = 0; i < 11; i++) { Serial.printf("-"); } // lastSeen
   for (int i = 0; i < 9; i++) { Serial.printf("-"); } // beacon
   for (int i = 0; i < 10; i++) { Serial.printf("-"); } // voltage
   for (int i = 0; i < 27; i++) { Serial.printf("-"); } // FEC
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // free
-  for (int i = 0; i < 11; i++) { Serial.printf("-"); } // lastSeen
   for (int i = 0; i < 20; i++) { Serial.printf("-"); } // uptime
   Serial.printf("\n");
 
