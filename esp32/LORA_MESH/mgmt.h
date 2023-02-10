@@ -307,8 +307,6 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
   int uh = (u / 1000 / 60 / 60) % 24;
   int ud = u / 1000 / 60 / 60 / 24;
   Serial.printf(" | %4dd %2dh %2dm %2ds", ud, uh, um ,us);
-  // this node
-  Serial.printf(received_on == NULL ? " (this node)" : "");
   // newline
   Serial.printf("\n");
 }
@@ -338,12 +336,19 @@ void mgmt_print_statust()
 
   // table entries
   for (int i = 0; i < statust_cnt; i++) {
-    _print_status(&statust[i].state, statust[i].received_on);
+    _print_status(&statust[i].state, statust[i].received_on, statust[i].state.id);
     // neighbors
     for (int j = 0; j < statust[i].neighbor_cnt; j++) {
       _print_status(&statust[i].neighbors[j], statust[i].received_on, statust[i].state.id);
     }
   }
+
+  // glossary
+  Serial.printf("\n");
+  Serial.printf(" src:      who said this\n");
+  Serial.printf(" received: when was this information received\n");
+  Serial.printf(" lastSeen: last time we heard from this node\n");
+  Serial.printf(" uptime:   reported uptime when node was last seen\n");
 }
 
 // send request to specified node (all if none)
