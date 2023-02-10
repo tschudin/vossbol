@@ -140,7 +140,6 @@ int lora_bad_crc = 0;
 File lora_log;
 unsigned long int next_log_flush;
 
-unsigned long int next_mgmt_send_status;
 unsigned long int next_mgmt_send_beacon;
 
 #include "cmd.h"
@@ -186,9 +185,6 @@ void setup()
   arm_dmx(mgmt_dmx, mgmt_rx, NULL);
   Serial.printf("listening for mgmt protocol on %s\n", to_hex(mgmt_dmx, DMX_LEN));
 
-  // set time for next send-status-event
-  next_mgmt_send_status = MGMT_SEND_STATUS_INTERVAL;
-  
   repo_load();
 
   // strcpy(lora_line, "?");
@@ -463,9 +459,8 @@ void loop()
 #endif // NO_OLED
 
   // periodically send status
-  if (millis() > next_mgmt_send_status) {
+  if (millis() > mgmt_next_send_status) {
     mgmt_send_status();
-    next_mgmt_send_status = millis() + MGMT_SEND_STATUS_INTERVAL;
   }
 
   // check if beacon is active

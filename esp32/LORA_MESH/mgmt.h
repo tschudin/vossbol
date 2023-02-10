@@ -53,6 +53,7 @@ void mgmt_send_status();
 void mgmt_send_beacon();
 
 bool mgmt_beacon = false;
+unsigned long int mgmt_next_send_status;
 
 //------------------------------------------------------------------------------
 
@@ -163,7 +164,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
     Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    mgmt_send_status();
+    mgmt_next_send_status = millis() + random(5000);
     return;
   }
   // receive status update
@@ -268,15 +269,6 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
   Serial.printf("mgmt_rx t=%c ??\n", pkt[0]);
 }
 
-// send status response (sent periodically or after request)
-void mgmt_send_status()
-{
-  unsigned long int now = millis();
-  unsigned long int rand = random(5000);
-  while (true) { if (millis() - now > rand) { break; } } // TODO increase timer for next send-event instead, or set some flag
-  io_enqueue(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN, mgmt_dmx, NULL);
-}
-
 // print status table entry
 void _print_status(status_s* status, unsigned long int received_on = NULL, unsigned char* src = NULL)
 {
@@ -358,6 +350,13 @@ void mgmt_print_statust()
 void mgmt_send_request(unsigned char cmd, unsigned char* id=NULL)
 {
   io_enqueue(_mkRequest(cmd, id), MGMT_REQUEST_LEN, mgmt_dmx, NULL);
+}
+
+// send status response (sent periodically or after request)
+void mgmt_send_status()
+{
+  io_enqueue(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN, mgmt_dmx, NULL);
+  mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
 }
 
 // send beacon
