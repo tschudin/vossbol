@@ -18,6 +18,7 @@
 #define LOG_BATTERY_INTERVAL  15*60*1000 // millis (15 minutes)
 
 #define MGMT_SEND_STATUS_INTERVAL  5*60*1000 // millis (5 minutes)
+#define MGMT_SEND_BEACON_INTERVAL     5*1000 // millis (5 seconds)
 
 // ----------------------------------------------------------------------
 
@@ -140,6 +141,7 @@ File lora_log;
 unsigned long int next_log_flush;
 
 unsigned long int next_mgmt_send_status;
+unsigned long int next_mgmt_send_beacon;
 
 #include "cmd.h"
 
@@ -464,6 +466,12 @@ void loop()
   if (millis() > next_mgmt_send_status) {
     mgmt_send_status();
     next_mgmt_send_status = millis() + MGMT_SEND_STATUS_INTERVAL;
+  }
+
+  // check if beacon is active
+  if (mgmt_beacon && millis() > next_mgmt_send_beacon) {
+    mgmt_send_beacon();
+    next_mgmt_send_beacon = millis() + MGMT_SEND_BEACON_INTERVAL + random(2000);
   }
 
   delay(10);

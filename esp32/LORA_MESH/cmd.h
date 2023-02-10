@@ -9,19 +9,20 @@ void cmd_rx(String cmd) {
   Serial.printf("CMD %s\n\n", cmd.c_str()); 
   switch(cmd[0]) {
     case '?':
-      Serial.println("  ?       help");
-      Serial.println("  a       add new random key");
-      Serial.println("  b[id|*] send beacon / request beacon from id/all");
-      Serial.println("  d       dump DMXT and CHKT");
-      Serial.println("  f       list file system");
+      Serial.println("  ?        help");
+      Serial.println("  a        add new random key");
+      Serial.println("  b+[id|*] turn beacon on on id/all (1 hop)"); // TODO make all global
+      Serial.println("  b-[id|*] turn beacon off on id/all (1 hop)"); // TODO same
+      Serial.println("  d        dump DMXT and CHKT");
+      Serial.println("  f        list file system");
 #if defined(LORA_LOG)
-      Serial.println("  l       list log file");
-      Serial.println("  m       empty log file");
+      Serial.println("  l        list log file");
+      Serial.println("  m        empty log file");
 #endif
-      Serial.println("  r       reset this repo to blank");
-      Serial.println("  s[id|*] status / request status from id/all");
-      Serial.println("  x[id|*] reboot / request reboot from id/all");
-      Serial.println("  z[N]    zap (feed with index N) on all nodes");
+      Serial.println("  r        reset this repo to blank");
+      Serial.println("  s[id|*]  status / request status from id/all (1 hop)");
+      Serial.println("  x[id|*]  reboot / request reboot from id/all (1 hop)");
+      Serial.println("  z[N]     zap (feed with index N) on all nodes (global)");
       break;
     case 'a': { // inject new key
       unsigned char key[GOSET_KEY_LEN];
@@ -34,18 +35,16 @@ void cmd_rx(String cmd) {
       break;
     }
     case 'b': // beacon
-      if (cmd[1] == '*') {
-        Serial.printf("sending beacon request to all\n");
-        mgmt_send_request('b');
-      } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
+      if (!(cmd[1] == '+' or cmd[1] == '-')) { Serial.printf("invalid command: %s\n", cmd[1]); break; }
+      if (cmd[2] == '*') {
+        Serial.printf("sending request to turn %s beacon to all nodes\n", cmd[1] == '+' ? "on" : "off");
+        mgmt_send_request(cmd[1]);
+      } else if (cmd.length() == 2 * MGMT_ID_LEN + 2) {
 	char idHex[2 * MGMT_ID_LEN];
-	for (int i = 0; i < 2 * MGMT_ID_LEN; i++) { idHex[i] = cmd[i+1]; }
+	for (int i = 0; i < 2 * MGMT_ID_LEN; i++) { idHex[i] = cmd[i+2]; }
 	unsigned char *id = from_hex(idHex, 4);
-        Serial.printf("sending beacon request to %s\n", to_hex(id, MGMT_ID_LEN, 0));
-        mgmt_send_request('b', id);
-      } else {
-        Serial.println("sending out beacon ...\n");
-        mgmt_send_beacon();
+        Serial.printf("sending request to turn %s beacon to %s\n", cmd[1] == '+' ? "on" : "off", to_hex(id, MGMT_ID_LEN, 0));
+        mgmt_send_request(cmd[1], id);
       }
       break;
     case 'd': // dump
@@ -89,7 +88,7 @@ void cmd_rx(String cmd) {
       break;
     case 's': // send status request
       if (cmd[1] == '*') {
-        Serial.printf("sending status request to all\n");
+        Serial.printf("sending status request to all reachable (1 hop) nodes\n");
         mgmt_send_request('s');
       } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
 	char idHex[2 * MGMT_ID_LEN];
@@ -104,7 +103,7 @@ void cmd_rx(String cmd) {
       break;
     case 'x': // reboot
       if (cmd[1] == '*') {
-        Serial.printf("sending reboot request to all\n");
+        Serial.printf("sending reboot request to all reachable (1 hop) nodes\n");
         mgmt_send_request('x');
       } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
 	char idHex[2 * MGMT_ID_LEN];

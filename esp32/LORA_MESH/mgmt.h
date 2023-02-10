@@ -16,6 +16,7 @@ struct request_s {
 struct status_s {
   unsigned char typ;
   unsigned char id[MGMT_ID_LEN];
+  bool beacon;
   long voltage;
   int feeds:10;
   int entries:10;
@@ -50,6 +51,8 @@ int statust_rrb;
 void mgmt_send_status();
 void mgmt_send_beacon();
 
+bool mgmt_beacon = false;
+
 //------------------------------------------------------------------------------
 
 // fill buffer with request packet
@@ -77,6 +80,7 @@ unsigned char* _mkStatus()
   status[0].typ = 's';
   status[0].id[0] = my_mac[4];
   status[0].id[1] = my_mac[5];
+  status[0].beacon = mgmt_beacon;
   status[0].voltage = axp.getBattVoltage()/1000;
   status[0].feeds = feed_cnt;
   status[0].entries = entry_cnt;
@@ -95,6 +99,7 @@ unsigned char* _mkStatus()
     status[i].typ = 's';
     status[i].id[0] = statust[ndxNeighbor].state.id[0];
     status[i].id[1] = statust[ndxNeighbor].state.id[1];
+    status[i].beacon = statust[ndxNeighbor].state.beacon;
     status[i].voltage = statust[ndxNeighbor].state.voltage;
     status[i].feeds = statust[ndxNeighbor].state.feeds;
     status[i].entries = statust[ndxNeighbor].state.entries;
@@ -134,23 +139,21 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
     return;
   }
   // receive beacon request
-  if (pkt[0] == 'r' && pkt[1] == 'b' && len == MGMT_REQUEST_LEN) {
+  if (pkt[0] == 'r' && (pkt[1] == '+' || pkt[1] == '-') && len == MGMT_REQUEST_LEN) {
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
     Serial.println(String("mgmt_rx received beacon request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    if (request->all == true) {
-      Serial.println("sending beacon ...");
-      mgmt_send_beacon();
-    } else {
+    if (request->all == false) {
       Serial.println(String("mgmt_rx received beacon request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
       for (int i = 0; i < MGMT_ID_LEN; i++) {
         if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
 	  return;
 	}
       }
-      Serial.println("sending beacon ...");
-      mgmt_send_beacon();
     }
+    Serial.printf("turning %s beacon ...\n", pkt[1] == '+' ? "on" : "off");
+    mgmt_beacon = pkt[1] == '+' ? true : false;
+    //mgmt_send_beacon();
     return;
   }
   // receive status request
@@ -186,6 +189,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
       }
     }
     memcpy(statust[ndx].state.id, other->id, MGMT_ID_LEN);
+    statust[ndx].state.beacon = other->beacon;
     statust[ndx].state.voltage = other->voltage;
     statust[ndx].state.feeds = other->feeds;
     statust[ndx].state.entries = other->entries;
@@ -224,6 +228,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
 	}
       }
       memcpy(statust[ndx].neighbors[ndxNeighbor].id, neighbor->id, MGMT_ID_LEN);
+      statust[ndx].neighbors[ndxNeighbor].beacon = neighbor->beacon;
       statust[ndx].neighbors[ndxNeighbor].voltage = neighbor->voltage;
       statust[ndx].neighbors[ndxNeighbor].feeds = neighbor->feeds;
       statust[ndx].neighbors[ndxNeighbor].entries = neighbor->entries;
@@ -265,7 +270,7 @@ void mgmt_send_status()
 {
   unsigned long int now = millis();
   unsigned long int rand = random(5000);
-  while (true) { if (millis() - now > rand) { break; } }
+  while (true) { if (millis() - now > rand) { break; } } // TODO increase timer for next send-event instead, or set some flag
   io_enqueue(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN, mgmt_dmx, NULL);
 }
 
@@ -276,6 +281,8 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
   Serial.printf("  %s", to_hex(status->id, MGMT_ID_LEN, 0));
   // src
   Serial.printf(" | %s", src == NULL ? "self" : to_hex(src, MGMT_ID_LEN, 0));
+  // beacon
+  Serial.printf(" | %6s", status->beacon == true ? "on" : "off");
   // voltage
   Serial.printf(" | %6dV", status->voltage);
   // feeds, entries & chunks
@@ -308,10 +315,11 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
 void mgmt_print_statust()
 {
   // header
-  Serial.println("  id   | src  | battery | feeds | entries | chunks | free | lastSeen | uptime");
+  Serial.println("  id   | src  | beacon | battery | feeds | entries | chunks | free | lastSeen | uptime");
   Serial.printf("  ");
   for (int i = 0; i < 4; i++) { Serial.printf("-"); } // id
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // src
+  for (int i = 0; i < 9; i++) { Serial.printf("-"); } // beacon
   for (int i = 0; i < 10; i++) { Serial.printf("-"); } // voltage
   for (int i = 0; i < 27; i++) { Serial.printf("-"); } // FEC
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // free
