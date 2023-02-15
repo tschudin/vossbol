@@ -176,6 +176,14 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
     Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
+    if (request->all == false) {
+      Serial.println(String("mgmt_rx received status request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
+      for (int i = 0; i < MGMT_ID_LEN; i++) {
+        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
+	  return;
+	}
+      }
+    }
     mgmt_next_send_status = millis() + random(5000);
     return;
   }
