@@ -4,6 +4,7 @@ unsigned char mgmt_dmx[DMX_LEN];
 
 #define MGMT_ID_LEN  2
 #define STATUST_SIZE 23
+#define STATUST_EOL  24 * 60 * 60 * 1000 // millis (24h)
 
 struct request_s {
   unsigned char typ;
@@ -104,7 +105,8 @@ unsigned char* _mkStatus()
   int ndxNeighbor;
   for (int i = 1; i < maxEntries; i++) {
     if (i > statust_cnt) { break; }
-    ndxNeighbor = statust_rrb++ % statust_cnt;
+    ndxNeighbor = statust_rrb;
+    statust_rrb = ++statust_rrb % statust_cnt;
     status[i].typ = 's';
     status[i].id[0] = statust[ndxNeighbor].state.id[0];
     status[i].id[1] = statust[ndxNeighbor].state.id[1];
@@ -385,7 +387,40 @@ void mgmt_send_request(unsigned char cmd, unsigned char* id=NULL)
 // send status response (sent periodically or after request)
 void mgmt_send_status()
 {
+  // housekeeping
+  while (true) {
+    int old_cnt = statust_cnt;
+    for (int i = 0; i < old_cnt; i++) {
+      if (millis() - statust[i].received_on > STATUST_EOL) {
+        if (i < old_cnt - 1) {
+          memcpy(&statust[i], &statust[old_cnt - 1], sizeof(struct statust_entry_s));
+	}
+	statust[old_cnt - 1] = (const struct statust_entry_s) { 0 };
+	statust_cnt--;
+	break;
+      } else {
+        // same for its neighbors
+        while (true) {
+          int old_neighbor_cnt = statust[i].neighbor_cnt;
+          for (int j = 0; j < old_neighbor_cnt; j++) {
+            if (millis() - statust[i].received_on + statust[i].neighbors[j].lastSeen > STATUST_EOL) {
+              if (i < old_neighbor_cnt - 1) {
+                memcpy(&statust[i].neighbors[j], &statust[i].neighbors[old_neighbor_cnt - 1], sizeof(struct status_s));
+	      }
+	      statust[i].neighbors[old_neighbor_cnt - 1] = (const struct status_s) { 0 };
+	      statust[i].neighbor_cnt--;
+	      break;
+            }
+          }
+          if (old_neighbor_cnt == statust[i].neighbor_cnt) { break; }
+        }
+      }
+    }
+    if (old_cnt == statust_cnt) { break; }
+  }
+  // send status
   io_enqueue(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN, mgmt_dmx, NULL);
+  // set next event
   mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
 }
 
