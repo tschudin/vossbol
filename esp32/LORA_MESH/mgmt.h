@@ -3,7 +3,7 @@
 unsigned char mgmt_dmx[DMX_LEN];
 
 #define MGMT_ID_LEN  2
-#define STATUST_SIZE 42
+#define STATUST_SIZE 23
 
 struct request_s {
   unsigned char typ;
@@ -24,6 +24,9 @@ struct status_s {
   int free;
   unsigned long int uptime;
   unsigned long int lastSeen;
+  float latitude;
+  float longitude;
+  int altitude:14;
 };
 
 struct statust_entry_s {
@@ -91,9 +94,13 @@ unsigned char* _mkStatus()
   int avail = total - MyFS.usedBytes();
   status[0].free = avail / (total/100);
   status[0].uptime = millis();
+  status[0].latitude = gps.location.isValid() ? (float) gps.location.lat() : 0;
+  status[0].longitude = gps.location.isValid() ? (float) gps.location.lng() : 0;
+  status[0].altitude = gps.location.isValid() ? (float) gps.altitude.meters() : 0;
 
   // add neighbors
   int maxEntries = (int) (120 - 11) / MGMT_STATUS_LEN;
+  Serial.printf("MGMT_STATUS_LEN = %d\n", MGMT_STATUS_LEN);
   int ndxNeighbor;
   for (int i = 1; i < maxEntries; i++) {
     if (i > statust_cnt) { break; }
@@ -109,6 +116,9 @@ unsigned char* _mkStatus()
     status[i].free = statust[ndxNeighbor].state.free;
     status[i].uptime = statust[ndxNeighbor].state.uptime;
     status[i].lastSeen = millis() - statust[ndxNeighbor].received_on;
+    status[i].latitude = statust[ndxNeighbor].state.latitude;
+    status[i].longitude = statust[ndxNeighbor].state.longitude;
+    status[i].altitude = statust[ndxNeighbor].state.altitude;
   }
 
   return (unsigned char*) &status;
@@ -191,6 +201,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
 	return;
       }
     }
+    statust[ndx].received_on = received_on;
     memcpy(statust[ndx].state.id, other->id, MGMT_ID_LEN);
     statust[ndx].state.beacon = other->beacon;
     statust[ndx].state.voltage = other->voltage;
@@ -199,7 +210,9 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
     statust[ndx].state.chunks = other->chunks;
     statust[ndx].state.free = other->free;
     statust[ndx].state.uptime = other->uptime;
-    statust[ndx].received_on = received_on;
+    statust[ndx].state.latitude = other->latitude;
+    statust[ndx].state.longitude = other->longitude;
+    statust[ndx].state.altitude = other->altitude;
 
     pkt += MGMT_STATUS_LEN;
 
@@ -239,6 +252,9 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
       statust[ndx].neighbors[ndxNeighbor].free = neighbor->free;
       statust[ndx].neighbors[ndxNeighbor].uptime = neighbor->uptime;
       statust[ndx].neighbors[ndxNeighbor].lastSeen = neighbor->lastSeen;
+      statust[ndx].neighbors[ndxNeighbor].latitude = neighbor->latitude;
+      statust[ndx].neighbors[ndxNeighbor].longitude = neighbor->longitude;
+      statust[ndx].neighbors[ndxNeighbor].altitude = neighbor->altitude;
       free(neighbor);
     }
 
@@ -307,6 +323,12 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
   int uh = (u / 1000 / 60 / 60) % 24;
   int ud = u / 1000 / 60 / 60 / 24;
   Serial.printf(" | %4dd %2dh %2dm %2ds", ud, uh, um ,us);
+  // latitude
+  Serial.printf(" | %10f", status->latitude);
+  // longitude
+  Serial.printf(" | %10f", status->longitude);
+  // altitude
+  Serial.printf(" | %7dm", status->altitude);
   // newline
   Serial.printf("\n");
 }
@@ -315,7 +337,7 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
 void mgmt_print_statust()
 {
   // header
-  Serial.println("  id   | src  | received | lastSeen | beacon | battery | feeds | entries | chunks | free | uptime");
+  Serial.println("  id   | src  | received | lastSeen | beacon | battery | feeds | entries | chunks | free | uptime            | latitude   | longitude  | altitude");
   Serial.printf("  ");
   for (int i = 0; i < 4; i++) { Serial.printf("-"); } // id
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // src
@@ -326,6 +348,9 @@ void mgmt_print_statust()
   for (int i = 0; i < 27; i++) { Serial.printf("-"); } // FEC
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // free
   for (int i = 0; i < 20; i++) { Serial.printf("-"); } // uptime
+  for (int i = 0; i < 13; i++) { Serial.printf("-"); } // latitude
+  for (int i = 0; i < 13; i++) { Serial.printf("-"); } // longitude
+  for (int i = 0; i < 11; i++) { Serial.printf("-"); } // altitude
   Serial.printf("\n");
 
   // self
