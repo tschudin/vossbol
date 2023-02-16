@@ -57,7 +57,7 @@ void mgmt_send_status();
 void mgmt_send_beacon();
 
 bool mgmt_beacon = false;
-unsigned long int mgmt_next_send_status;
+unsigned long int mgmt_next_send_status = MGMT_SEND_STATUS_INTERVAL;
 
 //------------------------------------------------------------------------------
 
