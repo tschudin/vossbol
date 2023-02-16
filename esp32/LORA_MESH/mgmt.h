@@ -107,20 +107,8 @@ unsigned char* _mkStatus()
     if (i > statust_cnt) { break; }
     ndxNeighbor = statust_rrb;
     statust_rrb = ++statust_rrb % statust_cnt;
-    status[i].typ = 's';
-    status[i].id[0] = statust[ndxNeighbor].state.id[0];
-    status[i].id[1] = statust[ndxNeighbor].state.id[1];
-    status[i].beacon = statust[ndxNeighbor].state.beacon;
-    status[i].voltage = statust[ndxNeighbor].state.voltage;
-    status[i].feeds = statust[ndxNeighbor].state.feeds;
-    status[i].entries = statust[ndxNeighbor].state.entries;
-    status[i].chunks = statust[ndxNeighbor].state.chunks;
-    status[i].free = statust[ndxNeighbor].state.free;
-    status[i].uptime = statust[ndxNeighbor].state.uptime;
+    memcpy(&status[i], &statust[ndxNeighbor].state, sizeof(struct status_s));
     status[i].lastSeen = millis() - statust[ndxNeighbor].received_on;
-    status[i].latitude = statust[ndxNeighbor].state.latitude;
-    status[i].longitude = statust[ndxNeighbor].state.longitude;
-    status[i].altitude = statust[ndxNeighbor].state.altitude;
   }
 
   return (unsigned char*) &status;
@@ -212,17 +200,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
       }
     }
     statust[ndx].received_on = received_on;
-    memcpy(statust[ndx].state.id, other->id, MGMT_ID_LEN);
-    statust[ndx].state.beacon = other->beacon;
-    statust[ndx].state.voltage = other->voltage;
-    statust[ndx].state.feeds = other->feeds;
-    statust[ndx].state.entries = other->entries;
-    statust[ndx].state.chunks = other->chunks;
-    statust[ndx].state.free = other->free;
-    statust[ndx].state.uptime = other->uptime;
-    statust[ndx].state.latitude = other->latitude;
-    statust[ndx].state.longitude = other->longitude;
-    statust[ndx].state.altitude = other->altitude;
+    memcpy(&statust[ndx].state, other, sizeof(struct status_s));
 
     pkt += MGMT_STATUS_LEN;
 
@@ -253,18 +231,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
 	  continue;
 	}
       }
-      memcpy(statust[ndx].neighbors[ndxNeighbor].id, neighbor->id, MGMT_ID_LEN);
-      statust[ndx].neighbors[ndxNeighbor].beacon = neighbor->beacon;
-      statust[ndx].neighbors[ndxNeighbor].voltage = neighbor->voltage;
-      statust[ndx].neighbors[ndxNeighbor].feeds = neighbor->feeds;
-      statust[ndx].neighbors[ndxNeighbor].entries = neighbor->entries;
-      statust[ndx].neighbors[ndxNeighbor].chunks = neighbor->chunks;
-      statust[ndx].neighbors[ndxNeighbor].free = neighbor->free;
-      statust[ndx].neighbors[ndxNeighbor].uptime = neighbor->uptime;
-      statust[ndx].neighbors[ndxNeighbor].lastSeen = neighbor->lastSeen;
-      statust[ndx].neighbors[ndxNeighbor].latitude = neighbor->latitude;
-      statust[ndx].neighbors[ndxNeighbor].longitude = neighbor->longitude;
-      statust[ndx].neighbors[ndxNeighbor].altitude = neighbor->altitude;
+      memcpy(&statust[ndx].neighbors[ndxNeighbor], neighbor, sizeof(struct status_s));
       free(neighbor);
     }
 
