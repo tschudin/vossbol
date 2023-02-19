@@ -109,7 +109,7 @@ unsigned char* _mkStatus()
 
   // add neighbors
   int maxEntries = (int) (120 - 11) / MGMT_STATUS_LEN;
-  Serial.printf("MGMT_STATUS_LEN = %d\n", MGMT_STATUS_LEN);
+  Serial.printf("MGMT_STATUS_LEN = %d\r\n", MGMT_STATUS_LEN);
   int ndxNeighbor;
   for (int i = 1; i < maxEntries; i++) {
     if (i > statust_cnt) { break; }
@@ -173,7 +173,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 	}
       }
     }
-    Serial.printf("turning %s beacon ...\n", pkt[1] == '+' ? "on" : "off");
+    Serial.printf("turning %s beacon ...\r\n", pkt[1] == '+' ? "on" : "off");
     mgmt_beacon = pkt[1] == '+' ? true : false;
     //mgmt_send_beacon();
     return;
@@ -205,7 +205,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
       if (statust_cnt < STATUST_SIZE) {
         ndx = statust_cnt++;
       } else {
-	Serial.printf("%8sstatus table is full, skipping...\n", "");
+	Serial.printf("%8sstatus table is full, skipping...\r\n", "");
 	free(other);
 	return;
       }
@@ -233,7 +233,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
       }
       struct status_s *neighbor = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
       memcpy(neighbor, pkt, MGMT_STATUS_LEN);
-      Serial.printf("%8slearned about %s\n", "", to_hex(neighbor->id, 2, 0));
+      Serial.printf("%8slearned about %s\r\n", "", to_hex(neighbor->id, 2, 0));
       pkt += MGMT_STATUS_LEN;
       ndxNeighbor = -1;
       // check if node is already in table
@@ -247,7 +247,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
         if (statust[ndx].neighbor_cnt < STATUST_SIZE) {
           ndxNeighbor = statust[ndx].neighbor_cnt++;
 	} else {
-	  Serial.printf("%8sneighbor table of %s is full, skipping...\n", "", to_hex(other->id, 2, 0));
+	  Serial.printf("%8sneighbor table of %s is full, skipping...\r\n", "", to_hex(other->id, 2, 0));
 	  free(neighbor);
 	  continue;
 	}
@@ -291,7 +291,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     return;
   }
   // unknown typ
-  Serial.printf("mgmt_rx t=%c ??\n", pkt[0]);
+  Serial.printf("mgmt_rx t=%c ??\r\n", pkt[0]);
 }
 
 // print status table entry
@@ -339,7 +339,7 @@ void _print_status(status_s* status, unsigned long int received_on = NULL, unsig
   // altitude
   Serial.printf(" | %7dm", status->altitude);
   // newline
-  Serial.printf("\n");
+  Serial.printf("\r\n");
 }
 
 // print the status table
@@ -360,7 +360,7 @@ void mgmt_print_statust()
   for (int i = 0; i < 13; i++) { Serial.printf("-"); } // latitude
   for (int i = 0; i < 13; i++) { Serial.printf("-"); } // longitude
   for (int i = 0; i < 11; i++) { Serial.printf("-"); } // altitude
-  Serial.printf("\n");
+  Serial.printf("\r\n");
 
   // self
   struct status_s *own = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
@@ -378,11 +378,11 @@ void mgmt_print_statust()
   }
 
   // glossary
-  Serial.printf("\n");
-  Serial.printf(" src:      who said this\n");
-  Serial.printf(" received: when was this information received\n");
-  Serial.printf(" lastSeen: last time we heard from this node\n");
-  Serial.printf(" uptime:   reported uptime when node was last seen\n");
+  Serial.printf("\r\n");
+  Serial.printf(" src:      who said this\r\n");
+  Serial.printf(" received: when was this information received\r\n");
+  Serial.printf(" lastSeen: last time we heard from this node\r\n");
+  Serial.printf(" uptime:   reported uptime when node was last seen\r\n");
 }
 
 // send request to specified node (all if none)
