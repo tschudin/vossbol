@@ -1,0 +1,6 @@
+# .gitignore
+
+partitions.csv
+
+# emacs backup files
+*~ 

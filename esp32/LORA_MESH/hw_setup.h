@@ -228,6 +228,7 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
     Serial.println("LittleFS Mount Failed, partition was reformatted");
     // return;
   }
+  // MyFS.format(); // uncomment and run once after a change in partition size
 
   // -------------------------------------------------------------------
 

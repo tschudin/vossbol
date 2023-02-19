@@ -26,9 +26,17 @@ ifndef SERIAL
   endif
 endif
 
+ifeq ($(BOARD),heltec)
+  PARTITIONS_CSV=partitions-6.5M.csv
+else
+  PARTITIONS_CSV=partitions-2.5M.csv
+endif
+
 all: compile
 
 compile:
+	rm -f partitions.csv
+	ln -s $(PARTITIONS_CSV) partitions.csv
 	$(BINDIR)/arduino-cli compile -v --fqbn $(FQBN) $(MAIN).ino \
 		--build-properties build.partitions=partitions.csv,upload.maximum_size=1572864
 
