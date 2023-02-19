@@ -7,7 +7,7 @@
 #define NODE_ROUND_LEN  (8000/2) // millis, take turns between log entries and chunks
 unsigned int node_next_vector; // time when one of the two next vectors should be sent
 
-void incoming_want_request(unsigned char *buf, int len, unsigned char *aux)
+void incoming_want_request(unsigned char *buf, int len, unsigned char *aux, struct face_s *f)
 {
   struct bipf_s *lptr = bipf_loads(buf + DMX_LEN, len - DMX_LEN);
   if (lptr == NULL || lptr->typ != BIPF_LIST || lptr->cnt < 1) return;
@@ -36,7 +36,7 @@ void incoming_want_request(unsigned char *buf, int len, unsigned char *aux)
   bipf_free(lptr);
 }
 
-void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux)
+void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux, struct face_s *f)
 {
   struct bipf_s *lptr = bipf_loads(buf + DMX_LEN, len - DMX_LEN);
   if (lptr == NULL || lptr->typ != BIPF_LIST) return;
@@ -75,14 +75,14 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux)
   bipf_free(lptr);
 }
 
-void incoming_pkt(unsigned char *buf, int len, unsigned char *fid)
+void incoming_pkt(unsigned char *buf, int len, unsigned char *fid, struct face_s *f)
 {
   // Serial.println("incoming pkt " + String(len));
   if (len != TINYSSB_PKT_LEN) return;
   repo_feed_append(fid, buf);
 }
 
-void incoming_chunk(unsigned char *buf, int len, int blbt_ndx)
+void incoming_chunk(unsigned char *buf, int len, int blbt_ndx, struct face_s *f)
 {
   // Serial.println("received chunk");
   if (len != TINYSSB_PKT_LEN) return;

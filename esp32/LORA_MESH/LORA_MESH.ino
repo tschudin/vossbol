@@ -107,10 +107,10 @@ struct feed_s* fid2feed(unsigned char* fid) {
 char* to_hex(unsigned char* buf, int len, int add_colon=0);
 void repo_new_feed(unsigned char* fid);
 void repo_reset(char *path = (char*)FEED_DIR);
-void incoming_pkt(unsigned char* buf, int len, unsigned char *fid);
-void incoming_chunk(unsigned char* buf, int len, int blbt_ndx);
-void incoming_want_request(unsigned char* buf, int len, unsigned char* aux);
-void incoming_chnk_request(unsigned char* buf, int len, unsigned char* aux);
+void incoming_pkt(unsigned char* buf, int len, unsigned char *fid, struct face_s *);
+void incoming_chunk(unsigned char* buf, int len, int blbt_ndx, struct face_s *);
+void incoming_want_request(unsigned char* buf, int len, unsigned char* aux, struct face_s *);
+void incoming_chnk_request(unsigned char* buf, int len, unsigned char* aux, struct face_s *);
 void ble_init();
 
 
@@ -165,7 +165,7 @@ void setup()
   
   io_init();
 
-  Serial.printf("File system: %d total bytes, %d used\n",
+  Serial.printf("File system: %d total bytes, %d used\n\r",
                 MyFS.totalBytes(), MyFS.usedBytes());
   MyFS.mkdir(FEED_DIR);
   listDir(MyFS, FEED_DIR, 0);
@@ -177,13 +177,13 @@ void setup()
   crypto_hash_sha256(h, (unsigned char*) GOSET_DMX_STR, strlen(GOSET_DMX_STR));
   memcpy(goset_dmx, h, DMX_LEN);
   arm_dmx(goset_dmx, goset_rx, NULL);
-  Serial.printf("listening for GOset protocol on %s\n", to_hex(goset_dmx, 7));
+  Serial.printf("listening for GOset protocol on %s\n\r", to_hex(goset_dmx, 7));
 
   // initialize mgmt_dmx
   crypto_hash_sha256(h, (unsigned char*) MGMT_DMX_STR, strlen(MGMT_DMX_STR));
   memcpy(mgmt_dmx, h, DMX_LEN);
   arm_dmx(mgmt_dmx, mgmt_rx, NULL);
-  Serial.printf("listening for mgmt protocol on %s\n", to_hex(mgmt_dmx, DMX_LEN));
+  Serial.printf("listening for mgmt protocol on %s\n\r", to_hex(mgmt_dmx, DMX_LEN));
 
   repo_load();
 
@@ -203,14 +203,14 @@ void setup()
 #endif
   lora_log.printf("millis,batt,utc,mac,lat,lon,ele,plen,prssi,psnr,pfe,rssi\n");
   next_log_flush = millis() + LOG_FLUSH_INTERVAL;
-  Serial.printf("\nlength of %s: %d bytes\n", LORA_LOG_FILENAME, lora_log.size());
+  Serial.printf("\n\rlength of %s: %d bytes\n\r", LORA_LOG_FILENAME, lora_log.size());
 #endif // LORA_LOG
 
-  Serial.printf("\nHeap: %d total, %d free, %d min, %d maxAlloc\n",
+  Serial.printf("\n\rHeap: %d total, %d free, %d min, %d maxAlloc\n\r",
                  ESP.getHeapSize(), ESP.getFreeHeap(),
                  ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
 
-  Serial.println("\ninit done, starting loop now. Type '?' for list of commands\n");
+  Serial.println("\n\rinit done, starting loop now. Type '?' for list of commands\n\r");
 
   delay(1500); // keep the screen for some time so the display headline can be read ..
   OLED_toggle(); // default is OLED off, use button to switch on
@@ -242,7 +242,7 @@ int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
     // Serial.println("CRC OK");
     len -= sizeof(uint32_t);
   }
-  if (!on_rx(pkt, len))
+  if (!on_rx(pkt, len, f))
     return 0;
   Serial.println(String("DMX: unknown ") + to_hex(pkt, DMX_LEN));
   return -1;
@@ -427,8 +427,12 @@ void loop()
     theDisplay.drawString(0, 18, time_line);
     // theDisplay.drawString(0, 24, goset_line);
     char stat_line[30];
+    char gps_synced = 0;
+# if !defined(NO_GPS)
+    gps_synced = gps.location.isValid() ? 1 : 0;
+#endif
     sprintf(stat_line, "W:%d E:%d G:%d L:%s",
-            wifi_clients, ble_clients, gps.location.isValid() ? 1 : 0, wheel[lora_cnt % 4]);
+            wifi_clients, ble_clients, gps_synced, wheel[lora_cnt % 4]);
     theDisplay.drawString(0, 30, stat_line);
 
 #if defined(MAIN_BLEDevice_H_)

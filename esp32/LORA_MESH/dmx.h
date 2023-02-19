@@ -12,13 +12,13 @@
 
 struct dmx_s {
   unsigned char dmx[DMX_LEN];
-  void (*fct)(unsigned char*, int, unsigned char *aux);
+  void (*fct)(unsigned char*, int, unsigned char *aux, struct face_s *f);
   unsigned char *aux;
 };
 
 struct blb_s {
   unsigned char h[HASH_LEN];
-  void (*fct)(unsigned char*, int, int);
+  void (*fct)(unsigned char*, int, int, struct face_s *f);
   unsigned char *fid;
   int seq;
   int bnr;
@@ -52,7 +52,7 @@ int _blbt_index(unsigned char *h)
 }
 
 void arm_dmx(unsigned char *dmx,
-             void (*fct)(unsigned char*, int, unsigned char*)=NULL,
+             void (*fct)(unsigned char*, int, unsigned char*, struct face_s*)=NULL,
              unsigned char *aux=NULL)
 {
   int ndx = _dmxt_index(dmx);
@@ -76,7 +76,7 @@ void arm_dmx(unsigned char *dmx,
 }
 
 void arm_blb(unsigned char *h,
-             void (*fct)(unsigned char*, int, int)=NULL,
+             void (*fct)(unsigned char*, int, int, struct face_s*)=NULL,
              unsigned char *fid=NULL, int seq=-1, int bnr=-1)
 {
   int ndx = _blbt_index(h);
@@ -118,7 +118,7 @@ void compute_dmx(unsigned char *dst, unsigned char *buf, int len)
   // Serial.printf(" --> dmx=%s\n", to_hex(dst, DMX_LEN));
 }
 
-int on_rx(unsigned char *buf, int len)
+int on_rx(unsigned char *buf, int len, struct face_s *f)
 {
   unsigned char h[crypto_hash_sha256_BYTES];
   crypto_hash_sha256(h, buf, len);
@@ -129,13 +129,13 @@ int on_rx(unsigned char *buf, int len)
   int ndx = _dmxt_index(buf);
   if (ndx >= 0) {
     // dmxt[ndx].fct(buf + DMX_LEN, len - DMX_LEN, dmxt[ndx].aux);
-    dmxt[ndx].fct(buf, len, dmxt[ndx].aux);
+    dmxt[ndx].fct(buf, len, dmxt[ndx].aux, f);
     // return 0;  // try also the hash path (colliding DMX values so both handler must be served)
     rc = 0;
   }
   ndx = _blbt_index(h);
   if (ndx >= 0) {
-    blbt[ndx].fct(buf, len, ndx);
+    blbt[ndx].fct(buf, len, ndx, f);
     rc = 0;
   }
   return rc;

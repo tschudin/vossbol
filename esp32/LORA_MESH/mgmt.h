@@ -86,7 +86,10 @@ unsigned char* _mkStatus()
   status[0].id[0] = my_mac[4];
   status[0].id[1] = my_mac[5];
   status[0].beacon = mgmt_beacon;
-  status[0].voltage = axp.getBattVoltage()/1000;
+  status[0].voltage = 0;
+#if defined(AXP_DEBUG)
+  status[0] = axp.getBattVoltage()/1000;
+#endif
   status[0].feeds = feed_cnt;
   status[0].entries = entry_cnt;
   status[0].chunks = chunk_cnt;
@@ -94,9 +97,15 @@ unsigned char* _mkStatus()
   int avail = total - MyFS.usedBytes();
   status[0].free = avail / (total/100);
   status[0].uptime = millis();
+#if defined(NO_GPS)
+  status[0].latitude = 0;
+  status[0].longitude = 0;
+  status[0].altitude = 0;
+#else
   status[0].latitude = gps.location.isValid() ? (float) gps.location.lat() : 0;
   status[0].longitude = gps.location.isValid() ? (float) gps.location.lng() : 0;
   status[0].altitude = gps.location.isValid() ? (float) gps.altitude.meters() : 0;
+#endif
 
   // add neighbors
   int maxEntries = (int) (120 - 11) / MGMT_STATUS_LEN;
@@ -137,7 +146,7 @@ unsigned char* _mkBeacon()
 //------------------------------------------------------------------------------
 
 // incoming packet with mgmt_dmx
-void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux)
+void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 {
   pkt += DMX_LEN;
   len -= DMX_LEN;

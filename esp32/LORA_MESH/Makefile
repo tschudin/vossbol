@@ -16,11 +16,14 @@ ifeq ($(BOARD),heltec)
 endif
 
 ifndef SERIAL
-	#SERIAL=/dev/tty.wchusbserial54750108741  # fc84
-	#SERIAL=/dev/tty.wchusbserial54750108751  # fcd4
-	 SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
-	#SERIAL=/dev/tty.wchusbserial54750389471  # f948
-	#SERIAL=/dev/tty.usbserial-0001           # heltec LORA32
+  ifeq ($(BOARD),heltec)
+    SERIAL=/dev/tty.usbserial-0001           # heltec LORA32
+  else
+    #SERIAL=/dev/tty.wchusbserial54750108741  # fc84
+    #SERIAL=/dev/tty.wchusbserial54750108751  # fcd4
+    SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
+    #SERIAL=/dev/tty.wchusbserial54750389471  # f948
+  endif
 endif
 
 all: compile

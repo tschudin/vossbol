@@ -196,7 +196,7 @@ void goset_add(struct goset_s *gp, unsigned char *key)
   Serial.printf("added key %s, len=%d\n", to_hex(key, GOSET_KEY_LEN), gp->goset_len);
 }
 
-void goset_rx(unsigned char *pkt, int len, unsigned char *aux)
+void goset_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 {
   // struct face_s *f,
   struct goset_s *gp = theGOset;

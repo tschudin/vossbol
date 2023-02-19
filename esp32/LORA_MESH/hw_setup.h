@@ -8,6 +8,8 @@
 #if defined(WIFI_LoRa_32_V2) || defined(WIFI_LORA_32_V2)
 
 # include <heltec.h>
+
+#define NO_GPS
 # define theDisplay (*Heltec.display)
 
 // user button
@@ -91,6 +93,9 @@ IPAddress broadcastIP;
 
 #if defined(AXP_DEBUG)
 AXP20X_Class axp;
+#endif
+
+#if defined(LORA_LOG)
 unsigned long int next_log_battery;
 #endif
 
