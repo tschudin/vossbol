@@ -165,7 +165,7 @@ void setup()
   
   io_init();
 
-  Serial.printf("File system: %d total bytes, %d used\n\r",
+  Serial.printf("File system: %d total bytes, %d used\r\n",
                 MyFS.totalBytes(), MyFS.usedBytes());
   MyFS.mkdir(FEED_DIR);
   listDir(MyFS, FEED_DIR, 0);
@@ -177,13 +177,13 @@ void setup()
   crypto_hash_sha256(h, (unsigned char*) GOSET_DMX_STR, strlen(GOSET_DMX_STR));
   memcpy(goset_dmx, h, DMX_LEN);
   arm_dmx(goset_dmx, goset_rx, NULL);
-  Serial.printf("listening for GOset protocol on %s\n\r", to_hex(goset_dmx, 7));
+  Serial.printf("listening for GOset protocol on %s\r\n", to_hex(goset_dmx, 7));
 
   // initialize mgmt_dmx
   crypto_hash_sha256(h, (unsigned char*) MGMT_DMX_STR, strlen(MGMT_DMX_STR));
   memcpy(mgmt_dmx, h, DMX_LEN);
   arm_dmx(mgmt_dmx, mgmt_rx, NULL);
-  Serial.printf("listening for mgmt protocol on %s\n\r", to_hex(mgmt_dmx, DMX_LEN));
+  Serial.printf("listening for mgmt protocol on %s\r\n", to_hex(mgmt_dmx, DMX_LEN));
 
   repo_load();
 
@@ -203,14 +203,14 @@ void setup()
 #endif
   lora_log.printf("millis,batt,utc,mac,lat,lon,ele,plen,prssi,psnr,pfe,rssi\n");
   next_log_flush = millis() + LOG_FLUSH_INTERVAL;
-  Serial.printf("\n\rlength of %s: %d bytes\n\r", LORA_LOG_FILENAME, lora_log.size());
+  Serial.printf("\r\nlength of %s: %d bytes\r\n", LORA_LOG_FILENAME, lora_log.size());
 #endif // LORA_LOG
 
-  Serial.printf("\n\rHeap: %d total, %d free, %d min, %d maxAlloc\n\r",
+  Serial.printf("\r\nHeap: %d total, %d free, %d min, %d maxAlloc\r\n",
                  ESP.getHeapSize(), ESP.getFreeHeap(),
                  ESP.getMinFreeHeap(), ESP.getMaxAllocHeap());
 
-  Serial.println("\n\rinit done, starting loop now. Type '?' for list of commands\n\r");
+  Serial.println("\r\ninit done, starting loop now. Type '?' for list of commands\r\n");
 
   delay(1500); // keep the screen for some time so the display headline can be read ..
   OLED_toggle(); // default is OLED off, use button to switch on
@@ -375,7 +375,7 @@ void loop()
 # if defined(AXP_DEBUG)
     lora_log.printf("battery=%.04gV ", axp.getBattVoltage()/1000);
 # endif
-    lora_log.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d\n",
+    lora_log.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%dXX\r\n",
                 dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt, ESP.getFreeHeap());
     next_log_battery = millis() + LOG_BATTERY_INTERVAL;
   }

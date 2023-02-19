@@ -104,7 +104,7 @@ void node_tick()
 #if defined(AXP_DEBUG)
   Serial.printf("battery=%.04gV ", axp.getBattVoltage()/1000);
 #endif
-  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d\n",
+  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d\r\n",
                 dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt, ESP.getFreeHeap());
 
   if (theGOset->goset_len == 0)
@@ -149,7 +149,7 @@ void node_tick()
       bipf_encode(buf, lptr);
       io_enqueue(buf, sz, want_dmx);
       bipf_free(lptr);
-      Serial.printf(">> %dB log entry request: %s ]\n", sz, v.c_str());
+      Serial.printf(">> %dB log entry request: %s ]\r\n", sz, v.c_str());
     }
     return;
   }
@@ -229,7 +229,7 @@ void node_tick()
     bipf_encode(buf, lptr);
     io_enqueue(buf, sz, chnk_dmx);
     bipf_free(lptr);
-    Serial.printf(">> %dB chunk request: %s ]\n", sz, v.c_str());
+    Serial.printf(">> %dB chunk request: %s ]\r\n", sz, v.c_str());
   }
 
 }
