@@ -53,8 +53,8 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 #include <Button2.h>
 
 // FS
-#include <littlefs_api.h>
-#include <littleFS.h>
+//#include <littlefs_api.h>
+#include <LittleFS.h>
 
 // crypto
 #include <sodium/crypto_hash_sha256.h>
@@ -82,7 +82,7 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 
 // create instances
 
-#define MyFS LITTLEFS
+#define MyFS LittleFS
 #if !defined(NO_WIFI)
   WiFiUDP udp;
 #endif

@@ -89,7 +89,7 @@ unsigned char* _mkStatus()
   status[0].beacon = mgmt_beacon;
   status[0].voltage = 0;
 #if defined(AXP_DEBUG)
-  status[0] = axp.getBattVoltage()/1000;
+  status[0].voltage = axp.getBattVoltage()/1000;
 #endif
   status[0].feeds = feed_cnt;
   status[0].entries = entry_cnt;

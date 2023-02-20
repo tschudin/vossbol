@@ -6,7 +6,8 @@
 #   make monitor SERIAL=/dev/tty.....
 
 
-BINDIR=/opt/homebrew/bin
+#BINDIR=/opt/homebrew/bin
+BINDIR=/usr/local/bin
 MAIN=LORA_MESH
 
 
@@ -21,7 +22,9 @@ ifndef SERIAL
   else
     #SERIAL=/dev/tty.wchusbserial54750108741  # fc84
     #SERIAL=/dev/tty.wchusbserial54750108751  # fcd4
-    SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
+    #SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
+    #SERIAL=/dev/ttyACM0
+    SERIAL=/dev/ttyUSB0
     #SERIAL=/dev/tty.wchusbserial54750389471  # f948
   endif
 endif
