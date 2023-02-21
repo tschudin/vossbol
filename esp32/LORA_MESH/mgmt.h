@@ -1,15 +1,27 @@
 // mgmt.h
 
+#include <sodium/crypto_auth.h>
+
+#if defined __has_include
+#if __has_include ("credentials.h")
+#include "credentials.h"
+#else
+unsigned char MGMT_KEY[crypto_auth_hmacsha512_KEYBYTES] = { 0 };
+#endif
+#endif
+
 unsigned char mgmt_dmx[DMX_LEN];
 
-#define MGMT_ID_LEN  2
-#define STATUST_SIZE 23
-#define STATUST_EOL  24 * 60 * 60 * 1000 // millis (24h)
+#define MGMT_ID_LEN    2
+#define STATUST_SIZE   23
+#define STATUST_EOL    24 * 60 * 60 * 1000 // millis (24h)
+#define MGMT_NONCE_LEN 4
+#define MGMT_MIC_LEN   4
 
 struct request_s {
   unsigned char typ;
-  unsigned char cmd;
   unsigned char id[MGMT_ID_LEN];
+  unsigned char cmd;
   unsigned char dst[MGMT_ID_LEN];
   bool all = false;
 };
@@ -51,13 +63,14 @@ struct statust_entry_s statust[STATUST_SIZE];
 int statust_cnt;
 int statust_rrb;
 
+unsigned int mgmt_nonce = 0;
+
+bool mgmt_beacon = false;
+unsigned long int mgmt_next_send_status = MGMT_SEND_STATUS_INTERVAL;
 
 // forward declaration
 void mgmt_send_status();
 void mgmt_send_beacon();
-
-bool mgmt_beacon = false;
-unsigned long int mgmt_next_send_status = MGMT_SEND_STATUS_INTERVAL;
 
 //------------------------------------------------------------------------------
 
@@ -138,10 +151,48 @@ unsigned char* _mkBeacon()
 // incoming packet with mgmt_dmx
 void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 {
+  // check if face == lora
+  // TODO
+
+  // remove DMX
   pkt += DMX_LEN;
   len -= DMX_LEN;
 
-  Serial.printf("mgmt_rx received packet of len = %d\n", len);
+  // get message integrity code
+  len -= MGMT_MIC_LEN;
+  unsigned char mic[MGMT_MIC_LEN];
+  memcpy(mic, pkt+len, MGMT_MIC_LEN);
+  // compute hmac
+  unsigned char hash[crypto_auth_hmacsha512_BYTES];
+  crypto_auth_hmacsha512(hash, pkt, len, MGMT_KEY);
+  // copy mic to hmac
+  memcpy(hash, mic, MGMT_MIC_LEN);
+  // verify hmac
+  if (crypto_auth_hmacsha512_verify(hash, pkt, len, MGMT_KEY) != 0) {
+    Serial.printf("mgmt_rx verification of hmac failed\r\n");
+    return;
+  }
+  // get nonce
+  len -= MGMT_NONCE_LEN;
+  unsigned int nonce = (uint32_t)pkt[len+3] << 24 |
+                       (uint32_t)pkt[len+2] << 16 |
+                       (uint32_t)pkt[len+1] << 8  |
+                       (uint32_t)pkt[len];
+  // TODO validate nonce
+  Serial.printf("mgmt_rx received nonce = %d, current nonce = %d\r\n", nonce, mgmt_nonce);
+  if (nonce > mgmt_nonce) { // TODO wraparound
+    Serial.printf("nonce gud\r\n");
+  } else {
+    Serial.printf("nonce bad\r\n");
+    // TODO uncomment this
+    //return;
+  }
+ 
+  unsigned char id[MGMT_ID_LEN];
+  memcpy(id, pkt+1, MGMT_ID_LEN);
+  Serial.printf("mgmt_rx got packet from %s\r\n", to_hex(id, MGMT_ID_LEN, 0));
+ 
+  // TODO nonce
 
   // receive beacon
   if (pkt[0] == 'b' && len == MGMT_BEACON_LEN) {
@@ -151,7 +202,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     return;
   }
   // receive beacon request
-  if (pkt[0] == 'r' && (pkt[1] == '+' || pkt[1] == '-') && len == MGMT_REQUEST_LEN) {
+  if (pkt[0] == 'r' && (pkt[3] == '+' || pkt[3] == '-') && len == MGMT_REQUEST_LEN) {
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
     Serial.println(String("mgmt_rx received beacon request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
@@ -163,13 +214,13 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 	}
       }
     }
-    Serial.printf("turning %s beacon ...\r\n", pkt[1] == '+' ? "on" : "off");
-    mgmt_beacon = pkt[1] == '+' ? true : false;
+    Serial.printf("turning %s beacon ...\r\n", pkt[3] == '+' ? "on" : "off");
+    mgmt_beacon = pkt[3] == '+' ? true : false;
     //mgmt_send_beacon();
     return;
   }
   // receive status request
-  if (pkt[0] == 'r' && pkt[1] == 's' && len == MGMT_REQUEST_LEN) {
+  if (pkt[0] == 'r' && pkt[3] == 's' && len == MGMT_REQUEST_LEN) {
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
     Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
@@ -248,7 +299,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     return;
   }
   // receive reboot request
-  if (pkt[0] == 'r' && pkt[1] == 'x' && len == MGMT_REQUEST_LEN) {
+  if (pkt[0] == 'r' && pkt[3] == 'x' && len == MGMT_REQUEST_LEN) {
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
     Serial.println(String("mgmt_rx received reboot request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
@@ -362,10 +413,27 @@ void mgmt_print_statust()
   Serial.printf(" uptime:   reported uptime when node was last seen\r\n");
 }
 
+// send mgmt packet
+void mgmt_tx(unsigned char* payload, int payload_len)
+{
+  int len = payload_len + MGMT_NONCE_LEN + MGMT_MIC_LEN;
+  // add payload
+  unsigned char message[len] = { 0 };
+  memcpy(message, payload, payload_len);
+  // add nonce
+  memcpy(message + payload_len, (unsigned char*) &++mgmt_nonce, MGMT_NONCE_LEN);
+  // add hmac
+  unsigned char hash[crypto_auth_hmacsha512_BYTES];
+  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_NONCE_LEN, MGMT_KEY);
+  memcpy(message + payload_len + MGMT_NONCE_LEN, hash, MGMT_MIC_LEN);
+  // send
+  io_enqueue(message, len, mgmt_dmx, NULL);
+}
+
 // send request to specified node (all if none)
 void mgmt_send_request(unsigned char cmd, unsigned char* id=NULL)
 {
-  io_enqueue(_mkRequest(cmd, id), MGMT_REQUEST_LEN, mgmt_dmx, NULL);
+  mgmt_tx(_mkRequest(cmd,id), MGMT_REQUEST_LEN);
 }
 
 // send status response (sent periodically or after request)
@@ -403,7 +471,7 @@ void mgmt_send_status()
     if (old_cnt == statust_cnt) { break; }
   }
   // send status
-  io_enqueue(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN, mgmt_dmx, NULL);
+  mgmt_tx(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN);
   // set next event
   mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
 }
@@ -411,7 +479,7 @@ void mgmt_send_status()
 // send beacon
 void mgmt_send_beacon()
 {
-  io_enqueue(_mkBeacon(), MGMT_BEACON_LEN, mgmt_dmx, NULL);
+  mgmt_tx(_mkBeacon(), MGMT_BEACON_LEN);
 }
 
 // eof

@@ -4,3 +4,6 @@ partitions.csv
 
 # emacs backup files
 *~ 
+
+# credentials
+credentials.h*
