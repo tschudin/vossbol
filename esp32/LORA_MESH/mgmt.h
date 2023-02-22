@@ -72,7 +72,10 @@ unsigned long int mgmt_next_send_status = MGMT_SEND_STATUS_INTERVAL;
 void mgmt_send_status();
 void mgmt_send_beacon();
 
+
+
 //------------------------------------------------------------------------------
+// CREATE PAYLOADS
 
 // fill buffer with request packet
 unsigned char* _mkRequest(unsigned char cmd, unsigned char* id=NULL)
@@ -123,7 +126,6 @@ unsigned char* _mkStatus()
 
   // add neighbors
   int maxEntries = (int) (120 - 11) / MGMT_STATUS_LEN;
-  Serial.printf("MGMT_STATUS_LEN = %d\r\n", MGMT_STATUS_LEN);
   int ndxNeighbor;
   for (int i = 1; i < maxEntries; i++) {
     if (i > statust_cnt) { break; }
@@ -146,7 +148,136 @@ unsigned char* _mkBeacon()
   return (unsigned char*) &beacon;
 }
 
-//------------------------------------------------------------------------------
+
+
+// -----------------------------------------------------------------------------
+// MGMT RX
+
+// receive request
+void mgmt_rx_request(unsigned char *pkt, int len)
+{
+  // beacon
+  if (pkt[3] == '+' || pkt[3] == '-') {
+    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+    memcpy(request, pkt, MGMT_REQUEST_LEN);
+    Serial.println(String("mgmt_rx received beacon request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
+    if (request->all == false) {
+      Serial.println(String("mgmt_rx received beacon request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
+      for (int i = 0; i < MGMT_ID_LEN; i++) {
+        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
+	  return;
+	}
+      }
+    }
+    Serial.printf("turning %s beacon ...\r\n", pkt[3] == '+' ? "on" : "off");
+    mgmt_beacon = pkt[3] == '+' ? true : false;
+    return;
+  }
+  
+  // status
+  if (pkt[3] == 's') {
+    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+    memcpy(request, pkt, MGMT_REQUEST_LEN);
+    Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
+    if (request->all == false) {
+      Serial.println(String("mgmt_rx received status request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
+      for (int i = 0; i < MGMT_ID_LEN; i++) {
+        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
+	  return;
+	}
+      }
+    }
+    mgmt_next_send_status = millis() + random(5000);
+    return;
+  }
+  
+  // reboot
+  if (pkt[3] == 'x') {
+    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+    memcpy(request, pkt, MGMT_REQUEST_LEN);
+    Serial.println(String("mgmt_rx received reboot request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
+    if (request->all == true) {
+      Serial.println("rebooting ...");
+      esp_restart();
+    } else {
+      Serial.println(String("mgmt_rx received reboot request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
+      for (int i = 0; i < MGMT_ID_LEN; i++) {
+        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
+	  return;
+	}
+      }
+      Serial.println("rebooting ...");
+      esp_restart();
+    }
+    return;
+  }
+  
+  // unknown
+  Serial.printf("mgmt_rx received request %s ??\r\n", pkt[3]);
+}
+
+// receive status
+void mgmt_rx_status(unsigned char *pkt, int len) {
+  unsigned long int received_on = millis();
+  int entries = len / MGMT_STATUS_LEN;
+  struct status_s *other = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
+  memcpy(other, pkt, MGMT_STATUS_LEN);
+  Serial.println(String("mgmt_rx received status update from ") + to_hex(other->id, 2, 0));
+  int ndx = -1;
+  // check if node is already in table
+  for (int i = 0; i < statust_cnt; i++) {
+    if (!memcmp(other->id, statust[i].state.id, MGMT_ID_LEN)) {
+      ndx = i;
+    }
+  }
+  // new node, check if table not full
+  if (ndx == -1) {
+    if (statust_cnt < STATUST_SIZE) {
+      ndx = statust_cnt++;
+    } else {
+      Serial.printf("%8sstatus table is full, skipping...\r\n", "");
+      free(other);
+      return;
+    }
+  }
+  statust[ndx].received_on = received_on;
+  memcpy(&statust[ndx].state, other, sizeof(struct status_s));
+
+  pkt += MGMT_STATUS_LEN;
+
+  int ndxNeighbor;
+  for (int i = 1; i < entries; i++) {
+    // no next status
+    if (pkt[0] != 's') {
+      break;
+    }
+    struct status_s *neighbor = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
+    memcpy(neighbor, pkt, MGMT_STATUS_LEN);
+    Serial.printf("%8slearned about %s\r\n", "", to_hex(neighbor->id, 2, 0));
+    pkt += MGMT_STATUS_LEN;
+    ndxNeighbor = -1;
+    // check if node is already in table
+    for (int i = 0; i < statust[ndx].neighbor_cnt; i++) {
+      if (!memcmp(neighbor->id, statust[ndx].neighbors[i].id, MGMT_ID_LEN)) {
+        ndxNeighbor = i;
+      }
+    }
+    // new node, check if table not full
+    if (ndxNeighbor == -1) {
+      if (statust[ndx].neighbor_cnt < STATUST_SIZE) {
+        ndxNeighbor = statust[ndx].neighbor_cnt++;
+      } else {
+	Serial.printf("%8sneighbor table of %s is full, skipping...\r\n", "", to_hex(other->id, 2, 0));
+	free(neighbor);
+	continue;
+      }
+    }
+    memcpy(&statust[ndx].neighbors[ndxNeighbor], neighbor, sizeof(struct status_s));
+    free(neighbor);
+  }
+
+  free(other);
+}
 
 // incoming packet with mgmt_dmx
 void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
@@ -180,7 +311,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
                        (uint32_t)pkt[len];
   // TODO validate nonce
   Serial.printf("mgmt_rx received nonce = %d, current nonce = %d\r\n", nonce, mgmt_nonce);
-  if (nonce > mgmt_nonce) { // TODO wraparound
+  if (nonce > mgmt_nonce) { // TODO wraparound, although, nvm, doesn't prevent replays that were captured a long time ago
     Serial.printf("nonce gud\r\n");
   } else {
     Serial.printf("nonce bad\r\n");
@@ -188,139 +319,43 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     //return;
   }
  
-  unsigned char id[MGMT_ID_LEN];
-  memcpy(id, pkt+1, MGMT_ID_LEN);
-  Serial.printf("mgmt_rx got packet from %s\r\n", to_hex(id, MGMT_ID_LEN, 0));
+  // get src id
+  unsigned char src[MGMT_ID_LEN];
+  memcpy(src, pkt+1, MGMT_ID_LEN);
+  Serial.printf("mgmt_rx got packet from %s\r\n", to_hex(src, MGMT_ID_LEN, 0));
  
   // TODO nonce
 
+
+
+
+
   // receive beacon
   if (pkt[0] == 'b' && len == MGMT_BEACON_LEN) {
-    struct beacon_s *beacon = (struct beacon_s*) calloc(1, MGMT_BEACON_LEN);
-    memcpy(beacon, pkt, MGMT_BEACON_LEN);
-    Serial.println(String("mgmt_rx received beacon from ") + to_hex(beacon->id, MGMT_ID_LEN, 0));
+    Serial.println(String("mgmt_rx received beacon from ") + to_hex(src, MGMT_ID_LEN, 0));
     return;
   }
-  // receive beacon request
-  if (pkt[0] == 'r' && (pkt[3] == '+' || pkt[3] == '-') && len == MGMT_REQUEST_LEN) {
-    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
-    memcpy(request, pkt, MGMT_REQUEST_LEN);
-    Serial.println(String("mgmt_rx received beacon request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    if (request->all == false) {
-      Serial.println(String("mgmt_rx received beacon request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
-      for (int i = 0; i < MGMT_ID_LEN; i++) {
-        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
-	  return;
-	}
-      }
-    }
-    Serial.printf("turning %s beacon ...\r\n", pkt[3] == '+' ? "on" : "off");
-    mgmt_beacon = pkt[3] == '+' ? true : false;
-    //mgmt_send_beacon();
+
+  // receive request
+  if (pkt[0] == 'r' && len == MGMT_REQUEST_LEN) {
+    mgmt_rx_request(pkt, len);
     return;
   }
-  // receive status request
-  if (pkt[0] == 'r' && pkt[3] == 's' && len == MGMT_REQUEST_LEN) {
-    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
-    memcpy(request, pkt, MGMT_REQUEST_LEN);
-    Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    if (request->all == false) {
-      Serial.println(String("mgmt_rx received status request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
-      for (int i = 0; i < MGMT_ID_LEN; i++) {
-        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
-	  return;
-	}
-      }
-    }
-    mgmt_next_send_status = millis() + random(5000);
-    return;
-  }
-  // receive status update
+
+  // receive status
   if (pkt[0] == 's' && len % MGMT_STATUS_LEN == 0) {
-    unsigned long int received_on = millis();
-    int entries = len / MGMT_STATUS_LEN;
-    struct status_s *other = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
-    memcpy(other, pkt, MGMT_STATUS_LEN);
-    Serial.println(String("mgmt_rx received status update from ") + to_hex(other->id, 2, 0));
-    int ndx = -1;
-    // check if node is already in table
-    for (int i = 0; i < statust_cnt; i++) {
-      if (!memcmp(other->id, statust[i].state.id, MGMT_ID_LEN)) {
-        ndx = i;
-      }
-    }
-    // new node, check if table not full
-    if (ndx == -1) {
-      if (statust_cnt < STATUST_SIZE) {
-        ndx = statust_cnt++;
-      } else {
-	Serial.printf("%8sstatus table is full, skipping...\r\n", "");
-	free(other);
-	return;
-      }
-    }
-    statust[ndx].received_on = received_on;
-    memcpy(&statust[ndx].state, other, sizeof(struct status_s));
-
-    pkt += MGMT_STATUS_LEN;
-
-    int ndxNeighbor;
-    for (int i = 1; i < entries; i++) {
-      // no next status
-      if (pkt[0] != 's') {
-        break;
-      }
-      struct status_s *neighbor = (struct status_s*) calloc(1, MGMT_STATUS_LEN);
-      memcpy(neighbor, pkt, MGMT_STATUS_LEN);
-      Serial.printf("%8slearned about %s\r\n", "", to_hex(neighbor->id, 2, 0));
-      pkt += MGMT_STATUS_LEN;
-      ndxNeighbor = -1;
-      // check if node is already in table
-      for (int i = 0; i < statust[ndx].neighbor_cnt; i++) {
-        if (!memcmp(neighbor->id, statust[ndx].neighbors[i].id, MGMT_ID_LEN)) {
-          ndxNeighbor = i;
-        }
-      }
-      // new node, check if table not full
-      if (ndxNeighbor == -1) {
-        if (statust[ndx].neighbor_cnt < STATUST_SIZE) {
-          ndxNeighbor = statust[ndx].neighbor_cnt++;
-	} else {
-	  Serial.printf("%8sneighbor table of %s is full, skipping...\r\n", "", to_hex(other->id, 2, 0));
-	  free(neighbor);
-	  continue;
-	}
-      }
-      memcpy(&statust[ndx].neighbors[ndxNeighbor], neighbor, sizeof(struct status_s));
-      free(neighbor);
-    }
-
-    free(other);
+    mgmt_rx_status(pkt, len);
     return;
   }
-  // receive reboot request
-  if (pkt[0] == 'r' && pkt[3] == 'x' && len == MGMT_REQUEST_LEN) {
-    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
-    memcpy(request, pkt, MGMT_REQUEST_LEN);
-    Serial.println(String("mgmt_rx received reboot request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    if (request->all == true) {
-      Serial.println("rebooting ...");
-      esp_restart();
-    } else {
-      Serial.println(String("mgmt_rx received reboot request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
-      for (int i = 0; i < MGMT_ID_LEN; i++) {
-        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
-	  return;
-	}
-      }
-      Serial.println("rebooting ...");
-      esp_restart();
-    }
-    return;
-  }
+   
   // unknown typ
   Serial.printf("mgmt_rx t=%c ??\r\n", pkt[0]);
 }
+
+
+
+// -----------------------------------------------------------------------------
+// STATUS TABLE
 
 // print status table entry
 void _print_status(status_s* status, unsigned long int received_on = NULL, unsigned char* src = NULL)
@@ -413,33 +448,9 @@ void mgmt_print_statust()
   Serial.printf(" uptime:   reported uptime when node was last seen\r\n");
 }
 
-// send mgmt packet
-void mgmt_tx(unsigned char* payload, int payload_len)
+// remove stale entries from status table
+void mgmt_statust_housekeeping()
 {
-  int len = payload_len + MGMT_NONCE_LEN + MGMT_MIC_LEN;
-  // add payload
-  unsigned char message[len] = { 0 };
-  memcpy(message, payload, payload_len);
-  // add nonce
-  memcpy(message + payload_len, (unsigned char*) &++mgmt_nonce, MGMT_NONCE_LEN);
-  // add hmac
-  unsigned char hash[crypto_auth_hmacsha512_BYTES];
-  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_NONCE_LEN, MGMT_KEY);
-  memcpy(message + payload_len + MGMT_NONCE_LEN, hash, MGMT_MIC_LEN);
-  // send
-  io_enqueue(message, len, mgmt_dmx, NULL);
-}
-
-// send request to specified node (all if none)
-void mgmt_send_request(unsigned char cmd, unsigned char* id=NULL)
-{
-  mgmt_tx(_mkRequest(cmd,id), MGMT_REQUEST_LEN);
-}
-
-// send status response (sent periodically or after request)
-void mgmt_send_status()
-{
-  // housekeeping
   while (true) {
     int old_cnt = statust_cnt;
     for (int i = 0; i < old_cnt; i++) {
@@ -470,16 +481,52 @@ void mgmt_send_status()
     }
     if (old_cnt == statust_cnt) { break; }
   }
-  // send status
-  mgmt_tx(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN);
-  // set next event
-  mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
+  
+}
+
+
+
+// -----------------------------------------------------------------------------
+// MGMT TX
+ 
+// send mgmt packet
+void mgmt_tx(unsigned char* payload, int payload_len)
+{
+  int len = payload_len + MGMT_NONCE_LEN + MGMT_MIC_LEN;
+  // add payload
+  unsigned char message[len] = { 0 };
+  memcpy(message, payload, payload_len);
+  // add nonce
+  memcpy(message + payload_len, (unsigned char*) &++mgmt_nonce, MGMT_NONCE_LEN);
+  // add hmac
+  unsigned char hash[crypto_auth_hmacsha512_BYTES];
+  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_NONCE_LEN, MGMT_KEY);
+  memcpy(message + payload_len + MGMT_NONCE_LEN, hash, MGMT_MIC_LEN);
+  // send
+  io_enqueue(message, len, mgmt_dmx, NULL);
 }
 
 // send beacon
 void mgmt_send_beacon()
 {
   mgmt_tx(_mkBeacon(), MGMT_BEACON_LEN);
+}
+
+// send request to specified node (all if none)
+void mgmt_send_request(unsigned char cmd, unsigned char* id=NULL)
+{
+  mgmt_tx(_mkRequest(cmd,id), MGMT_REQUEST_LEN);
+}
+
+// send status response (sent periodically or after request)
+void mgmt_send_status()
+{
+  // housekeeping
+  mgmt_statust_housekeeping();
+  // send status
+  mgmt_tx(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN);
+  // set next event
+  mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
 }
 
 // eof
