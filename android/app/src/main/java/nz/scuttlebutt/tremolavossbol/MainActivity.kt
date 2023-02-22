@@ -21,6 +21,7 @@ import com.google.zxing.integration.android.IntentIntegrator
 import nz.scuttlebutt.tremolavossbol.crypto.IdStore
 import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeers
 import nz.scuttlebutt.tremolavossbol.tssb.*
+import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeersBroadcast
 import nz.scuttlebutt.tremolavossbol.utils.Constants
 import tremolavossbol.R
 import java.net.*
@@ -43,6 +44,7 @@ class MainActivity : Activity() {
     @Volatile var mc_group: InetAddress? = null
     @Volatile var mc_socket: MulticastSocket? = null
     var ble: BlePeers? = null
+    //var ble: BlePeersBroadcast? = null
     val ioLock = ReentrantLock()
     var broadcastReceiver: BroadcastReceiver? = null
     var isWifiConnected = false
@@ -280,6 +282,7 @@ class MainActivity : Activity() {
             ble!!.startBluetooth()
 
 
+
         }
 
         super.onActivityResult(requestCode, resultCode, data)
@@ -297,6 +300,9 @@ class MainActivity : Activity() {
 
         ble = BlePeers(this)
         ble!!.startBluetooth()
+        //ble = BlePeersBroadcast(this)
+        //ble!!.checkPermissions(true)
+        //ble!!.scan()
 
     }
 
