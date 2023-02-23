@@ -192,6 +192,16 @@ void setup()
   strcpy(loc_line, "?");
   strcpy(goset_line, "?");
 
+  // load fcnt
+  mgmt_fcnt_log = MyFS.open(MGMT_FCNT_LOG_FILENAME, "r");
+  mgmt_fcnt_log.read((unsigned char*) &mgmt_fcnt, sizeof(mgmt_fcnt));
+  mgmt_fcnt_log.close();
+  // load fcnt-table
+  mgmt_fcnt_table_log = MyFS.open(MGMT_FCNT_TABLE_LOG_FILENAME, "r");
+  mgmt_fcnt_table_log.read((unsigned char*) &mgmt_fcnt_table_cnt, sizeof(mgmt_fcnt_table_cnt));
+  mgmt_fcnt_table_log.read((unsigned char*) &mgmt_fcnt_table, MGMT_FCNT_LEN * MGMT_FCNT_TABLE_SIZE);
+  mgmt_fcnt_table_log.close();
+
 #if defined(LORA_LOG)
   lora_log = MyFS.open(LORA_LOG_FILENAME, FILE_APPEND);
   lora_log.printf("reboot\n");

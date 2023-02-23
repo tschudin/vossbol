@@ -10,13 +10,18 @@ unsigned char MGMT_KEY[crypto_auth_hmacsha512_KEYBYTES] = { 0 };
 #endif
 #endif
 
+
 unsigned char mgmt_dmx[DMX_LEN];
 
 #define MGMT_ID_LEN    2
 #define STATUST_SIZE   23
 #define STATUST_EOL    24 * 60 * 60 * 1000 // millis (24h)
-#define MGMT_NONCE_LEN 4
+#define MGMT_FCNT_LEN  4
 #define MGMT_MIC_LEN   4
+
+#define MGMT_FCNT_LOG_FILENAME        "/mgmt_fcnt_log.bin"
+#define MGMT_FCNT_TABLE_LOG_FILENAME  "/mgmt_fcnt_table_log.bin"
+#define MGMT_FCNT_TABLE_SIZE          42
 
 struct request_s {
   unsigned char typ;
@@ -54,16 +59,31 @@ struct beacon_s {
   unsigned char id[MGMT_ID_LEN];
 };
 
+struct fcnt_s {
+  unsigned char typ;
+  unsigned char id[MGMT_ID_LEN];
+  unsigned int fcnt;
+};
+
 #define MGMT_REQUEST_LEN  sizeof(struct request_s)
 #define MGMT_STATUS_LEN   sizeof(struct status_s)
 #define MGMT_BEACON_LEN   sizeof(struct beacon_s)
+#define MGMT_FCNT_LEN     sizeof(struct fcnt_s)
+
 
 
 struct statust_entry_s statust[STATUST_SIZE];
 int statust_cnt;
 int statust_rrb;
 
-unsigned int mgmt_nonce = 0;
+struct fcnt_s mgmt_fcnt_table[MGMT_FCNT_TABLE_SIZE];
+int mgmt_fcnt_table_cnt;
+
+File mgmt_fcnt_log;
+File mgmt_fcnt_table_log;
+
+unsigned int mgmt_fcnt = 0;
+
 
 bool mgmt_beacon = false;
 unsigned long int mgmt_next_send_status = MGMT_SEND_STATUS_INTERVAL;
@@ -303,30 +323,48 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     Serial.printf("mgmt_rx verification of hmac failed\r\n");
     return;
   }
-  // get nonce
-  len -= MGMT_NONCE_LEN;
-  unsigned int nonce = (uint32_t)pkt[len+3] << 24 |
+  // get fcnt
+  len -= MGMT_FCNT_LEN;
+  unsigned int fcnt = (uint32_t)pkt[len+3] << 24 |
                        (uint32_t)pkt[len+2] << 16 |
                        (uint32_t)pkt[len+1] << 8  |
                        (uint32_t)pkt[len];
-  // TODO validate nonce
-  Serial.printf("mgmt_rx received nonce = %d, current nonce = %d\r\n", nonce, mgmt_nonce);
-  if (nonce > mgmt_nonce) { // TODO wraparound, although, nvm, doesn't prevent replays that were captured a long time ago
-    Serial.printf("nonce gud\r\n");
-  } else {
-    Serial.printf("nonce bad\r\n");
-    // TODO uncomment this
-    //return;
-  }
- 
   // get src id
   unsigned char src[MGMT_ID_LEN];
   memcpy(src, pkt+1, MGMT_ID_LEN);
   Serial.printf("mgmt_rx got packet from %s\r\n", to_hex(src, MGMT_ID_LEN, 0));
- 
-  // TODO nonce
-
-
+  // check if node is already in fcnt table
+  int ndx = -1;
+  for (int i = 0; i < mgmt_fcnt_table_cnt; i++) {
+    if (!memcmp(src, mgmt_fcnt_table[i].id, MGMT_ID_LEN)) {
+      ndx = i;
+    }
+  }
+  // new node, check if table not full
+  if (ndx == -1) {
+    if (mgmt_fcnt_table_cnt < MGMT_FCNT_TABLE_SIZE) {
+      ndx = mgmt_fcnt_table_cnt++;
+      memcpy(&mgmt_fcnt_table[ndx].id, src, MGMT_ID_LEN);
+    } else {
+      Serial.printf("mgmt_rx fcnt table is full, skipping...\r\n");
+      return;
+    }
+  }
+  // existing node -> validate fcnt
+  if (ndx != -1) {
+    Serial.printf("mgmt_rx received fcnt = %d, last fcnt = %d\r\n", fcnt, mgmt_fcnt_table[ndx].fcnt);
+    if (fcnt <= mgmt_fcnt_table[ndx].fcnt) {
+      Serial.printf("mgmt_rx already heard that message, skipping...\r\n");
+      return;
+    }
+  }
+  // update fcnt
+  mgmt_fcnt_table[ndx].fcnt = fcnt;
+  // write fcnt-table to file
+  mgmt_fcnt_table_log = MyFS.open(MGMT_FCNT_TABLE_LOG_FILENAME, "w");
+  mgmt_fcnt_table_log.write((unsigned char*) &mgmt_fcnt_table_cnt, sizeof(mgmt_fcnt_table_cnt));
+  mgmt_fcnt_table_log.write((unsigned char*) &mgmt_fcnt_table, MGMT_FCNT_LEN * MGMT_FCNT_TABLE_SIZE);
+  mgmt_fcnt_table_log.close();
 
 
 
@@ -487,21 +525,30 @@ void mgmt_statust_housekeeping()
 
 
 // -----------------------------------------------------------------------------
+// FRAME COUNTER
+
+
+
+// -----------------------------------------------------------------------------
 // MGMT TX
  
 // send mgmt packet
 void mgmt_tx(unsigned char* payload, int payload_len)
 {
-  int len = payload_len + MGMT_NONCE_LEN + MGMT_MIC_LEN;
+  int len = payload_len + MGMT_FCNT_LEN + MGMT_MIC_LEN;
   // add payload
   unsigned char message[len] = { 0 };
   memcpy(message, payload, payload_len);
-  // add nonce
-  memcpy(message + payload_len, (unsigned char*) &++mgmt_nonce, MGMT_NONCE_LEN);
+  // add fcnt
+  memcpy(message + payload_len, (unsigned char*) &++mgmt_fcnt, MGMT_FCNT_LEN);
+  // write fcnt to flash
+  mgmt_fcnt_log = MyFS.open(MGMT_FCNT_LOG_FILENAME, "w");
+  mgmt_fcnt_log.write((unsigned char*) &mgmt_fcnt, sizeof(mgmt_fcnt));
+  mgmt_fcnt_log.close();
   // add hmac
   unsigned char hash[crypto_auth_hmacsha512_BYTES];
-  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_NONCE_LEN, MGMT_KEY);
-  memcpy(message + payload_len + MGMT_NONCE_LEN, hash, MGMT_MIC_LEN);
+  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_FCNT_LEN, MGMT_KEY);
+  memcpy(message + payload_len + MGMT_FCNT_LEN, hash, MGMT_MIC_LEN);
   // send
   io_enqueue(message, len, mgmt_dmx, NULL);
 }

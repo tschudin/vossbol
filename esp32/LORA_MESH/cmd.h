@@ -13,6 +13,7 @@ void cmd_rx(String cmd) {
       Serial.println("  a        add new random key");
       Serial.println("  b+[id|*] turn beacon on on id/all (1 hop)"); // TODO make all global
       Serial.println("  b-[id|*] turn beacon off on id/all (1 hop)"); // TODO same
+      Serial.println("  c        remove log files for fcnt & fcnt-table");
       Serial.println("  d        dump DMXT and CHKT");
       Serial.println("  f        list file system");
 #if defined(LORA_LOG)
@@ -46,6 +47,11 @@ void cmd_rx(String cmd) {
         Serial.printf("sending request to turn %s beacon to %s\n", cmd[1] == '+' ? "on" : "off", to_hex(id, MGMT_ID_LEN, 0));
         mgmt_send_request(cmd[1], id);
       }
+      break;
+    case 'c': // fcnt
+      Serial.println("Deleting logs of fcnt & fcnt-table...");
+      MyFS.remove(MGMT_FCNT_LOG_FILENAME);
+      MyFS.remove(MGMT_FCNT_TABLE_LOG_FILENAME);
       break;
     case 'd': // dump
       // goset_dump(theGOset);
