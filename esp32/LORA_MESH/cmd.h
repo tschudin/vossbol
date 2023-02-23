@@ -11,9 +11,9 @@ void cmd_rx(String cmd) {
     case '?':
       Serial.println("  ?        help");
       Serial.println("  a        add new random key");
-      Serial.println("  b+[id|*] turn beacon on on id/all (1 hop)"); // TODO make all global
-      Serial.println("  b-[id|*] turn beacon off on id/all (1 hop)"); // TODO same
-      Serial.println("  c        remove log files for fcnt & fcnt-table");
+      Serial.println("  b+[id|*] turn beacon on on id/all");
+      Serial.println("  b-[id|*] turn beacon off on id/all");
+      Serial.println("  c        remove log files for fcnt & fcnt-table (local dev only!)");
       Serial.println("  d        dump DMXT and CHKT");
       Serial.println("  f        list file system");
 #if defined(LORA_LOG)
@@ -21,9 +21,9 @@ void cmd_rx(String cmd) {
       Serial.println("  m        empty log file");
 #endif
       Serial.println("  r        reset this repo to blank");
-      Serial.println("  s[id|*]  status / request status from id/all (1 hop)");
-      Serial.println("  x[id|*]  reboot / request reboot from id/all (1 hop)");
-      Serial.println("  z[N]     zap (feed with index N) on all nodes (global)");
+      Serial.println("  s[id|*]  status / request status from id/all");
+      Serial.println("  x[id|*]  reboot / request reboot from id/all");
+      Serial.println("  z[N]     zap (feed with index N) on all nodes");
       break;
     case 'a': { // inject new key
       unsigned char key[GOSET_KEY_LEN];

@@ -84,6 +84,7 @@ File mgmt_fcnt_table_log;
 
 unsigned int mgmt_fcnt = 0;
 
+unsigned char mgmt_id[MGMT_ID_LEN];
 
 bool mgmt_beacon = false;
 unsigned long int mgmt_next_send_status = MGMT_SEND_STATUS_INTERVAL;
@@ -178,57 +179,19 @@ void mgmt_rx_request(unsigned char *pkt, int len)
 {
   // beacon
   if (pkt[3] == '+' || pkt[3] == '-') {
-    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
-    memcpy(request, pkt, MGMT_REQUEST_LEN);
-    Serial.println(String("mgmt_rx received beacon request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    if (request->all == false) {
-      Serial.println(String("mgmt_rx received beacon request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
-      for (int i = 0; i < MGMT_ID_LEN; i++) {
-        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
-	  return;
-	}
-      }
-    }
-    Serial.printf("turning %s beacon ...\r\n", pkt[3] == '+' ? "on" : "off");
     mgmt_beacon = pkt[3] == '+' ? true : false;
     return;
   }
   
   // status
   if (pkt[3] == 's') {
-    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
-    memcpy(request, pkt, MGMT_REQUEST_LEN);
-    Serial.println(String("mgmt_rx received status request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    if (request->all == false) {
-      Serial.println(String("mgmt_rx received status request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
-      for (int i = 0; i < MGMT_ID_LEN; i++) {
-        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
-	  return;
-	}
-      }
-    }
     mgmt_next_send_status = millis() + random(5000);
     return;
   }
   
   // reboot
   if (pkt[3] == 'x') {
-    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
-    memcpy(request, pkt, MGMT_REQUEST_LEN);
-    Serial.println(String("mgmt_rx received reboot request from ") + to_hex(request->id, MGMT_ID_LEN, 0));
-    if (request->all == true) {
-      Serial.println("rebooting ...");
-      esp_restart();
-    } else {
-      Serial.println(String("mgmt_rx received reboot request for ") + to_hex(request->dst, MGMT_ID_LEN, 0));
-      for (int i = 0; i < MGMT_ID_LEN; i++) {
-        if (request->dst[i] != my_mac[6 - MGMT_ID_LEN + i]) {
-	  return;
-	}
-      }
-      Serial.println("rebooting ...");
-      esp_restart();
-    }
+    esp_restart();
     return;
   }
   
@@ -333,6 +296,8 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   unsigned char src[MGMT_ID_LEN];
   memcpy(src, pkt+1, MGMT_ID_LEN);
   Serial.printf("mgmt_rx got packet from %s\r\n", to_hex(src, MGMT_ID_LEN, 0));
+  // check if we sent this
+  if (!memcmp(src, mgmt_id, MGMT_ID_LEN)) { return; }
   // check if node is already in fcnt table
   int ndx = -1;
   for (int i = 0; i < mgmt_fcnt_table_cnt; i++) {
@@ -351,13 +316,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     }
   }
   // existing node -> validate fcnt
-  if (ndx != -1) {
-    Serial.printf("mgmt_rx received fcnt = %d, last fcnt = %d\r\n", fcnt, mgmt_fcnt_table[ndx].fcnt);
-    if (fcnt <= mgmt_fcnt_table[ndx].fcnt) {
-      Serial.printf("mgmt_rx already heard that message, skipping...\r\n");
-      return;
-    }
-  }
+  if (ndx != -1 && fcnt <= mgmt_fcnt_table[ndx].fcnt) { return; }
   // update fcnt
   mgmt_fcnt_table[ndx].fcnt = fcnt;
   // write fcnt-table to file
@@ -374,18 +333,26 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     return;
   }
 
-  // receive request
-  if (pkt[0] == 'r' && len == MGMT_REQUEST_LEN) {
-    mgmt_rx_request(pkt, len);
-    return;
-  }
-
   // receive status
   if (pkt[0] == 's' && len % MGMT_STATUS_LEN == 0) {
     mgmt_rx_status(pkt, len);
     return;
   }
-   
+
+  // receive request
+  if (pkt[0] == 'r' && len == MGMT_REQUEST_LEN) {
+    struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
+    memcpy(request, pkt, MGMT_REQUEST_LEN);
+    if (memcmp(request->dst, mgmt_id, MGMT_ID_LEN)) {
+      io_send(pkt - DMX_LEN, len + DMX_LEN + MGMT_MIC_LEN + MGMT_FCNT_LEN, NULL);
+    }
+    if (!memcmp(request->dst, mgmt_id, MGMT_ID_LEN || request->all == true)) {
+      mgmt_rx_request(pkt, len);
+    }
+    free(request);
+    return;
+  }
+
   // unknown typ
   Serial.printf("mgmt_rx t=%c ??\r\n", pkt[0]);
 }

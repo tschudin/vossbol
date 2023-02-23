@@ -192,6 +192,9 @@ void setup()
   strcpy(loc_line, "?");
   strcpy(goset_line, "?");
 
+  // get id
+  mgmt_id[0] = my_mac[4];
+  mgmt_id[1] = my_mac[5];
   // load fcnt
   mgmt_fcnt_log = MyFS.open(MGMT_FCNT_LOG_FILENAME, "r");
   mgmt_fcnt_log.read((unsigned char*) &mgmt_fcnt, sizeof(mgmt_fcnt));
