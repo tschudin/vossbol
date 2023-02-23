@@ -346,7 +346,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     if (memcmp(request->dst, mgmt_id, MGMT_ID_LEN)) {
       io_send(pkt - DMX_LEN, len + DMX_LEN + MGMT_MIC_LEN + MGMT_FCNT_LEN, NULL);
     }
-    if (!memcmp(request->dst, mgmt_id, MGMT_ID_LEN || request->all == true)) {
+    if (!memcmp(request->dst, mgmt_id, MGMT_ID_LEN) || request->all == true) {
       mgmt_rx_request(pkt, len);
     }
     free(request);

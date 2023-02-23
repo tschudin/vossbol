@@ -94,7 +94,7 @@ void cmd_rx(String cmd) {
       break;
     case 's': // send status request
       if (cmd[1] == '*') {
-        Serial.printf("sending status request to all reachable (1 hop) nodes\n");
+        Serial.printf("sending status request to all nodes\n");
         mgmt_send_request('s');
       } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
 	char idHex[2 * MGMT_ID_LEN];
@@ -109,7 +109,7 @@ void cmd_rx(String cmd) {
       break;
     case 'x': // reboot
       if (cmd[1] == '*') {
-        Serial.printf("sending reboot request to all reachable (1 hop) nodes\n");
+        Serial.printf("sending reboot request to all nodes\n");
         mgmt_send_request('x');
       } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
 	char idHex[2 * MGMT_ID_LEN];
