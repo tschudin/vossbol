@@ -104,8 +104,7 @@ unsigned char* _mkRequest(unsigned char cmd, unsigned char* id=NULL)
   static struct request_s request;
   request.typ = 'r';
   request.cmd = cmd;
-  request.id[0] = my_mac[4];
-  request.id[1] = my_mac[5];
+  memcpy(request.id, mgmt_id, MGMT_ID_LEN);
   if (id == NULL) {
     request.all = true;
   } else {
@@ -121,8 +120,7 @@ unsigned char* _mkStatus()
   static struct status_s status[(int) (120 - 11) / MGMT_STATUS_LEN];
   // add self
   status[0].typ = 's';
-  status[0].id[0] = my_mac[4];
-  status[0].id[1] = my_mac[5];
+  memcpy(status[0].id, mgmt_id, MGMT_ID_LEN);
   status[0].beacon = mgmt_beacon;
   status[0].voltage = 0;
 #if defined(AXP_DEBUG)
@@ -164,8 +162,7 @@ unsigned char* _mkBeacon()
 {
   static struct beacon_s beacon;
   beacon.typ = 'b';
-  beacon.id[0] = my_mac[4];
-  beacon.id[1] = my_mac[5];
+  memcpy(beacon.id, mgmt_id, MGMT_ID_LEN);
   return (unsigned char*) &beacon;
 }
 
