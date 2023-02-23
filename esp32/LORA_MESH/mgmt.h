@@ -303,7 +303,7 @@ void mgmt_rx_status(unsigned char *pkt, int len) {
 void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 {
   // check if face == lora
-  // TODO
+  if (memcmp(f->name, (char *) "lora", 4)) { return; }
 
   // remove DMX
   pkt += DMX_LEN;
