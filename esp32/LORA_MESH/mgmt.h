@@ -1,5 +1,18 @@
 // mgmt.h
 
+// packet structure:
+//
+//     7B DMX       demultiplex (app layer)
+//
+//     1B TYP       message type
+//     2B SRC       sender ID
+//     xB PAYLOAD   message contents
+//     4B FCNT      frame counter
+//     4B MAC       message authentication code (computed over TYP, SRC, PAYLOAD & FCNT)
+//
+//     4B CRC       cyclic redundancy check (LoRa layer)
+//
+
 #include <sodium/crypto_auth.h>
 
 #if defined __has_include
@@ -13,11 +26,11 @@ unsigned char MGMT_KEY[crypto_auth_hmacsha512_KEYBYTES] = { 0 };
 
 unsigned char mgmt_dmx[DMX_LEN];
 
-#define MGMT_ID_LEN    2
-#define STATUST_SIZE   23
-#define STATUST_EOL    24 * 60 * 60 * 1000 // millis (24h)
-#define MGMT_FCNT_LEN  4
-#define MGMT_MIC_LEN   4
+#define MGMT_ID_LEN          2
+#define STATUST_SIZE         23
+#define STATUST_EOL          24 * 60 * 60 * 1000 // millis (24h)
+#define MGMT_FCNT_FIELD_LEN  4
+#define MGMT_MAC_FIELD_LEN   4
 
 #define MGMT_FCNT_LOG_FILENAME        "/mgmt_fcnt_log.bin"
 #define MGMT_FCNT_TABLE_LOG_FILENAME  "/mgmt_fcnt_table_log.bin"
@@ -269,22 +282,22 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   pkt += DMX_LEN;
   len -= DMX_LEN;
 
-  // get message integrity code
-  len -= MGMT_MIC_LEN;
-  unsigned char mic[MGMT_MIC_LEN];
-  memcpy(mic, pkt+len, MGMT_MIC_LEN);
+  // get message authentication code
+  len -= MGMT_MAC_FIELD_LEN;
+  unsigned char msg_mac[MGMT_MAC_FIELD_LEN];
+  memcpy(msg_mac, pkt+len, MGMT_MAC_FIELD_LEN);
   // compute hmac
   unsigned char hash[crypto_auth_hmacsha512_BYTES];
   crypto_auth_hmacsha512(hash, pkt, len, MGMT_KEY);
-  // copy mic to hmac
-  memcpy(hash, mic, MGMT_MIC_LEN);
+  // copy msg_mac to hmac
+  memcpy(hash, msg_mac, MGMT_MAC_FIELD_LEN);
   // verify hmac
   if (crypto_auth_hmacsha512_verify(hash, pkt, len, MGMT_KEY) != 0) {
     Serial.printf("mgmt_rx verification of hmac failed\r\n");
     return;
   }
   // get fcnt
-  len -= MGMT_FCNT_LEN;
+  len -= MGMT_FCNT_FIELD_LEN;
   unsigned int fcnt = (uint32_t)pkt[len+3] << 24 |
                        (uint32_t)pkt[len+2] << 16 |
                        (uint32_t)pkt[len+1] << 8  |
@@ -313,6 +326,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     }
   }
   // existing node -> validate fcnt
+  Serial.printf("mgmt_rx received fcnt = %d, last fcnt = %d\r\n", fcnt, mgmt_fcnt_table[ndx].fcnt);
   if (ndx != -1 && fcnt <= mgmt_fcnt_table[ndx].fcnt) { return; }
   // update fcnt
   mgmt_fcnt_table[ndx].fcnt = fcnt;
@@ -341,7 +355,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
     if (memcmp(request->dst, mgmt_id, MGMT_ID_LEN)) {
-      io_send(pkt - DMX_LEN, len + DMX_LEN + MGMT_MIC_LEN + MGMT_FCNT_LEN, NULL);
+      io_send(pkt - DMX_LEN, len + DMX_LEN + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
     }
     if (!memcmp(request->dst, mgmt_id, MGMT_ID_LEN) || request->all == true) {
       mgmt_rx_request(pkt, len);
@@ -499,20 +513,20 @@ void mgmt_statust_housekeeping()
 // send mgmt packet
 void mgmt_tx(unsigned char* payload, int payload_len)
 {
-  int len = payload_len + MGMT_FCNT_LEN + MGMT_MIC_LEN;
+  int len = payload_len + MGMT_FCNT_FIELD_LEN + MGMT_MAC_FIELD_LEN;
   // add payload
   unsigned char message[len] = { 0 };
   memcpy(message, payload, payload_len);
   // add fcnt
-  memcpy(message + payload_len, (unsigned char*) &++mgmt_fcnt, MGMT_FCNT_LEN);
+  memcpy(message + payload_len, (unsigned char*) &++mgmt_fcnt, MGMT_FCNT_FIELD_LEN);
   // write fcnt to flash
   mgmt_fcnt_log = MyFS.open(MGMT_FCNT_LOG_FILENAME, "w");
   mgmt_fcnt_log.write((unsigned char*) &mgmt_fcnt, sizeof(mgmt_fcnt));
   mgmt_fcnt_log.close();
   // add hmac
   unsigned char hash[crypto_auth_hmacsha512_BYTES];
-  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_FCNT_LEN, MGMT_KEY);
-  memcpy(message + payload_len + MGMT_FCNT_LEN, hash, MGMT_MIC_LEN);
+  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_FCNT_FIELD_LEN, MGMT_KEY);
+  memcpy(message + payload_len + MGMT_FCNT_FIELD_LEN, hash, MGMT_MAC_FIELD_LEN);
   // send
   io_enqueue(message, len, mgmt_dmx, NULL);
 }
