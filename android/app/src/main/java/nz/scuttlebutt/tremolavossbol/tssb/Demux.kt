@@ -52,6 +52,7 @@ class Demux(val context: MainActivity) {
     }
 
     fun arm_dmx(dmx: ByteArray, fct: Dmx_callback =null, aux: ByteArray? =null) {
+        Log.d("arm_dmx", "dmx: ${dmx.toHex()}, fct: ${fct.toString()}, aux: ${aux?.toHex()}")
         var d = dmxt_find(dmx)
         if (fct == null) { // del
             dmxt.remove(d)
@@ -99,6 +100,7 @@ class Demux(val context: MainActivity) {
                 rc = true
         }
         if (buf.size == TINYSSB_PKT_LEN) {
+            Log.d("demux", "buf.size == TINYSSB_PKT_LEN")
             val b = blbt_find(h)
             if (b != null) {
                 b.fct!!.invoke(buf, chkt.indexOf(b))
@@ -109,10 +111,19 @@ class Demux(val context: MainActivity) {
     }
 
     fun set_want_dmx(goset_state: ByteArray) {
+        Log.d("demux", "SET NEW DMX FOR STATE ${goset_state.toHex()}")
+
+        //undefine current handler
+        if(context.tinyDemux.want_dmx != null)
+            arm_dmx(context.tinyDemux.want_dmx!!, null, null)
+
+        if(context.tinyDemux.chnk_dmx != null)
+            arm_blb(context.tinyDemux.chnk_dmx!!, null, null, 0, 0)
+
         want_dmx = compute_dmx("want".encodeToByteArray() + goset_state)
         chnk_dmx = compute_dmx("blob".encodeToByteArray() + goset_state)
-        arm_dmx(want_dmx!!, null, null)
-        arm_blb(chnk_dmx!!, null, null, 0, 0)
+        arm_dmx(want_dmx!!, { buf:ByteArray, aux:ByteArray? -> context.tinyNode.incoming_want_request(buf,null)}, null)
+        arm_dmx(chnk_dmx!!, { buf:ByteArray, aux:ByteArray? -> context.tinyNode.incoming_chunk_request(buf,aux)})
         Log.d("demux", "GOset state is  ${goset_state.toHex()}")
         Log.d("demux", "new WANT dmx is ${want_dmx!!.toHex()}")
         Log.d("demux", "new BLOB dmx is ${chnk_dmx!!.toHex()}")
