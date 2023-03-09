@@ -40,11 +40,11 @@ class BlePeers(val act: MainActivity) {
     private val bleScanner = bluetoothAdapter.bluetoothLeScanner
     private var gattServer: BluetoothGattServer? = null
     private var advertiser: BluetoothLeAdvertiser? = null
-    private val connectedDevices = mutableSetOf<BluetoothDevice>()
-    private var pending = mutableMapOf<BluetoothDevice,BluetoothGatt>()
-    var peers = mutableMapOf<BluetoothDevice,BluetoothGatt>()
-    private var pendingList = mutableSetOf<BluetoothDevice>()
-    private var peerList = mutableSetOf<BluetoothDevice>()
+
+    private val connectedDevices = mutableSetOf<BluetoothDevice>() // Bluetooth devices connected to the hosted GATT-server
+    private var pending = mutableMapOf<BluetoothDevice,BluetoothGatt>() // pending connection to other GATT-Servers, waiting for a successful reply
+    var peers = mutableMapOf<BluetoothDevice,BluetoothGatt>() // Bluetooth devices we are connected to
+    private var writeErrorCounter = mutableMapOf<BluetoothDevice,Int>() // Counts the number of write errors for the given Bluetooth device (not included in the set -> no errors occurred).
     var isScanning = false
 
     private val scanSettings = ScanSettings.Builder()
@@ -145,10 +145,6 @@ class BlePeers(val act: MainActivity) {
         isScanning = false
     }
 
-    fun addPeer(gatt: BluetoothGatt) {
-        peers[gatt.device] = gatt
-    }
-
     @SuppressLint("MissingPermission")
     private val gattCallback = object : BluetoothGattCallback() {
 
@@ -221,7 +217,6 @@ class BlePeers(val act: MainActivity) {
 
         override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
             super.onMtuChanged(gatt, mtu, status)
-            Log.d("TEST_T", peers.size.toString())
             Log.d("ble mtu", "status=$status, mtu=$mtu")
             if (status == GATT_SUCCESS && gatt != null) {
                 Log.d("ble gatt", "${gatt.discoverServices()}")
@@ -247,6 +242,27 @@ class BlePeers(val act: MainActivity) {
         ) {
             super.onCharacteristicWrite(gatt, characteristic, status)
             Log.d("gatt", "Write success status: $status")
+
+            if(gatt != null) {
+                if(status != 0) {
+
+                    // increase error counter
+                    if(writeErrorCounter.contains(gatt.device))
+                        writeErrorCounter[gatt.device] = writeErrorCounter[gatt.device]!! + 1
+                    else
+                        writeErrorCounter[gatt.device] = 1
+
+                    // to many write errors -> disconnect from GATT-Server
+                    if(writeErrorCounter[gatt.device]!! > 10) {
+                        gatt.disconnect()
+                        peers.remove(gatt.device)
+                        writeErrorCounter.remove(gatt.device)
+                    }
+                } else {
+                    // reset error counter
+                    writeErrorCounter.remove(gatt.device)
+                }
+            }
         }
     }
 
@@ -255,16 +271,12 @@ class BlePeers(val act: MainActivity) {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             super.onScanResult(callbackType, result)
             if (!(result.device in peers) and !(result.device in pending)) {
-            //if (!(result.device in peerList) and !(result.device in pendingList)) {
                 Log.d("ble_scan_callback", "Found BLE tinySSB device! adding address: ${result.device.address}")
-                Log.d("ble_scan_callback", "current pending: ${pendingList}")
-                Log.d("ble_scan_callback", "current peers: ${peerList}")
                 /*if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 
                 }
                  */
                 val g = result.device.connectGatt(act, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
-                //pendingList.add(result.device)
                 pending[result.device] = g
                 //val g = result.device.connectGatt(act, true, gattCallback)
                 //peers[result.device] = g
