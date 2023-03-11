@@ -26,11 +26,15 @@ unsigned char MGMT_KEY[crypto_auth_hmacsha512_KEYBYTES] = { 0 };
 
 unsigned char mgmt_dmx[DMX_LEN];
 
+#define MGMT_DMX_STR         "tinySSB-0.1 mgmt 1"
 #define MGMT_ID_LEN          2
 #define STATUST_SIZE         23
 #define STATUST_EOL          24 * 60 * 60 * 1000 // millis (24h)
 #define MGMT_FCNT_FIELD_LEN  4
 #define MGMT_MAC_FIELD_LEN   4
+
+#define MGMT_SEND_STATUS_INTERVAL  5*60*1000 // millis (5 minutes)
+#define MGMT_SEND_BEACON_INTERVAL     5*1000 // millis (5 seconds)
 
 #define MGMT_FCNT_LOG_FILENAME        "/mgmt_fcnt_log.bin"
 #define MGMT_FCNT_TABLE_LOG_FILENAME  "/mgmt_fcnt_table_log.bin"
@@ -100,6 +104,7 @@ unsigned int mgmt_fcnt = 0;
 unsigned char mgmt_id[MGMT_ID_LEN];
 
 bool mgmt_beacon = false;
+unsigned long int next_mgmt_send_beacon;
 unsigned long int mgmt_next_send_status = MGMT_SEND_STATUS_INTERVAL;
 
 // forward declaration
@@ -552,6 +557,51 @@ void mgmt_send_status()
   mgmt_tx(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN);
   // set next event
   mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
+}
+
+
+
+//------------------------------------------------------------------------------
+// SETUP & TICK
+
+// called once on boot
+void mgmt_setup()
+{
+  // initialize mgmt_dmx
+  unsigned char h[32];
+  crypto_hash_sha256(h, (unsigned char*) MGMT_DMX_STR, strlen(MGMT_DMX_STR));
+  memcpy(mgmt_dmx, h, DMX_LEN);
+  arm_dmx(mgmt_dmx, mgmt_rx, NULL);
+  Serial.printf("listening for mgmt protocol on %s\r\n", to_hex(mgmt_dmx, DMX_LEN));
+  // get id
+  for (int i = 0; i < MGMT_ID_LEN; i++) {
+    mgmt_id[i] = my_mac[6 - MGMT_ID_LEN + i];
+  }
+  // load fcnt
+  mgmt_fcnt_log = MyFS.open(MGMT_FCNT_LOG_FILENAME, "r");
+  mgmt_fcnt_log.read((unsigned char*) &mgmt_fcnt, sizeof(mgmt_fcnt));
+  mgmt_fcnt_log.close();
+  // load fcnt-table
+  mgmt_fcnt_table_log = MyFS.open(MGMT_FCNT_TABLE_LOG_FILENAME, "r");
+  mgmt_fcnt_table_log.read((unsigned char*) &mgmt_fcnt_table_cnt, sizeof(mgmt_fcnt_table_cnt));
+  mgmt_fcnt_table_log.read((unsigned char*) &mgmt_fcnt_table, MGMT_FCNT_LEN * MGMT_FCNT_TABLE_SIZE);
+  mgmt_fcnt_table_log.close();
+
+}
+
+// called in main loop
+void mgmt_tick()
+{
+  // periodically send status
+  if (millis() > mgmt_next_send_status) {
+    mgmt_send_status();
+  }
+
+  // check if beacon is active
+  if (mgmt_beacon && millis() > next_mgmt_send_beacon) {
+    mgmt_send_beacon();
+    next_mgmt_send_beacon = millis() + MGMT_SEND_BEACON_INTERVAL + random(2000);
+  }
 }
 
 // eof

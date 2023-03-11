@@ -17,9 +17,6 @@
 #define LOG_FLUSH_INTERVAL         10000 // millis
 #define LOG_BATTERY_INTERVAL  15*60*1000 // millis (15 minutes)
 
-#define MGMT_SEND_STATUS_INTERVAL  5*60*1000 // millis (5 minutes)
-#define MGMT_SEND_BEACON_INTERVAL     5*1000 // millis (5 seconds)
-
 // ----------------------------------------------------------------------
 
 // #define LORA_BAND    902E6 // USA
@@ -42,7 +39,6 @@
 
 #define DMX_LEN          7
 #define GOSET_DMX_STR    "tinySSB-0.1 GOset 1"
-#define MGMT_DMX_STR     "tinySSB-0.1 mgmt 1"
 
 #define TINYSSB_PKT_LEN   120
 
@@ -140,8 +136,6 @@ int lora_bad_crc = 0;
 File lora_log;
 unsigned long int next_log_flush;
 
-unsigned long int next_mgmt_send_beacon;
-
 #include "cmd.h"
 
 // ----------------------------------------------------------------------------
@@ -179,11 +173,7 @@ void setup()
   arm_dmx(goset_dmx, goset_rx, NULL);
   Serial.printf("listening for GOset protocol on %s\r\n", to_hex(goset_dmx, 7));
 
-  // initialize mgmt_dmx
-  crypto_hash_sha256(h, (unsigned char*) MGMT_DMX_STR, strlen(MGMT_DMX_STR));
-  memcpy(mgmt_dmx, h, DMX_LEN);
-  arm_dmx(mgmt_dmx, mgmt_rx, NULL);
-  Serial.printf("listening for mgmt protocol on %s\r\n", to_hex(mgmt_dmx, DMX_LEN));
+  mgmt_setup();
 
   repo_load();
 
@@ -191,19 +181,6 @@ void setup()
   strcpy(time_line, "?");
   strcpy(loc_line, "?");
   strcpy(goset_line, "?");
-
-  // get id
-  mgmt_id[0] = my_mac[4];
-  mgmt_id[1] = my_mac[5];
-  // load fcnt
-  mgmt_fcnt_log = MyFS.open(MGMT_FCNT_LOG_FILENAME, "r");
-  mgmt_fcnt_log.read((unsigned char*) &mgmt_fcnt, sizeof(mgmt_fcnt));
-  mgmt_fcnt_log.close();
-  // load fcnt-table
-  mgmt_fcnt_table_log = MyFS.open(MGMT_FCNT_TABLE_LOG_FILENAME, "r");
-  mgmt_fcnt_table_log.read((unsigned char*) &mgmt_fcnt_table_cnt, sizeof(mgmt_fcnt_table_cnt));
-  mgmt_fcnt_table_log.read((unsigned char*) &mgmt_fcnt_table, MGMT_FCNT_LEN * MGMT_FCNT_TABLE_SIZE);
-  mgmt_fcnt_table_log.close();
 
 #if defined(LORA_LOG)
   lora_log = MyFS.open(LORA_LOG_FILENAME, FILE_APPEND);
@@ -297,6 +274,7 @@ void loop()
   io_dequeue();
   goset_tick(theGOset);
   node_tick();
+  mgmt_tick();
 
   if (Serial.available())
     cmd_rx(Serial.readString());
@@ -474,17 +452,6 @@ void loop()
     refresh = 0;
   }
 #endif // NO_OLED
-
-  // periodically send status
-  if (millis() > mgmt_next_send_status) {
-    mgmt_send_status();
-  }
-
-  // check if beacon is active
-  if (mgmt_beacon && millis() > next_mgmt_send_beacon) {
-    mgmt_send_beacon();
-    next_mgmt_send_beacon = millis() + MGMT_SEND_BEACON_INTERVAL + random(2000);
-  }
 
   delay(10);
 
