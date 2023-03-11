@@ -197,19 +197,19 @@ void mgmt_rx_request(unsigned char *pkt, int len)
     mgmt_beacon = pkt[3] == '+' ? true : false;
     return;
   }
-  
+
   // status
   if (pkt[3] == 's') {
     mgmt_next_send_status = millis() + random(5000);
     return;
   }
-  
+
   // reboot
   if (pkt[3] == 'x') {
     esp_restart();
     return;
   }
-  
+
   // unknown
   Serial.printf("mgmt_rx received request %s ??\r\n", pkt[3]);
 }
@@ -502,19 +502,13 @@ void mgmt_statust_housekeeping()
     }
     if (old_cnt == statust_cnt) { break; }
   }
-  
 }
 
 
 
 // -----------------------------------------------------------------------------
-// FRAME COUNTER
-
-
-
-// -----------------------------------------------------------------------------
 // MGMT TX
- 
+
 // send mgmt packet
 void mgmt_tx(unsigned char* payload, int payload_len)
 {
@@ -596,7 +590,6 @@ void mgmt_tick()
   if (millis() > mgmt_next_send_status) {
     mgmt_send_status();
   }
-
   // check if beacon is active
   if (mgmt_beacon && millis() > next_mgmt_send_beacon) {
     mgmt_send_beacon();
