@@ -220,6 +220,8 @@ function leave(bid) {
     board_send_to_backend(data)
 }
 
+
+
 function board_send_to_backend(data) {
   var bid = data['bid'] != null ? data['bid'] : "null"
   var prevs = data['prev'] != null ? btoa(data['prev'].map(btoa)) : "null"
@@ -229,6 +231,167 @@ function board_send_to_backend(data) {
   backend(to_backend.join(" "))
 }
 
+function kanban_new_event(e) {
+  // parse data
+  var op = e.public[3]
+  var bid = op == Operation.BOARD_CREATE ? e.header.ref : e.public[1]
+  var prev = e.public[2] != "null" ? e.public[2] : []
+  var args = e.public.length > 4 ? e.public.slice(4) : []
+
+  // add new entry if it is a new board
+  if(!(bid in tremola.board)) {
+    tremola.board[bid] = {
+      "operations": {}, // all received operations for this board
+      "sortedOperations": new Timeline(), // "linear timeline", sorted list of operationIds
+      "members": [e.header.fid], // members of the board
+      "forgotten": false, // flag for hiding this board from the board list
+      "name" : bid.toString().slice(0, 15) + '...', // name of the board
+      "curr_prev": [], // prev pointer
+      "columns": {},
+      "items": {},
+      "numOfActiveColumns": 0,
+      "history" : [],
+      "lastUpdate": Date.now(),
+      "unreadEvents": 0,
+      "subscribed": false,
+      "pendingInvitations": {}, // User: [inviteIds]
+      "key": bid.toString(),
+      "flags": []
+    }
+  }
+
+  var board = tremola.board[bid]
+
+  if (op == Operation.BOARD_CREATE) {
+    board.name = args[0]
+    board.flags = args.slice(1)
+    if (e.header.fid == myId)
+      board.subscribed = true // the creator of the board is automatically subscribed
+  }
+
+  if(!(board.sortedOperations instanceof Timeline)) { // deserialize ScuttleSort-Timeline
+    board.sortedOperations = Timeline.fromJSON(board.sortedOperations)
+  }
+
+  if(e.header.ref in board.operations)
+    return
+
+
+
+  // translation of the event format into the kanban board format
+  var body = {
+    'bid': bid,
+    'cmd': [op].concat(args),
+    'prev': prev
+  }
+
+  // store new event
+  var p = {"key": e.header.ref, "fid": e.header.fid, "fid_seq": e.header.seq, "body": body, "when": e.header.tst};
+  board["operations"][e.header.ref] = p;
+
+  if(op == Operation.LEAVE && e.header.fid == myId) {
+      delete board.pendingInvitations[myId]
+      board.subscribed = false
+      load_board_list()
+    }
+
+  if(board.subscribed) {
+    board.sortedOperations.add(e.header.ref, prev)
+
+    var independentOPs = [Operation.COLUMN_CREATE, Operation.ITEM_CREATE, Operation.COLUMN_REMOVE, Operation.ITEM_REMOVE, Operation.LEAVE] // these operations cannot be overwritten; their position in the linear timeline does not affect the resulting board
+
+    //  Ui update + update optimization // board.operations[e.header.ref].indx == board.sortedOperations.length -1
+    if( board.sortedOperations.name2p[e.header.ref].indx == board.sortedOperations.linear.length - 1 || independentOPs.indexOf(board.operations[e.header.ref].body.cmd[0]) >= 0 ) { //if the new event is inserted at the end of the linear timeline or the position is irrelevant for this operation
+      if(curr_scenario == 'board' && curr_board == bid)
+        apply_operation(bid, e.header.ref, true) // the board is currently displayed; additionally perform operation on UI
+      else
+        apply_operation(bid, e.header.ref, false)
+    } else {
+      console.log("DEBUG APPLYALL")
+      apply_all_operations(bid)
+    }
+
+    board.curr_prev = board.sortedOperations.get_tips()
+    board.lastUpdate = Date.now()
+
+    if(curr_scenario != 'board' || curr_board != bid)
+      board.unreadEvents++
+
+    load_board_list()
+
+    // invite selected users (during Kanban board creation)
+    if(op == Operation.BOARD_CREATE && e.header.fid == myId) {
+      var pendingInvites = []
+      for (var m in tremola.contacts) {
+        if (m != myId && document.getElementById(m).checked) {
+          inviteUser(bid, m)
+          console.log("Invited: " + m)
+        }
+      }
+      if(curr_scenario == 'members')
+        load_board(bid)
+    }
+
+    // creates Personal Board
+    if (board.flags.includes(FLAG.PERSONAL)) {
+      if(op == Operation.BOARD_CREATE)
+        createColumn(bid, 'Welcome')
+      else if (Object.values(board.columns)[0].item_ids.length == 0)
+        createColumnItem(bid, Object.values(board.columns)[0].id, 'Welcome!')
+      else if (board.items[Object.values(board.columns)[0].item_ids[0]].description == "") {
+        setItemDescription(bid, Object.values(board.columns)[0].item_ids[0], "You can create/edit cards and lists to organize your projects")
+        board.unreadEvents = 1
+      }
+    }
+  } else {
+    if(op == Operation.INVITE && body.cmd[1] == myId) { // received invitation to board
+      if(board.pendingInvitations[myId])
+        board.pendingInvitations[myId].push(e.header.ref)
+      else {
+        board.pendingInvitations[myId] = [e.header.ref]
+        launch_snackbar('New invitation received')
+        if (document.getElementById('kanban-invitations-overlay').style.display != 'none') {
+          menu_board_invitation_create_entry(bid)
+          console.log("create invite NAME:" + tremola.board['bid'].name)
+
+        }
+
+      }
+    }
+
+    if(op == Operation.INVITE_ACCEPT && e.header.fid == myId) { // invitation accepted -> start sorting all events
+      board.subscribed = true
+      board_reload(bid)
+      board.lastUpdate = Date.now()
+      board.unreadEvents++
+      board.curr_prev = board.sortedOperations.get_tips()
+      load_board_list()
+      return
+    }
+
+    if(op == Operation.INVITE_DECLINE && e.header.fid == myId) {
+      delete board.pendingInvitations[myId]
+    }
+  }
+
+}
+
+function loadPendingOp(bid, opID) {
+  var board = tremola.board[bid]
+
+  if(board.pendingOperations.indexOf(opID) < 0 || board.pendingOperations[opID] > 0)
+    return
+
+  board.sortedOperations.add(opID, prev)
+
+
+  board.pendingOperations.splice(board.pendingOperations.indexOf(opID), 1)
+
+
+}
+
+
+/*
 function updateCurrPrev(bid, e) {
   var board = tremola.board[bid]
   var event_prev = e.body.prev
@@ -243,7 +406,7 @@ function updateCurrPrev(bid, e) {
       }
     }
   }
-
+*/
   /*
   board.curr_prev[e.fid] = e.key.toString()
 
@@ -254,9 +417,9 @@ function updateCurrPrev(bid, e) {
       }
     }
   }
-  */
-}
 
+}
+*/
 /*
     ScuttleSort
     https://github.com/tschudin/scuttlesort

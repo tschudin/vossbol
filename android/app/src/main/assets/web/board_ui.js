@@ -347,7 +347,7 @@ function menu_board_invitation_create_entry(bid) {
   var invitationId = board.pendingInvitations[myId][0]
   var inviteUserId = board.operations[invitationId].fid
   var inviteUserName = tremola.contacts[inviteUserId].alias
-  var board_name = board.name
+  var board_name = board.name.length < 30 ? board.name : board.name.slice(0,30)
 
 
   var invHTML = "<div id='kanban_invitation_" + bid + "' class='kanban_invitation_container'>"

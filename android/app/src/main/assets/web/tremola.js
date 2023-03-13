@@ -102,7 +102,6 @@ function menu_edit(target, title, text) {
 }
 
 function edit_checkEnter(ev) {
-  console.log(ev.key)
   if(ev.key == "Enter") {
     edit_confirmed()
   }
@@ -786,6 +785,15 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
   console.log('pub', JSON.stringify(e.public))
   // console.log('cfd', JSON.stringify(e.confid))
   console.log("New Frontend Event: " + JSON.stringify(e.header))
+
+  //add
+  if (!(e.header.fid in tremola.contacts)) {
+    var a = id2b32(e.header.fid);
+    tremola.contacts[e.header.fid] = { "alias": a, "initial": a.substring(0,1).toUpperCase(),
+                                  "color": colors[Math.floor(colors.length * Math.random())] }
+    load_contact_list()
+  }
+
   if (e.public) {
     if (e.public[0] == 'TAV') { // text and voice
       console.log("new post 0 ", tremola)
@@ -796,12 +804,6 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
                                          "members":["ALL"], "touched": Date.now(), "lastRead": 0,
                                          "timeline": new Timeline() };
             load_chat_list()
-      }
-      if (!(e.header.fid in tremola.contacts)) {
-        var a = id2b32(e.header.fid);
-        tremola.contacts[e.header.fid] = { "alias": a, "initial": a.substring(0,1).toUpperCase(),
-                                      "color": colors[Math.floor(colors.length * Math.random())] }
-        load_contact_list()
       }
       console.log("new post 1")
       var ch = tremola.chats[conv_name];
@@ -818,6 +820,7 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
             var p = {"key": e.header.ref, "from": e.header.fid, "body": a[1],
                      "voice": a[2], "when": a[3] * 1000};
             console.log("new post 2 ", p)
+            console.log("time: ", a[3])
             ch["posts"][e.header.ref] = p;
             if (ch["touched"] < e.header.tst)
               ch["touched"] = e.header.tst
@@ -833,202 +836,45 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
       load_chat_list();
     } else if(e.public[0] == "KAN") { // Kanban board event
       console.log("New kanban event")
-      //var data = e.public[1]
-      var bid =  e.public[1] //data.bid//e.public[1]
-      var prev = e.public[2] != "null" ? e.public[2] : [] //data.prev == "null" ? []: data.prev//e.public[2] == "null" ? [] : e.public[2].split(" ")
-      var op = e.public[3]//e.public[3]
-      var args = e.public.length > 4 ? e.public.slice(4) : []  //e.public[4].split(" ")
-      console.log("OP: " + op)
-      console.log("PREV: " + prev)
-
-      if(op == Operation.BOARD_CREATE)
-        bid = e.header.ref
-
-      if (!(e.header.fid in tremola.contacts)) {
-        var a = id2b32(e.header.fid);
-        tremola.contacts[e.header.fid] = { "alias": a, "initial": a.substring(0,1).toUpperCase(),
-                                      "color": colors[Math.floor(colors.length * Math.random())] }
-        load_contact_list()
+      kanban_new_event(e)
+    } else if (e.confid && e.confid.type == "post") {
+      var i, conv_name = recps2nm(e.confid.recps);
+      if (!(conv_name in tremola.chats)) { // create new conversation if needed
+        tremola.chats[conv_name] = { "alias":"Unnamed conversation", "posts":{},
+                                     "members":e.confid.recps, "touched": Date.now(), "lastRead": 0,
+                                     "timeline": new Timeline()};
+        load_chat_list()
       }
-
-
-      // add new entry if it is a new board
-      if(!(bid in tremola.board)) {
-        console.log("new board name: " + args[0])
-        tremola.board[bid] = {
-          "operations": {}, // all received operations for this board
-          "sortedOperations": new Timeline(), // "linear timeline", sorted list of operationIds
-          "members": [e.header.fid], // members of the board
-          "forgotten": false, // flag for hiding this board from the board list
-          "name" : args[0], // name of the board
-          "curr_prev": [], // prev pointer
-          "columns": {},
-          "items": {},
-          "numOfActiveColumns": 0,
-          "history" : [],
-          "pendingOperations" : {},
-          "lastUpdate": Date.now(),
-          "unreadEvents": 0,
-          "subscribed": false,
-          "pendingInvitations": {}, // User: [inviteIds]
-          "key": bid.toString(),
-          "flags": args.slice(1)
+      for (i in e.confid.recps) {
+        var id, r = e.confid.recps[i];
+        if (!(r in tremola.contacts)) {
+          var a = id2b32(r);
+          tremola.contacts[r] = { "alias": a, "initial": a.substring(0,1).toUpperCase(),
+                                  "color": colors[Math.floor(colors.length * Math.random())] }
+          load_contact_list()
         }
       }
-
-      var board = tremola.board[bid]
-
-      if(!(board.sortedOperations instanceof Timeline)) { // deserialize ScuttleSort-Timeline
-        board.sortedOperations = Timeline.fromJSON(board.sortedOperations)
+      var ch = tremola.chats[conv_name];
+      if (!(e.header.ref in ch.posts)) { // new post
+        // var d = new Date(e.header.tst);
+        // d = d.toDateString() + ' ' + d.toTimeString().substring(0,5);
+        var p = {"key": e.header.ref, "from": e.header.fid, "body": e.confid.text, "when": e.header.tst };
+        ch["posts"][e.header.ref] = p;
+        if (ch["touched"] < e.header.tst)
+          ch["touched"] = e.header.tst
+        if (curr_scenario == "posts" && curr_chat == conv_name) {
+          load_chat(conv_name); // reload all messages (not very efficient ...)
+          ch["lastRead"] = Date.now();
+        }
+        set_chats_badge(conv_name)
       }
-
-      if (!(e.header.ref in board.operations)) { //new operation
-
-        // translation of the event format into the kanban board format
-        var body = {
-          'bid': bid,
-          'cmd': [op].concat(args),
-          'prev': prev
-        }
-
-        var p = {"key": e.header.ref, "fid": e.header.fid, "fid_seq": e.header.seq, "body": body, "when": e.header.tst, "sorted": false };
-        board["operations"][e.header.ref] = p;
-
-        if(op == Operation.BOARD_CREATE && e.header.fid == myId) {
-          board.subscribed = true // the creator of the board is automatically subscribed
-        }
-
-        if(op == Operation.INVITE && !board.subscribed && body.cmd[1] == myId) { // received invitation to board
-          if(board.pendingInvitations[myId])
-            board.pendingInvitations[myId].push(e.header.ref)
-          else {
-            board.pendingInvitations[myId] = [e.header.ref]
-            launch_snackbar('New invitation received')
-            if (document.getElementById('kanban-invitations-overlay').style.display != 'none') {
-              menu_board_invitation_create_entry(bid)
-              console.log("create invite NAME:" + tremola.board['bid'].name)
-
-            }
-
-          }
-        }
-
-        if(op == Operation.INVITE_ACCEPT && e.header.fid == myId) { // invitation accepted -> start sorting all events
-          board.subscribed = true
-          board_reload(bid)
-          board.lastUpdate = Date.now()
-          board.unreadEvents++
-          board.curr_prev = board.sortedOperations.get_tips()
-          load_board_list()
-          return
-        }
-
-        if(op == Operation.INVITE_DECLINE && e.header.fid == myId) {
-          delete board.pendingInvitations[myId]
-        }
-
-        if(op == Operation.LEAVE && e.header.fid == myId) {
-          delete board.pendingInvitations[myId]
-          board.subscribed = false
-          load_board_list()
-        }
-
-        // Updates of UI and linear timeline is only necessary if someone is subscribed to this board
-        if(board.subscribed) {
-          //newOperation(bid, e.header.ref) // insert Operation in sorted linear timeline via ScuttleSort
-          board.sortedOperations.add(e.header.ref, prev)
-
-          var independentOPs = [Operation.COLUMN_CREATE, Operation.ITEM_CREATE, Operation.COLUMN_REMOVE, Operation.ITEM_REMOVE, Operation.LEAVE] // these operations cannot be overwritten; their position in the linear timeline does not affect the resulting board
-
-          //  Ui update + update optimization // board.operations[e.header.ref].indx == board.sortedOperations.length -1
-          if( board.sortedOperations.name2p[e.header.ref].indx == board.sortedOperations.linear.length - 1 || independentOPs.indexOf(board.operations[e.header.ref].body.cmd[0]) >= 0 ) { //if the new event is inserted at the end of the linear timeline or the position is irrelevant for this operation
-            if(curr_scenario == 'board' && curr_board == bid)
-              apply_operation(bid, e.header.ref, true) // the board is currently displayed; additionally perform operation on UI
-            else
-              apply_operation(bid, e.header.ref, false)
-          } else {
-            console.log("DEBUG APPLYALL")
-            apply_all_operations(bid)
-          }
-
-
-          //updateCurrPrev(bid, p) // prepare "previous pointer" for future operation
-          board.curr_prev = board.sortedOperations.get_tips()
-
-          // updating the local timestamp + counter for sorting the board list
-          board.lastUpdate = Date.now()
-          if(curr_scenario != 'board' || curr_board != bid)
-            board.unreadEvents++
-
-          load_board_list()
-
-          if(op == Operation.BOARD_CREATE && e.header.fid == myId) {
-            var pendingInvites = []
-            for (var m in tremola.contacts) {
-              if (m != myId && document.getElementById(m).checked) {
-                inviteUser(bid, m)
-                console.log("Invited: " + m)
-              }
-            }
-            if(curr_scenario == 'members')
-              load_board(bid)
-          }
-
-          // creates Personal Board
-          if (board.flags.includes(FLAG.PERSONAL)) {
-            if(op == Operation.BOARD_CREATE)
-              createColumn(bid, 'Welcome')
-            else if (Object.values(board.columns)[0].item_ids.length == 0)
-              createColumnItem(bid, Object.values(board.columns)[0].id, 'Welcome!')
-            else if (board.items[Object.values(board.columns)[0].item_ids[0]].description == "") {
-              setItemDescription(bid, Object.values(board.columns)[0].item_ids[0], "You can create/edit cards and lists to organize your projects")
-              board.unreadEvents = 1
-            }
-
-
-          }
-
-
-        }
-      }
+      // if (curr_scenario == "chats") // the updated conversation could bubble up
+      load_chat_list();
+      // console.log(JSON.stringify(tremola))
     }
-  } else if (e.confid && e.confid.type == "post") {
-    var i, conv_name = recps2nm(e.confid.recps);
-    if (!(conv_name in tremola.chats)) { // create new conversation if needed
-      tremola.chats[conv_name] = { "alias":"Unnamed conversation", "posts":{},
-                                   "members":e.confid.recps, "touched": Date.now(), "lastRead": 0,
-                                   "timeline": new Timeline()};
-      load_chat_list()
-    }
-    for (i in e.confid.recps) {
-      var id, r = e.confid.recps[i];
-      if (!(r in tremola.contacts)) {
-        var a = id2b32(r);
-        tremola.contacts[r] = { "alias": a, "initial": a.substring(0,1).toUpperCase(),
-                                "color": colors[Math.floor(colors.length * Math.random())] }
-        load_contact_list()
-      }
-    }
-    var ch = tremola.chats[conv_name];
-    if (!(e.header.ref in ch.posts)) { // new post
-      // var d = new Date(e.header.tst);
-      // d = d.toDateString() + ' ' + d.toTimeString().substring(0,5);
-      var p = {"key": e.header.ref, "from": e.header.fid, "body": e.confid.text, "when": e.header.tst };
-      ch["posts"][e.header.ref] = p;
-      if (ch["touched"] < e.header.tst)
-        ch["touched"] = e.header.tst
-      if (curr_scenario == "posts" && curr_chat == conv_name) {
-        load_chat(conv_name); // reload all messages (not very efficient ...)
-        ch["lastRead"] = Date.now();
-      }
-      set_chats_badge(conv_name)
-    }
-    // if (curr_scenario == "chats") // the updated conversation could bubble up
-    load_chat_list();
-    // console.log(JSON.stringify(tremola))
+    persist();
+    must_redraw = true;
   }
-  persist();
-  must_redraw = true;
 }
 
 function b2f_new_contact(contact_str) { // '{"alias": "nickname", "id": "fid", 'img' : base64, date}'
