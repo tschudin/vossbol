@@ -837,41 +837,8 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
     } else if(e.public[0] == "KAN") { // Kanban board event
       console.log("New kanban event")
       kanban_new_event(e)
-    } else if (e.confid && e.confid.type == "post") {
-      var i, conv_name = recps2nm(e.confid.recps);
-      if (!(conv_name in tremola.chats)) { // create new conversation if needed
-        tremola.chats[conv_name] = { "alias":"Unnamed conversation", "posts":{},
-                                     "members":e.confid.recps, "touched": Date.now(), "lastRead": 0,
-                                     "timeline": new Timeline()};
-        load_chat_list()
-      }
-      for (i in e.confid.recps) {
-        var id, r = e.confid.recps[i];
-        if (!(r in tremola.contacts)) {
-          var a = id2b32(r);
-          tremola.contacts[r] = { "alias": a, "initial": a.substring(0,1).toUpperCase(),
-                                  "color": colors[Math.floor(colors.length * Math.random())] }
-          load_contact_list()
-        }
-      }
-      var ch = tremola.chats[conv_name];
-      if (!(e.header.ref in ch.posts)) { // new post
-        // var d = new Date(e.header.tst);
-        // d = d.toDateString() + ' ' + d.toTimeString().substring(0,5);
-        var p = {"key": e.header.ref, "from": e.header.fid, "body": e.confid.text, "when": e.header.tst };
-        ch["posts"][e.header.ref] = p;
-        if (ch["touched"] < e.header.tst)
-          ch["touched"] = e.header.tst
-        if (curr_scenario == "posts" && curr_chat == conv_name) {
-          load_chat(conv_name); // reload all messages (not very efficient ...)
-          ch["lastRead"] = Date.now();
-        }
-        set_chats_badge(conv_name)
-      }
-      // if (curr_scenario == "chats") // the updated conversation could bubble up
-      load_chat_list();
-      // console.log(JSON.stringify(tremola))
     }
+
     persist();
     must_redraw = true;
   }

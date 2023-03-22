@@ -393,195 +393,6 @@ function loadPendingOp(bid, opID) {
 
 }
 
-
-/*
-function updateCurrPrev(bid, e) {
-  var board = tremola.board[bid]
-  var event_prev = e.body.prev
-
-  board.curr_prev.push(e.key.toString())
-
-  if(event_prev) {
-    for(var i in event_prev) {
-      var indx = board.curr_prev.indexOf(event_prev[i])
-      if( indx >= 0) {
-        board.curr_prev.splice(indx, 1)
-      }
-    }
-  }
-*/
-  /*
-  board.curr_prev[e.fid] = e.key.toString()
-
-  if(event_prev) {
-    for(var i in event_prev) {
-      if(board.curr_prev[i] == event_prev[i]) {
-        delete board.curr_prev[i]
-      }
-    }
-  }
-
-}
-*/
-/*
-    ScuttleSort
-    https://github.com/tschudin/scuttlesort
-*/
-
-/*function newOperation(bid, operationID) {
-  var board = tremola.board[bid]
-  var op = board.operations[operationID]
-  var prev = op.body.prev
-  op['cycl'] = false
-  op['succ'] = []
-  op['rank'] = 0
-  op['vstd'] = false
-  op['sorted'] = true
-
-  for(var i in prev) {
-    let c = prev[i]
-    let p = board.operations[c]
-    if(p && p.sorted) {
-      p.succ.push(operationID)
-    } else {
-      if(!(c in board.pendingOperations))
-        board.pendingOperations[c] = []
-      let a = board.pendingOperations[c]
-      if(!a.includes(operationID))
-        a.push(operationID)
-
-    }
-  }
-
-  var pos = 0
-  for(var i in prev) {
-    let p = prev[i]
-    if(p in board.operations && board.operations[p].sorted && board.operations[p].indx > pos)
-      pos = board.operations[p].indx
-  }
-
-  for(var i= pos; i < board.sortedOperations.length; i++)
-    board.operations[board.sortedOperations[i]].indx += 1
-  op['indx'] = pos
-  board.sortedOperations.splice(pos, 0, operationID) // _insert
-
-  var no_anchor = true
-  for(var i in prev) {
-    let p = prev[i]
-    if(p in board.operations && board.operations[p].sorted) {
-      add_edge_to_the_past(bid, operationID, p)
-      no_anchor = false
-    }
-  }
-  if(no_anchor && board.sortedOperations.length > 1)
-    rise(bid, operationID)
-
-  let s = board.pendingOperations[operationID]
-  if(s) {
-    for(let e of s) {
-      let curr_op = board.operations[e]
-      for(var i in curr_op.body.prev) {
-        if(curr_op.body.prev[i] != operationID)
-          continue
-        add_edge_to_the_past(bid, e, operationID)
-        op.succ.push(e)
-      }
-    }
-    delete board.pendingOperations[operationID]
-  }
-}
-
-function add_edge_to_the_past(bid, operationID, causeID) {
-  var board = tremola.board[bid]
-  var op = board.operations[operationID]
-  var cause = board.operations[causeID]
-
-  let visited = new Set()
-  cause.cycl = true
-  visit(bid, operationID, cause.rank, visited)
-  cause.cycl = false
-
-  let si = op.indx
-  let ci = cause.indx
-  if(si < ci)
-    jump(bid, operationID, ci)
-  else
-    rise(bid, operationID)
-
-  // console.log(visited);
-  // let a = visited.slice() // Array.from(visited)
-  var a = [];
-  visited.forEach( function(v) { a.push(v); } );
-  a.sort( function(a,b) {return b.indx - a.indx;} )
-  for(let v of a) {
-    rise(bid, v.key)
-    v.vstd = false
-  }
-}
-
-function rise(bid, operationID) {
-  var board = tremola.board[bid]
-  var op = board.operations[operationID]
-
-  let len1 = board.sortedOperations.length -1
-  let si = op.indx
-  var pos = si
-  while( pos < len1 && op.rank > board.operations[board.sortedOperations[pos+1]].rank)
-    pos += 1
-  while( pos < len1 && op.rank == board.operations[board.sortedOperations[pos+1]].rank
-                               && board.sortedOperations[pos+1] < operationID) {
-       pos += 1
-  }
-
-  if(si < pos)
-    jump(bid, operationID, pos)
-}
-
-function jump(bid, operationID, pos) {
-  var board = tremola.board[bid]
-  var op = board.operations[operationID]
-
-  let si = op.indx
-  for (var i = si +1; i < pos+1; i++)
-    board.operations[board.sortedOperations[i]].indx -= 1
-  moveOperation(bid, si, pos)
-  op.indx = pos
-}
-
-function visit(bid, operationID, rnk, visited) {
-  var board = tremola.board[bid]
-  let out = [[operationID]];
-
-  while (out.length > 0) {
-      let o = out[out.length - 1];
-      if (o.length == 0) {
-          out.pop();
-          continue
-      }
-      let c = board.operations[o.pop()];
-      c.vstd = true;
-      visited.add(c);
-      if (c.cycl)
-          throw new Error('cycle');
-      if (c.rank <= (rnk + out.length - 1)) {
-          c.rank = rnk + out.length;
-          // console.log("c.succ");
-          // console.log(c.succ);
-          out.push(c.succ.slice()); // Array.from(c.succ));
-      }
-  }
-
-}
-
-function moveOperation(bid, from, to) {
-  var board = tremola.board[bid]
-  let h = board.sortedOperations[from]
-  board.sortedOperations.splice(from, 1);
-  board.sortedOperations.splice(to, 0, h);
-}*/
-
-
-
 function reload_curr_board() {
   if(curr_board)
     board_reload(curr_board)
@@ -596,22 +407,9 @@ function board_reload(bid) {
   board.pendingOperations = {}
   board.pendingInvitations = {}
   board.members = []
-  //board.sortedOperations = []
   board.sortedOperations = new Timeline()
 
-  /*
   for(var op in board.operations) {
-    delete board.operations[op].indx
-    delete board.operations[op].succ
-    delete board.operations[op].rank
-    delete board.operations[op].vstd
-    delete board.operations[op].cycl
-    board.operations[op].sorted = false
-  }
-  */
-
-  for(var op in board.operations) {
-    //newOperation(bid, op)
     console.log("ADD op: " + op +", prev:" + board.operations[op].body.prev)
     board.sortedOperations.add(op, board.operations[op].body.prev)
   }
@@ -625,57 +423,6 @@ function board_reload(bid) {
     load_board(bid)
   }
 }
-
-// sort events with Kahn's algorithm
-// sorted_list[0] contains the hash value of the first operation (according to the logical clock)
-/*
-function sortOperations(bid) {
-  var board = tremola.board[bid]
-  var sorted_list = [] // sorted hash values of board operations
-  var operation_list = board['operations']
-
-  var sources // hash values of events which are not pointed to by a prev-pointer
-  while((sources = getSources(tremola.board[bid]['operations'], sorted_list)).length != 0) {
-    var max_hash = ''
-    if(sources.length > 1) { // Concurrency conflict resolving via max hash rule
-      for (var i in sources) {
-        if(sources[i] > max_hash)
-          max_hash = sources[i]
-      }
-    } else {
-      max_hash = sources[0]
-    }
-    sorted_list.push(max_hash.toString())
-  }
-  sorted_list.reverse()
-  return sorted_list
-}
-
-//returns events which are not pointed to by a prev-pointer
-function getSources(events, already_sorted) {
-  var sources = []
-
-  for(var i in events) {
-    var hasIngoingDependencies = false
-    if(!(already_sorted.includes(i))) {
-      for(var j in events) {
-        if(i != j && !(already_sorted.includes(j)) && events[j].body.prev) {
-          if(Object.values(events[j].body.prev).includes(i)) {
-            hasIngoingDependencies = true
-            break
-          }
-        }
-      }
-      if(!hasIngoingDependencies) {
-        sources.push(i)
-      }
-    }
-  }
-
-  return sources
-}
-*/
-
 
 /**
  * Creates a snapshot of the given kanban board. It applies all operations and updates the user interface
@@ -717,29 +464,6 @@ function helper_linear_timeline_without_pending_prevs(timeline) {
   return lst;
 }
 
-/**
- * Applies the given operation to the current snapshot of the kanban board
- *
- * @param {string} bid - Id of the kanban board
- * @param {string} operationID - Id of the operation, that should be applied
- * @param {boolean} apply_on_ui - Whether the operation should also be performed on the user interface
- */
-/* cft stash
-function apply_operation_from_pos(bid, pos) {
-  var board = tremola.board[bid]
-  var old_state = JSON.parse(JSON.stringify(board));
-
-  board.history.splice(pos, board.history.length - pos)
-
-  for (var i = pos; i < board.sortedOperations.length; i++) {
-    apply_operation(bid, board.sortedOperations[i], false)
-  }
-
-  if(curr_board == bid) { // update ui
-      ui_update_board(bid, old_state)
-   }
-}
-*/
 function apply_operation(bid, operationID, apply_on_ui) {
   console.log("Apply:" + operationID)
   var board = tremola.board[bid]
@@ -1059,7 +783,6 @@ function ui_debug() {
   closeOverlay()
   document.getElementById('div:debug').style.display = 'initial'
   document.getElementById('txt:debug').value = debug_toDot()//JSON.stringify(tremola.board[curr_board])
-  // document.getElementById("overlay-trans").style.display = 'initial';
   document.getElementById("overlay-bg").style.display = 'initial';
 }
 

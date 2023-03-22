@@ -335,22 +335,6 @@ function menu_board_invitation_create_entry(bid) {
   if(!(myId in board.pendingInvitations)) // not invited
     return
 
-   /*
-   <div id='kanban_invitation_1 w100' class='kanban_invitation_container'>
-     <div class='kanban_invitation_text_container'>
-       <div style="grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px">Name</div>
-       <div style="grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px">Author</div>
-     </div>
-
-     <div style="grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;">
-       <div style="padding-right:8px;">
-         <button class="flat passive buttontext" style="height: 40px; background-image: url('img/checked.svg'); width: 35px;padding-right:10px" onclick="">&nbsp;</button>
-         <button class="flat passive buttontext" style="height: 40px; color: red; background-image: url('img/cancel.svg');width: 35px;" onclick="">&nbsp;</button>
-       </div>
-     </div>
-   </div>
-   */
-
   var invitationId = board.pendingInvitations[myId][0]
   var inviteUserId = board.operations[invitationId].fid
   var inviteUserName = tremola.contacts[inviteUserId].alias
@@ -695,10 +679,6 @@ function load_item(itemID) {
     return
 
   var itemHTML = "<div class='column_item' style='order:" + pos + ";overflow: auto;' id='"+ itemID +"-item' onclick='item_menu(\"" + itemID + "\")'  draggable='true' ondragstart='dragStart(event)' ondrop='dragDrop(event)' ondragover='allowDrop(event)'>" //board_item_button
-  /* cft stashed
-  var itemHTML = "<div class='column_item' style='order:" + pos + ";overflow: auto; background-color: #ffe7f1; border-top: 2px dotted blue;' id='"+ itemID +"-item' onclick='item_menu(\"" + itemID + "\")'  draggable='true' ondragstart='dragStart(event)' ondrop='dragDrop(event)' ondragover='allowDrop(event)'>" //board_item_button
-  */
-  //itemHTML += "<button class='item_button' onclick='item_menu(\"" + itemID + "\")'>"
   itemHTML += "<div style='padding-top: 10px; padding-left: 10px; padding-bottom: 10px'> <b><font id='"+ itemID +"-itemHdr' color='" + color +"'>" + name + "</font></b></div>"
   itemHTML += "<div id='"+ itemID +"-itemDescr' style='font: 12px Helvetica Neue, sans-serif; color: #808080;overflow-wrap: break-word;max-height: 4.8em;overflow: hidden;padding-left: 10px;padding-right: 10px;'>" + board.items[itemID].description + "</div>"
   itemHTML += "<div id='"+ itemID +"-itemAssignees' style='padding-left: 10px;padding-right: 10px;display:flex;justify-content: flex-start;flex-direction: row;padding-bottom:10px;padding-top:5px;'>"
