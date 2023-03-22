@@ -271,7 +271,7 @@ function menu_history() {
     var author_color = tremola.contacts[reversedHistory[i][0]].color
     var author_initial = tremola.contacts[reversedHistory[i][0]].initial
 
-    var entryHTML = "<div class='w100' style='padding: 5px 5px 5px;overflow:auto;'>"
+    var entryHTML = "<div class='w100' style='padding: 5px 5px 5px;'>"
     entryHTML += "<button class=contact_picture style='float:left;margin-right: 0.75em; background: " + author_color + ";'>" + author_initial + "</button>"
     entryHTML += "<div class='chat_item_button light' style='display: table;float:right;overflow: hidden; width: calc(100% - 4.4em);word-break: break-word;margin-right:10px'>"
     entryHTML += "<div style='display: table-cell;padding-left:10px;vertical-align: middle;overflow-wrap: break-word;'>" + reversedHistory[i][1] + "</div>"
@@ -291,8 +291,11 @@ function history_sort_select(obj) {
         history.style.flexDirection = 'column'
       break
     case('oldest_first'):
-      if(history.style.flexDirection != 'column-reverse')
+      if(history.style.flexDirection != 'column-reverse') {
         history.style.flexDirection = 'column-reverse'
+        history.scrollTo(0, -history.scrollHeight)
+      }
+
       break
   }
 }
@@ -316,7 +319,8 @@ function menu_board_invitation_create_entry(bid) {
   if(document.getElementById("kanban_invitation_" + bid)) {
     if(board.subscribed || !(myId in board.pendingInvitations))
       document.getElementById("kanban_invitation_" + bid).outerHTML = ""
-
+    else
+      document.getElementById("kanban_invitation_" + bid + "_name").innerHTML = board.name.length < 15 ? board.name : board.name.slice(0,15) + '...'
     return
   }
 
@@ -324,6 +328,9 @@ function menu_board_invitation_create_entry(bid) {
 
   if(board.subscribed) // already subscribed
     return
+
+  console.log("Create invitation for BOARD: " + bid)
+  console.log("PENDING LIST: " + Object.keys(board.pendingInvitations))
 
   if(!(myId in board.pendingInvitations)) // not invited
     return
@@ -347,12 +354,12 @@ function menu_board_invitation_create_entry(bid) {
   var invitationId = board.pendingInvitations[myId][0]
   var inviteUserId = board.operations[invitationId].fid
   var inviteUserName = tremola.contacts[inviteUserId].alias
-  var board_name = board.name.length < 30 ? board.name : board.name.slice(0,30)
+  var board_name = board.name.length < 15 ? board.name : board.name.slice(0,15) + '...'
 
 
   var invHTML = "<div id='kanban_invitation_" + bid + "' class='kanban_invitation_container'>"
   invHTML += "<div class='kanban_invitation_text_container'>"
-  invHTML += "<div style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + board_name + "</div>"
+  invHTML += "<div id='kanban_invitation_" + bid + "_name' style='grid-area: name; padding-top: 5px; padding-left: 10px;font-size:15px'>" + board_name + "</div>"
   invHTML += "<div style='grid-area: author; padding-top: 2px; padding-left: 10px;font-size:8px'>From: " + inviteUserName + "</div></div>"
 
   invHTML += "<div style='grid-area: btns;justify-self:end;display: flex;justify-content: center;align-items: center;'>"
@@ -384,6 +391,7 @@ function btn_invite_decline (bid) {
 }
 
 function menu_new_board() {
+  closeOverlay()
   fill_members();
   prev_scenario = 'kanban';
   setScenario("members");

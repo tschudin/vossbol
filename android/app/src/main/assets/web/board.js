@@ -265,6 +265,9 @@ function kanban_new_event(e) {
   if (op == Operation.BOARD_CREATE) {
     board.name = args[0]
     board.flags = args.slice(1)
+    if (document.getElementById('kanban-invitations-overlay').style.display != 'none')
+      if(document.getElementById("kanban_invitation_" + bid))
+          menu_board_invitation_create_entry(bid)
     if (e.header.fid == myId)
       board.subscribed = true // the creator of the board is automatically subscribed
   }
@@ -345,7 +348,7 @@ function kanban_new_event(e) {
     }
   } else {
     if(op == Operation.INVITE && body.cmd[1] == myId) { // received invitation to board
-      if(board.pendingInvitations[myId])
+      if(myId in board.pendingInvitations)
         board.pendingInvitations[myId].push(e.header.ref)
       else {
         board.pendingInvitations[myId] = [e.header.ref]
