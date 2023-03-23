@@ -9,18 +9,18 @@
 class Timeline {
 
     constructor(update_cb) {
-        this.linear  = [];
-        this.name2p  = {}; // name ~ point_in_time
+        this.linear = [];
+        this.name2p = {}; // name ~ point_in_time
         this.pending = {}; // cause_name ~ [effect_name]
-        this.notify  = update_cb;
-        this.cmds    = [];
-        this.tips    = new Set();
+        this.notify = update_cb;
+        this.cmds = [];
+        this.tips = new Set();
     }
 
     _insert(pos, h) {
         this.linear.splice(pos, 0, h);
         if (this.notify)
-            this.cmds.push( ['ins', h.name, pos] );
+            this.cmds.push(['ins', h.name, pos]);
     }
 
     _move(from, to) {
@@ -28,7 +28,7 @@ class Timeline {
         this.linear.splice(from, 1);
         this.linear.splice(to, 0, h);
         if (this.notify)
-            this.cmds.push( ['mov', from, to] );
+            this.cmds.push(['mov', from, to]);
     }
 
     add(nm, after) {
@@ -45,12 +45,12 @@ class Timeline {
                         base[2] = c[2];
                         continue;
                     }
-                    this.notify( base );
+                    this.notify(base);
                 }
                 base = c;
             }
             if (base)
-                this.notify( base );
+                this.notify(base);
         }
     }
 
@@ -71,7 +71,7 @@ class Timeline {
         json.linear = this.linear
         json.notify = this.notify
         json.pending = {}
-        for(let p in this.pending)
+        for (let p in this.pending)
             json.pending[p] = Object.values(Array.from(this.pending[p])).map(x => x.name)
         json.tips = Object.values(Array.from(this.tips)).map(x => x.name)
         return json
@@ -81,11 +81,13 @@ class Timeline {
         var t = new Timeline()
         var nodes = []
         // name, cycl, indx, rank, vstd, prev, succ
-        for(let n of json.linear) {
+        for (let n of json.linear) {
             var prev = []
-            for(let p of n.prev) {
-                let prevNode = nodes.find((key, indx) => {return key.name == p})
-                if(prevNode) {
+            for (let p of n.prev) {
+                let prevNode = nodes.find((key, indx) => {
+                    return key.name == p
+                })
+                if (prevNode) {
                     prev.push(prevNode)
                 } else {
                     prev.push(p)
@@ -93,8 +95,8 @@ class Timeline {
             }
             var sortNode = ScuttleSortNode.createSortNode(n.name, n.cycl, n.indx, n.rank, n.vstd, prev, [])
             nodes.push(sortNode)
-            for(let p of prev) {
-                if(typeof p != "string")
+            for (let p of prev) {
+                if (typeof p != "string")
                     p.succ.push(sortNode)
             }
 
@@ -102,17 +104,19 @@ class Timeline {
         t.linear = nodes
 
         t.name2p = {}
-        for(let n of nodes) {
+        for (let n of nodes) {
             t.name2p[n.name] = n
         }
 
         t.pending = {}
-        for(let p in json.pending) {
+        for (let p in json.pending) {
             t.pending[p] = []
-            for(let n of json.pending[p]) {
-                let node = nodes.find((key, indx) => {return key.name == n})
-                if(node)
-                  t.pending[p].push(node)
+            for (let n of json.pending[p]) {
+                let node = nodes.find((key, indx) => {
+                    return key.name == n
+                })
+                if (node)
+                    t.pending[p].push(node)
             }
         }
 
@@ -120,9 +124,11 @@ class Timeline {
         t.cmds = json.cmds
 
         t.tips = new Set()
-        for(let tip of json.tips) {
-            let node = nodes.find((key, indx) => {return key.name == tip})
-            if(node)
+        for (let tip of json.tips) {
+            let node = nodes.find((key, indx) => {
+                return key.name == tip
+            })
+            if (node)
                 t.tips.add(node)
         }
         return t
@@ -132,13 +138,15 @@ class Timeline {
 class ScuttleSortNode {
 
     constructor(name, timeline, after) {
-        if(!name)  // should only be true if called from createSortNode()
+        if (!name)  // should only be true if called from createSortNode()
             return
         if (name in timeline.name2p) // can add a name only once, must be unique
             throw new Error("KeyError");
         this.name = name;
-        this.prev = after.map( x => { return x; } ); // copy of the causes we depend on
-                  // hack alert: these are str/bytes, will be replaced by nodes
+        this.prev = after.map(x => {
+            return x;
+        }); // copy of the causes we depend on
+        // hack alert: these are str/bytes, will be replaced by nodes
         // --- internal fields for insertion algorithm:
         this.cycl = false;  // cycle detection, could be removed for SSB
         this.succ = [];     // my future successors (="outgoing")
@@ -166,7 +174,7 @@ class ScuttleSortNode {
         var pos = 0;
         for (let i = 0; i < this.prev.length; i++) {
             let p = this.prev[i];
-            if (typeof(p) != "string" && p.indx > pos)
+            if (typeof (p) != "string" && p.indx > pos)
                 pos = p.indx;
         }
         for (let i = pos; i < timeline.linear.length; i++)
@@ -176,7 +184,7 @@ class ScuttleSortNode {
 
         var no_anchor = true;
         for (let p of this.prev) {
-            if (typeof(p) != "string") {
+            if (typeof (p) != "string") {
                 this.add_edge_to_the_past(timeline, p);
                 no_anchor = false;
             }
@@ -223,7 +231,9 @@ class ScuttleSortNode {
             this._rise(timeline)
 
         let a = Array.from(visited);
-        a.sort( (x,y) => { return y.indx - x.indx; });
+        a.sort((x, y) => {
+            return y.indx - x.indx;
+        });
         for (let v of a) {
             v._rise(timeline); // bubble up towards the future
             v.vstd = false;
@@ -257,7 +267,7 @@ class ScuttleSortNode {
         //
         //  after  .. | f | g | h | e | ... -> future
         let si = this.indx
-        for (let i = si+1; i < pos+1; i++)
+        for (let i = si + 1; i < pos + 1; i++)
             timeline.linear[i].indx -= 1;
         timeline._move(si, pos);
         this.indx = pos
@@ -267,10 +277,10 @@ class ScuttleSortNode {
         let len1 = timeline.linear.length - 1;
         let si = this.indx;
         var pos = si
-        while (pos < len1 && this.rank > timeline.linear[pos+1].rank)
+        while (pos < len1 && this.rank > timeline.linear[pos + 1].rank)
             pos += 1;
-        while (pos < len1 && this.rank == timeline.linear[pos+1].rank
-                          && timeline.linear[pos+1].name < this.name)
+        while (pos < len1 && this.rank == timeline.linear[pos + 1].rank
+        && timeline.linear[pos + 1].name < this.name)
             pos += 1;
         if (si < pos)
             this._jump(timeline, pos);
@@ -298,7 +308,7 @@ class ScuttleSortNode {
 
         json.prev = []
         for (let p of this.prev) {
-            if(typeof p != "string") {
+            if (typeof p != "string") {
                 json.prev.push(p.name)
             } else {
                 json.prev.push(p)
@@ -307,7 +317,7 @@ class ScuttleSortNode {
 
         json.succ = []
         for (let s of this.succ) {
-            if(typeof s != "string") {
+            if (typeof s != "string") {
                 json.succ.push(s.name)
             } else {
                 json.succ.push(s)
