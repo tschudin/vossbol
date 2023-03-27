@@ -41,15 +41,13 @@ unsigned char mgmt_dmx[DMX_LEN];
 #define MGMT_FCNT_TABLE_SIZE          42
 
 struct request_s {
-  unsigned char typ;
-  unsigned char id[MGMT_ID_LEN];
+  unsigned char id[MGMT_ID_LEN]; // TODO rename to src, also move out of payload somewhen, but things like status of neighbours would need to be reimplemented, as the id/src part is need to id the neighbor
   unsigned char cmd;
   unsigned char dst[MGMT_ID_LEN];
   bool all = false;
 };
 
 struct status_s {
-  unsigned char typ;
   unsigned char id[MGMT_ID_LEN];
   bool beacon;
   long voltage;
@@ -72,12 +70,10 @@ struct statust_entry_s {
 };
 
 struct beacon_s {
-  unsigned char typ;
   unsigned char id[MGMT_ID_LEN];
 };
 
 struct fcnt_s {
-  unsigned char typ;
   unsigned char id[MGMT_ID_LEN];
   unsigned int fcnt;
 };
@@ -120,14 +116,12 @@ void mgmt_send_beacon();
 unsigned char* _mkRequest(unsigned char cmd, unsigned char* id=NULL)
 {
   static struct request_s request;
-  request.typ = 'r';
   request.cmd = cmd;
   memcpy(request.id, mgmt_id, MGMT_ID_LEN);
   if (id == NULL) {
     request.all = true;
   } else {
-    request.dst[0] = id[0];
-    request.dst[1] = id[1];
+    memcpy(request.dst, id, MGMT_ID_LEN);
   }
   return (unsigned char*) &request;
 }
@@ -137,7 +131,6 @@ unsigned char* _mkStatus()
 {
   static struct status_s status[(int) (120 - 11) / MGMT_STATUS_LEN];
   // add self
-  status[0].typ = 's';
   memcpy(status[0].id, mgmt_id, MGMT_ID_LEN);
   status[0].beacon = mgmt_beacon;
   status[0].voltage = 0;
@@ -179,7 +172,6 @@ unsigned char* _mkStatus()
 unsigned char* _mkBeacon()
 {
   static struct beacon_s beacon;
-  beacon.typ = 'b';
   memcpy(beacon.id, mgmt_id, MGMT_ID_LEN);
   return (unsigned char*) &beacon;
 }
@@ -190,28 +182,28 @@ unsigned char* _mkBeacon()
 // MGMT RX
 
 // receive request
-void mgmt_rx_request(unsigned char *pkt, int len)
+void mgmt_rx_request(struct request_s *request, int len)
 {
   // beacon
-  if (pkt[3] == '+' || pkt[3] == '-') {
-    mgmt_beacon = pkt[3] == '+' ? true : false;
+  if (request->cmd == '+' || request->cmd == '-') {
+    mgmt_beacon = request->cmd == '+' ? true : false;
     return;
   }
 
   // status
-  if (pkt[3] == 's') {
+  if (request->cmd == 's') {
     mgmt_next_send_status = millis() + random(5000);
     return;
   }
 
   // reboot
-  if (pkt[3] == 'x') {
+  if (request->cmd == 'x') {
     esp_restart();
     return;
   }
 
   // unknown
-  Serial.printf("mgmt_rx received request %s ??\r\n", pkt[3]);
+  Serial.printf("mgmt_rx received request %s ??\r\n", request->cmd);
 }
 
 // receive status
@@ -280,22 +272,21 @@ void mgmt_rx_status(unsigned char *pkt, int len) {
 // incoming packet with mgmt_dmx
 void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 {
-  // check if face == lora
+  // check if face == lora   => only allow mgmt over LoRa
   if (memcmp(f->name, (char *) "lora", 4)) { return; }
+
+  Serial.printf("mgmt_rx: message = %s\r\n", to_hex(pkt, len));
 
   // remove DMX
   pkt += DMX_LEN;
   len -= DMX_LEN;
 
-  // get message authentication code
+  // compute mac
   len -= MGMT_MAC_FIELD_LEN;
-  unsigned char msg_mac[MGMT_MAC_FIELD_LEN];
-  memcpy(msg_mac, pkt+len, MGMT_MAC_FIELD_LEN);
-  // compute hmac
   unsigned char hash[crypto_auth_hmacsha512_BYTES];
   crypto_auth_hmacsha512(hash, pkt, len, MGMT_KEY);
-  // copy msg_mac to hmac
-  memcpy(hash, msg_mac, MGMT_MAC_FIELD_LEN);
+  // copy received mac to computed mac
+  memcpy(hash, pkt + len, MGMT_MAC_FIELD_LEN);
   // verify hmac
   if (crypto_auth_hmacsha512_verify(hash, pkt, len, MGMT_KEY) != 0) {
     Serial.printf("mgmt_rx verification of hmac failed\r\n");
@@ -332,7 +323,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   }
   // existing node -> validate fcnt
   Serial.printf("mgmt_rx received fcnt = %d, last fcnt = %d\r\n", fcnt, mgmt_fcnt_table[ndx].fcnt);
-  if (ndx != -1 && fcnt <= mgmt_fcnt_table[ndx].fcnt) { return; }
+  if (fcnt <= mgmt_fcnt_table[ndx].fcnt) { return; }
   // update fcnt
   mgmt_fcnt_table[ndx].fcnt = fcnt;
   // write fcnt-table to file
@@ -342,35 +333,39 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   mgmt_fcnt_table_log.close();
 
 
+  // get type of message
+  unsigned char typ = pkt[0];
+  pkt += 1;
+  len -= 1;
 
   // receive beacon
-  if (pkt[0] == 'b' && len == MGMT_BEACON_LEN) {
+  if (typ == 'b' && len == MGMT_BEACON_LEN) {
     Serial.println(String("mgmt_rx received beacon from ") + to_hex(src, MGMT_ID_LEN, 0));
     return;
   }
 
   // receive status
-  if (pkt[0] == 's' && len % MGMT_STATUS_LEN == 0) {
+  if (typ == 's' && len % MGMT_STATUS_LEN == 0) {
     mgmt_rx_status(pkt, len);
     return;
   }
 
   // receive request
-  if (pkt[0] == 'r' && len == MGMT_REQUEST_LEN) {
+  if (typ == 'r' && len == MGMT_REQUEST_LEN) {
     struct request_s *request = (struct request_s*) calloc(1, MGMT_REQUEST_LEN);
     memcpy(request, pkt, MGMT_REQUEST_LEN);
-    if (memcmp(request->dst, mgmt_id, MGMT_ID_LEN)) {
-      io_send(pkt - DMX_LEN, len + DMX_LEN + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
+    if (memcmp(request->dst, mgmt_id, MGMT_ID_LEN || request->all == true)) {
+      io_send(pkt - 1 - DMX_LEN, len + DMX_LEN + 1 + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
     }
     if (!memcmp(request->dst, mgmt_id, MGMT_ID_LEN) || request->all == true) {
-      mgmt_rx_request(pkt, len);
+      mgmt_rx_request(request, len);
     }
     free(request);
     return;
   }
 
   // unknown typ
-  Serial.printf("mgmt_rx t=%c ??\r\n", pkt[0]);
+  Serial.printf("mgmt_rx t=%c ??\r\n", typ);
 }
 
 
@@ -510,36 +505,48 @@ void mgmt_statust_housekeeping()
 // MGMT TX
 
 // send mgmt packet
-void mgmt_tx(unsigned char* payload, int payload_len)
+void mgmt_tx(unsigned char typ, unsigned char* payload, int payload_len)
 {
-  int len = payload_len + MGMT_FCNT_FIELD_LEN + MGMT_MAC_FIELD_LEN;
-  // add payload
+  int len = DMX_LEN + 1 + payload_len + MGMT_FCNT_FIELD_LEN + MGMT_MAC_FIELD_LEN;
   unsigned char message[len] = { 0 };
-  memcpy(message, payload, payload_len);
+  int offset = 0;
+  // add DMX
+  memcpy(message + offset, mgmt_dmx, DMX_LEN);
+  offset += DMX_LEN;
+  // add typ
+  int typ_len = 1;
+  message[offset] = typ;
+  offset += typ_len;
+  // add payload
+  memcpy(message + offset, payload, payload_len);
+  offset += payload_len;
   // add fcnt
-  memcpy(message + payload_len, (unsigned char*) &++mgmt_fcnt, MGMT_FCNT_FIELD_LEN);
+  memcpy(message + offset, (unsigned char*) &++mgmt_fcnt, MGMT_FCNT_FIELD_LEN);
+  offset += MGMT_FCNT_FIELD_LEN;
   // write fcnt to flash
   mgmt_fcnt_log = MyFS.open(MGMT_FCNT_LOG_FILENAME, "w");
   mgmt_fcnt_log.write((unsigned char*) &mgmt_fcnt, sizeof(mgmt_fcnt));
   mgmt_fcnt_log.close();
-  // add hmac
+  // add mac
   unsigned char hash[crypto_auth_hmacsha512_BYTES];
-  crypto_auth_hmacsha512(hash, message, payload_len + MGMT_FCNT_FIELD_LEN, MGMT_KEY);
-  memcpy(message + payload_len + MGMT_FCNT_FIELD_LEN, hash, MGMT_MAC_FIELD_LEN);
+  crypto_auth_hmacsha512(hash, message + DMX_LEN, typ_len + payload_len + MGMT_FCNT_FIELD_LEN, MGMT_KEY);
+  memcpy(message + offset, hash, MGMT_MAC_FIELD_LEN);
+  offset += MGMT_MAC_FIELD_LEN;
   // send
-  io_enqueue(message, len, mgmt_dmx, NULL);
+  if (offset != len) { Serial.printf("mgmt_tx: final offset and length differ\r\n"); return; }
+  io_send(message, len, NULL);
 }
 
 // send beacon
 void mgmt_send_beacon()
 {
-  mgmt_tx(_mkBeacon(), MGMT_BEACON_LEN);
+  mgmt_tx('b', _mkBeacon(), MGMT_BEACON_LEN);
 }
 
 // send request to specified node (all if none)
 void mgmt_send_request(unsigned char cmd, unsigned char* id=NULL)
 {
-  mgmt_tx(_mkRequest(cmd,id), MGMT_REQUEST_LEN);
+  mgmt_tx('r', _mkRequest(cmd,id), MGMT_REQUEST_LEN);
 }
 
 // send status response (sent periodically or after request)
@@ -548,7 +555,7 @@ void mgmt_send_status()
   // housekeeping
   mgmt_statust_housekeeping();
   // send status
-  mgmt_tx(_mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN);
+  mgmt_tx('s', _mkStatus(), ((int) ((120 - 11) / MGMT_STATUS_LEN)) * MGMT_STATUS_LEN);
   // set next event
   mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
 }
