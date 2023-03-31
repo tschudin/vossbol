@@ -210,7 +210,7 @@ void mgmt_rx_key(struct msg_key_s *key_update)
   strcat(p, "/");
   strcat(p, h);
   File k = MyFS.open(p, "r");
-  int cnt = 0;
+  unsigned int cnt = 0;
   bool changed = false;
   if (k) { // update
     k.read((unsigned char*) &cnt, sizeof(cnt));
