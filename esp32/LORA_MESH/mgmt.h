@@ -33,14 +33,13 @@ unsigned char mgmt_dmx[DMX_LEN];
 #define MGMT_FCNT_FIELD_LEN  4
 #define MGMT_MAC_FIELD_LEN   4
 
-#define MGMT_SEND_STATUS_INTERVAL  5*60*1000 // millis (5 minutes)
-#define MGMT_SEND_BEACON_INTERVAL     5*1000 // millis (5 seconds)
+#define MGMT_SEND_STATUS_INTERVAL  5*60*1000 // millis (5 minutes) // TODO how often should this be sent during deployment?
+#define MGMT_SEND_BEACON_INTERVAL     5*1000 // millis (5 seconds) // TODO turn off after 1h?
 
 #define MGMT_FCNT_LOG_FILENAME        "/mgmt_fcnt_log.bin"
 #define MGMT_FCNT_TABLE_LOG_FILENAME  "/mgmt_fcnt_table_log.bin"
 #define MGMT_FCNT_TABLE_SIZE          42
 
-#define GOSET_KEY_LOG_FILENAME            "/goset_key_log.bin"
 #define KEYS_DIR                      "/keys"
 
 struct msg_beacon_s {
@@ -398,8 +397,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     Serial.printf("mgmt_rx: %s key %s\r\n", key_update->op ? "allow" : "deny", to_hex(key_update->key, GOSET_KEY_LEN));
     mgmt_rx_key(key_update);
     free(key_update);
-    // TODO forward message
-    // TODO then have some hourly broadcast so the highest counter eventually reaches all nodes
+    io_send(pkt - 1 - DMX_LEN, len + DMX_LEN + 1 + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
     return;
   }
 
@@ -681,6 +679,13 @@ void mgmt_tick()
     mgmt_send_beacon();
     next_mgmt_send_beacon = millis() + MGMT_SEND_BEACON_INTERVAL + random(2000);
   }
+
+  // TODO have some 'hourly' broadcast so the highest goset key counter eventually reaches all nodes
+  // issues:
+  //   * 4B counter + 32B key
+  //     128B - 4B mac - 4B fcnt - 7B dmx - 1B type - 2B src = 110B payload
+  //     111B / 36B = we can send three entries per packet
+  //
 }
 
 // eof
