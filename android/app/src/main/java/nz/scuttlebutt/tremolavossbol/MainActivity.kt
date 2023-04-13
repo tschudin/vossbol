@@ -5,6 +5,7 @@ package nz.scuttlebutt.tremolavossbol
 // import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeers
 
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -22,6 +23,7 @@ import nz.scuttlebutt.tremolavossbol.crypto.IdStore
 import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeers
 import nz.scuttlebutt.tremolavossbol.tssb.*
 import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeersBroadcast
+import nz.scuttlebutt.tremolavossbol.tssb.ble.BluetoothEventListener
 import nz.scuttlebutt.tremolavossbol.utils.Constants
 import tremolavossbol.R
 import java.net.*
@@ -48,6 +50,7 @@ class MainActivity : Activity() {
     val ioLock = ReentrantLock()
     var broadcastReceiver: BroadcastReceiver? = null
     var isWifiConnected = false
+    var ble_event_listener: BluetoothEventListener? = null
 
     /*
     var broadcast_socket: DatagramSocket? = null
@@ -154,6 +157,9 @@ class MainActivity : Activity() {
             }
         }
         registerReceiver(broadcastReceiver, IntentFilter(WifiManager.NETWORK_STATE_CHANGED_ACTION))
+
+        ble_event_listener = BluetoothEventListener(this)
+        registerReceiver(ble_event_listener, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
         // val lck = ReentrantLock()
         /* disable TCP server and UDP advertisements in the tinyTremola version
@@ -340,6 +346,7 @@ class MainActivity : Activity() {
             ble!!.stopBluetooth()
         }
         unregisterReceiver(broadcastReceiver);
+        unregisterReceiver(ble_event_listener)
     }
 
     private fun mkSockets() {

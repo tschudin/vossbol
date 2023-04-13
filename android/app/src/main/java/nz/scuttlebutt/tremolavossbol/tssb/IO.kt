@@ -87,7 +87,6 @@ class IO(val context: MainActivity, val wai: WebAppInterface?) {
                     }
                 }
                 try { // BLE, no CRC added
-                    Log.d("tinyIO", "ble peer size: ${context.ble!!.peers.size}")
                     if (context.ble != null && context.ble!!.peers.size > 0) { // && context.ble!!.peers.size > 0
                         Log.d("tinyIO", "send ${buf.size} bytes via BLE")
                         context.ble!!.write(buf)
