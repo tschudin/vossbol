@@ -6,7 +6,7 @@
 void cmd_rx(String cmd) {
   cmd.toLowerCase();
   cmd.trim();
-  Serial.printf("CMD %s\n\n", cmd.c_str()); 
+  Serial.printf("CMD %s\r\n\n", cmd.c_str());
   switch(cmd[0]) {
     case '?':
       Serial.println("  ?        help");

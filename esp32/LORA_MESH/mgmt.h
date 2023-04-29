@@ -216,7 +216,7 @@ void mgmt_rx_key(struct msg_key_s *key_update)
     k.close();
     if (key_update->op && cnt % 2 == 1) { cnt++; changed = true; }
     if (!key_update->op && cnt % 2 == 0) { cnt++; changed = true; }
-  } else if (not k && key_update->op) { changed = true; }
+  } else if (not k && key_update->op) { changed = true; } // TODO probably just call goset_add here? then add cnt file to feed
 
   if (changed) {
     k = MyFS.open(p, "w");

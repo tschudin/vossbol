@@ -163,8 +163,8 @@ void node_tick()
     unsigned int ndx = (chunk_offs + i) % theGOset->goset_len;
     unsigned char *fid = theGOset->goset_keys + ndx*GOSET_KEY_LEN;
     struct feed_s *f = fid2feed(fid);
-    char dname[100];
-    sprintf(dname, "/%s/%s", FEED_DIR, to_hex(fid,32));
+    char dname[FEED_PATH_SIZE];
+    sprintf(dname, "%s/%s", FEED_DIR, to_hex(fid, FID_LEN));
     File fdir = MyFS.open(dname);
     File g = fdir.openNextFile("r");
     while (g) {

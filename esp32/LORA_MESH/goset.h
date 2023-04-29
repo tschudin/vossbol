@@ -158,9 +158,9 @@ struct goset_s* goset_new()
 
 void goset_dump(struct goset_s *gp)
 {
-  Serial.printf("GOset: %d keys\n", gp->goset_len);
+  Serial.printf("GOset: %d keys\r\n", gp->goset_len);
   for (int i = 0; i < gp->goset_len; i++) {
-    Serial.printf("  %2d %s\n", i,
+    Serial.printf("  %2d %s\r\n", i,
                   to_hex(gp->goset_keys + i * GOSET_KEY_LEN, GOSET_KEY_LEN));
   }
 }
@@ -193,7 +193,7 @@ void goset_add(struct goset_s *gp, unsigned char *key)
     }
   }
 
-  Serial.printf("added key %s, len=%d\n", to_hex(key, GOSET_KEY_LEN), gp->goset_len);
+  Serial.printf("added key %s, len=%d\r\n", to_hex(key, GOSET_KEY_LEN), gp->goset_len);
 }
 
 void goset_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
