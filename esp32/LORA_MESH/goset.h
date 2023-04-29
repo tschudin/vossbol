@@ -204,7 +204,7 @@ void goset_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   len -= DMX_LEN;
 
   if (pkt[0] == 'n' && len == NOVELTY_LEN) {
-    Serial.printf("goset_rx t=n %s\n", to_hex(pkt+1, GOSET_KEY_LEN));
+    Serial.printf("goset_rx t=n %s\r\n", to_hex(pkt+1, GOSET_KEY_LEN));
     goset_add(gp, pkt+1);
     return;
   }
@@ -350,7 +350,7 @@ void goset_tick(struct goset_s *gp)
   // unsigned char *heap = reinterpret_cast<unsigned char*>(sbrk(0));
   // Serial.println(String(", heap sbrk=") + to_hex((unsigned char *)&heap, sizeof(heap)));
   for (int i = 0; i < gp->pending_c_cnt; i++)
-    Serial.printf("  xor=%s, |span|=%d\n", to_hex(gp->pending_claims[i].xo,32), gp->pending_claims[i].cnt);
+    Serial.printf("  xor=%s, |span|=%d\r\n", to_hex(gp->pending_claims[i].xo,32), gp->pending_claims[i].cnt);
 }
 
 void goset_zap(struct goset_s *gp, int ndx)
