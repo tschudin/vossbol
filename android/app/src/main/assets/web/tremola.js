@@ -810,6 +810,7 @@ function persist() {
     window.localStorage.setItem("tremola", JSON.stringify(tremola));
 }
 
+/*
 function b2f_local_peer(p, status) { // wireless peer: online, offline, connected, disconnected
     console.log("local peer", p, status);
     if (!(p in localPeers))
@@ -822,6 +823,56 @@ function b2f_local_peer(p, status) { // wireless peer: online, offline, connecte
         delete localPeers[p]
     load_peer_list()
 }
+*/
+
+
+// type: 'udp' or 'ble'
+// identifier: unique identifier of the peer
+// displayname
+// status: 'connected', 'disconnected'
+
+function b2f_ble_enabled() {
+    //ble_status = "enabled"
+    //TODO update ui
+}
+
+function b2f_ble_disabled() {
+
+    for(var p in localPeers) {
+        if(localPeers[p].type == "ble") {
+            delete localPeers[p]
+            refresh_connection_entry(p)
+        }
+    }
+    //ble_status = "disabled"
+}
+
+function b2f_local_peer_remaining_updates(identifier, remaining) {
+    //TODO
+}
+
+function b2f_local_peer(type, identifier, displayname, status) {
+    console.log( "incoming displayname:", displayname)
+    if (displayname == "null") {
+        displayname = identifier
+    }
+
+    localPeers[identifier] = {
+        'type' : type,
+        'name': displayname,
+        'status': status,
+        'remaining': null
+    }
+
+    console.log("local_peer:", type, identifier, displayname, status)
+
+    if (status == "offline")
+        delete localPeers[identifier]
+
+    if (document.getElementById('connection-overlay').style.display != 'none')
+        refresh_connection_entry(identifier)
+}
+
 
 function b2f_new_event(e) { // incoming SSB log event: we get map with three entries
                             // console.log('hdr', JSON.stringify(e.header))

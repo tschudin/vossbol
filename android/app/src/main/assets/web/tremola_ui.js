@@ -27,13 +27,16 @@ var scenarioDisplay = {
 
 var scenarioMenu = {
     'chats': [['New conversation', 'menu_new_conversation'],
+        ['Connected Devices', 'menu_connection'],
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
     'contacts': [['New contact', 'menu_new_contact'],
+        ['Connected Devices', 'menu_connection'],
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
     'connex': [['New SSB pub', 'menu_new_pub'],
         ['Redeem invite code', 'menu_invite'],
+        ['Connected Devices', 'menu_connection'],
         // ['<del>Force sync</del>', 'menu_sync'],
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
@@ -61,6 +64,7 @@ var scenarioMenu = {
 
     'kanban': [['New Kanban board', 'menu_new_board'],
         ['Invitations', 'menu_board_invitations'],
+        ['Connected Devices', 'menu_connection'],
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
 
@@ -209,6 +213,7 @@ function closeOverlay() {
     document.getElementById('old_contact-overlay').style.display = 'none';
     document.getElementById('attach-menu').style.display = 'none';
     document.getElementById('div:modal_img').style.display = 'none';
+    document.getElementById('connection-overlay').style.display = 'none';
 
     // kanban overlays
     document.getElementById('div:menu_history').style.display = 'none';
@@ -366,6 +371,57 @@ function modal_img(img) {
             }, maxZoom: 8
         }
     );
+}
+
+function menu_connection() {
+    closeOverlay();
+
+    document.getElementById('connection-overlay-content').innerHTML = '';
+
+    for (var peer in localPeers) {
+        refresh_connection_entry(peer);
+    }
+
+    document.getElementById('overlay-bg').style.display = 'initial';
+    document.getElementById('connection-overlay').style.display = 'initial';
+    overlayIsActive = true;
+}
+
+function refresh_connection_entry(id) {
+    var content = document.getElementById('connection-overlay-content')
+
+    // only update existing entry
+    if (document.getElementById('connection_' + id)) {
+        if(id in localPeers) {
+            document.getElementById('connection_name_' + id).innerHTML = localPeers[id].name
+            document.getElementById('connection_type_' + id).innerHTML = localPeers[id].type
+            document.getElementById('connection_remaining_' + id).innerHTML = localPeers[id].remaining
+        } else {
+            document.getElementById('connection_' + id).outerHTML = ""
+        }
+        return
+    }
+
+    if(!(id in localPeers))
+        return
+
+    // create new entry
+
+    var peer = localPeers[id]
+    var name = peer.name;
+    var remaining = peer.remaining != null ? peer.remaining : ""//"Remaining: "+ peer.remaining + " messages" : "Remaining messages unknown"
+    var type = peer.type
+
+    var entryHTML = "<div id='connection_" + id + "' class = 'connection_entry_container'>"
+    entryHTML += "<div class='connection_entry_name_container'>"
+    entryHTML += "<div id='connection_name_" + id + "' style='grid-area: name; margin-left: 5px; margin-top: 4px;font-size: 16px; font-weight: bold;'>" + name + "</div>"
+    entryHTML += "<div id='connection_type_" + id + "' style='grid-area: type; margin-left: 5px; font-size: 13px'>via " + type + "</div>"
+    entryHTML += "</div>"
+    entryHTML += "<div id='connection_remaining_" + id + "' style='grid-area: remaining;align-self: center; text-align: end; padding-right: 5px; '>" + remaining + "</div>"
+    entryHTML += "</div>"
+
+    document.getElementById('connection-overlay-content').innerHTML += entryHTML
+
 }
 
 // ---

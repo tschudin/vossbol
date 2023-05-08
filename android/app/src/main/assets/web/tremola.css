@@ -363,6 +363,39 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 
+.connection_entry_container {
+  display: grid;
+  /*grid-template-columns: 1fr 1fr 1fr;*/
+  /*grid-template-rows: 1fr 1fr 1fr;*/
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr;
+  gap: 0px 0px;
+  /*grid-template-areas:
+    "name name ."
+    ". . remaining"
+    "type type .";
+    */
+  grid-template-areas:
+    "info remaining";
+  width:100%;
+  box-shadow: 0 0 5px rgba(0,0,0,0.7);
+  border-radius: 4pt;
+  height: 3em;
+  margin-bottom: 10px;
+}
+
+.connection_entry_info_container {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
+  grid-template-areas:
+    "name"
+    "type";
+  grid-area: info;
+}
+
+
+
 /* --------------------------------------------------------------------------- */
 /*                                Kanban Board                                 */
 /* --------------------------------------------------------------------------- */

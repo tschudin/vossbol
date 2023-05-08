@@ -73,7 +73,7 @@ class BlePeers(val act: MainActivity) {
             return
         }
         if (!bluetoothAdapter.isEnabled) {
-            Toast.makeText(act, "Bluetooth MUST be enabled for using BlueTooth-Low-Energy sync, then restart",
+            Toast.makeText(act, "Bluetooth MUST be enabled for using BlueTooth-Low-Energy sync",
                 Toast.LENGTH_LONG).show()
             /*
             val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -93,6 +93,7 @@ class BlePeers(val act: MainActivity) {
         }
         startBleScan()
         startServer()
+        act.wai.eval("b2f_ble_enabled()")
     }
 
     @SuppressLint("MissingPermission")
@@ -102,6 +103,7 @@ class BlePeers(val act: MainActivity) {
             p.value.close()
         }
         stopServer()
+        act.wai.eval("b2f_ble_disabled()")
     }
 
     @SuppressLint("MissingPermission")
@@ -172,6 +174,7 @@ class BlePeers(val act: MainActivity) {
                 Log.d("ble mtu", "request rc=$rc")
             } else if (newState == STATE_DISCONNECTED) {
                 Log.d("ble", "disconnected")
+                notifyFrontend(gatt.device, "offline")
                 peers.remove(gatt.device)
                 pending.remove(gatt.device)
             }
@@ -205,6 +208,7 @@ class BlePeers(val act: MainActivity) {
                             gatt.writeDescriptor(descr); //apply these changes to the ble chip to tell it we are ready for the data
                             pending.remove(gatt.device)
                             peers[gatt.device] = gatt
+                            notifyFrontend(gatt.device, "online")
                             foundService = true
                         }
                     } else
@@ -272,6 +276,7 @@ class BlePeers(val act: MainActivity) {
                         gatt.disconnect()
                         gatt.close()
                         peers.remove(gatt.device)
+                        notifyFrontend(gatt.device, "offline")
                         writeErrorCounter.remove(gatt.device)
                     }
                 } else {
@@ -368,10 +373,14 @@ class BlePeers(val act: MainActivity) {
         override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
             Log.d("GATT_Server", "Connection changed")
             super.onConnectionStateChange(device, status, newState)
-                if( status == GATT_SUCCESS && newState == STATE_CONNECTED) {
+                if( status == GATT_SUCCESS && newState == STATE_CONNECTED && device != null) {
                     Log.d("GATT_Server", "Device connected: $device")
+                    connectedDevices.add(device)
+                    notifyFrontend(device, "online")
                 } else if (newState == STATE_DISCONNECTED) {
                     connectedDevices.remove(device)
+                    if (device != null)
+                        notifyFrontend(device, "offline")
                     Log.d("GATT_Server", "Device disconnected: $device")
                 }
         }
@@ -437,6 +446,17 @@ class BlePeers(val act: MainActivity) {
                 value
             )
             gattServer?.sendResponse(device, requestId, GATT_SUCCESS,0,null)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun notifyFrontend(device: BluetoothDevice, status: String) {
+        Log.d("ble", "Connected devices: $connectedDevices, Peers: $peers, Server: ${bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)}")
+        if (connectedDevices.any { it.address == device.address} && peers.keys.any { it.address == device.address }) {
+            Log.d("BLE", "Device online: ${device}")
+            act.wai.eval("b2f_local_peer(\"ble\", \"${device.address}\", \"${device.name}\", \"${status}\")")
+        } else if (status == "offline") {
+            act.wai.eval("b2f_local_peer(\"ble\", \"${device.address}\", \"${device.name}\", \"${status}\")")
         }
     }
 }
