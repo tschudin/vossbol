@@ -272,7 +272,7 @@ class BlePeers(val act: MainActivity) {
                         writeErrorCounter[gatt.device] = 1
 
                     // to many write errors -> disconnect from GATT-Server
-                    if(writeErrorCounter[gatt.device]!! > 10) {
+                    if(writeErrorCounter[gatt.device]!! > 5) {
                         gatt.disconnect()
                         gatt.close()
                         peers.remove(gatt.device)

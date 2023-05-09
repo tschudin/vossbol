@@ -120,6 +120,7 @@ textarea {
   cursor: pointer;
   z-index: 1000; /* high z-index */
   background: rgba(1,1,1,0.3);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .overlay-trans {
