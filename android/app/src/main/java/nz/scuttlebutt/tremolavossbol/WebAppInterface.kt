@@ -152,11 +152,14 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             }
 
             "get:voice" -> { // get:voice
+                /*
                 val intent = Intent(act, RecordActivity::class.java)
                 act.startActivityForResult(intent, 808)
+                 */
                 return
             }
             "play:voice" -> { // play:voice b64enc(codec2) from date)
+                /*
                 Log.d("wai", s)
                 val voice = Base64.decode(args[1], Base64.NO_WRAP)
                 val intent = Intent(act, PlayActivity::class.java)
@@ -166,6 +169,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 if (args.size > 3)
                     intent.putExtra("date", Base64.decode(args[3], Base64.NO_WRAP).decodeToString())
                 act.startActivity(intent)
+                 */
                 return
             }
             "kanban" -> { // kanban bid atob(prev) atob(operation) atob(arg1) atob(arg2) atob(...)

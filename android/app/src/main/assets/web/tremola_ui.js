@@ -170,12 +170,14 @@ function btnBridge(e) {
         document.getElementById("menu").innerHTML = m;
         return;
     }
+    /*
     if (e == 'btn:attach') {
         if (scenarioMenu[curr_scenario].length == 0)
             return;
         backend('get:voice'); // + btoa(document.getElementById('draft').value));
         return;
     }
+    */
 
     // if (typeof Android != "undefined") { Android.onFrontendRequest(e); }
 }
