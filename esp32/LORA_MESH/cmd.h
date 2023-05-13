@@ -22,7 +22,7 @@ void cmd_rx(String cmd) {
       Serial.println("  l        list log file");
       Serial.println("  m        empty log file");
 #endif
-      Serial.println("  r        reset this repo to blank");
+      Serial.println("  r[id|*]  reset this repo to blank / request reset from id/all");
       Serial.println("  s[id|*]  status / request status from id/all");
       Serial.println("  x[id|*]  reboot / request reboot from id/all");
       Serial.println("  z[N]     zap (feed with index N) on all nodes");
@@ -102,8 +102,19 @@ void cmd_rx(String cmd) {
       break;
 #endif
     case 'r': // reset
-      repo_reset();
-      Serial.println("reset done");
+      if (cmd[1] == '*') {
+        Serial.printf("sending reset request to all nodes\r\n");
+        mgmt_send_request('r');
+      } else if (cmd.length() == 2 * MGMT_ID_LEN + 1) {
+	char idHex[2 * MGMT_ID_LEN];
+	for (int i = 0; i < 2 * MGMT_ID_LEN; i++) { idHex[i] = cmd[i+1]; }
+	unsigned char *id = from_hex(idHex, MGMT_ID_LEN);
+        Serial.printf("sending reset request to %s\r\n", to_hex(id, MGMT_ID_LEN, 0));
+        mgmt_send_request('r', id);
+      } else {
+        repo_reset();
+        Serial.println("reset done");
+      }
       break;
     case 's': // send status request
       if (cmd[1] == '*') {

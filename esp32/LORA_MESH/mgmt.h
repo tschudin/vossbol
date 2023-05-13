@@ -242,6 +242,12 @@ void mgmt_rx_request(struct msg_request_s *request, int len)
     return;
   }
 
+  // reset
+  if (request->cmd == 'r') {
+    repo_reset();
+    return;
+  }
+
   // reboot
   if (request->cmd == 'x') {
     esp_restart();
