@@ -35,7 +35,8 @@
 #define FID_HEX_LEN     (2*FID_LEN)
 #define FID_B64_LEN     ((FID_LEN + 2) / 3 * 4)
 #define FEED_DIR        "/feeds"
-#define MAX_FEEDS      100 
+#define MAX_FEEDS       100
+#define FEED_PATH_SIZE  sizeof(FEED_DIR) + 1 + 2 * FID_LEN
 
 #define DMX_LEN          7
 #define GOSET_DMX_STR    "tinySSB-0.1 GOset 1"

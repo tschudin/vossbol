@@ -9,25 +9,35 @@
 int entry_cnt;
 int chunk_cnt;
 
+char* _feed_path(unsigned char *fid)
+{
+  static char path[FEED_PATH_SIZE];
+  sprintf(path, "%s/%s", FEED_DIR, to_hex(fid, FID_LEN));
+  return path;
+}
 
-char* _feed_path(unsigned char *fid, int seq = -1, int blob = -1)
-{ // FIXME: ugly and error prone functionality
-  // blob=-1: create filename for MID hash, blob=1: incomplete sidechain, blob=0: full sidechain
-  static char p[sizeof(FEED_DIR) + 1 + 2*FID_LEN + 8];
-  char *h = to_hex(fid, FID_LEN); // to_b64(fid, FID_LEN)
-  strcpy(p, FEED_DIR);
-  strcat(p, "/");
-  strcat(p, h);
-  MyFS.mkdir(p);
-  strcat(p, "/");
-  if (blob == -1) {
-    if (seq == -1) // plain log
-      strcat(p, "log");
-    else // this is for the hash (mid), else a plain log
-      sprintf(p+strlen(p), "+%d", seq);
-  } else
-    sprintf(p+strlen(p), blob ? "!%d" : "-%d", seq); // sidechain
-  return p;
+char* _feed_log(unsigned char *fid)
+{
+  char *path = _feed_path(fid);
+  static char file[FEED_PATH_SIZE + 1 + 3];
+  sprintf(file, "%s/log", path);
+  return file;
+}
+
+char* _feed_mid(unsigned char *fid, int seq)
+{
+  char *path = _feed_path(fid);
+  static char file[FEED_PATH_SIZE + 1 + 3];
+  sprintf(file, "%s/+%d", path, seq);
+  return file;
+}
+
+char* _feed_chnk(unsigned char *fid, int seq, bool complete)
+{
+  char *path = _feed_path(fid);
+  static char file[FEED_PATH_SIZE + 1 + 10];
+  sprintf(file, complete ? "%s/!%d" : "%s/-%d", path, seq);
+  return file;
 }
 
 // ----------------------------------------------------------------------
@@ -38,7 +48,7 @@ void repo_clean(char *path)
   if (fdir) {
     File f = fdir.openNextFile();
     while (f) {
-      char *fn = strdup(f.name());
+      char *fn = strdup(f.path());
       if (f.isDirectory()) {
         repo_clean(fn);
         f.close();
@@ -56,8 +66,8 @@ void repo_clean(char *path)
 
 void repo_reset(char *path)
 {
-  if (path != NULL)
-    Serial.printf("repo reset of path %s\n", path);
+  if (path == NULL) { path = FEED_DIR; }
+  Serial.printf("repo reset of path %s\r\n", path);
   repo_clean(path);
   if (path != NULL)
     MyFS.rmdir(path);
@@ -72,50 +82,48 @@ void repo_load()
   File fdir = MyFS.open(FEED_DIR);
   File f = fdir.openNextFile("r");
   while (f) {
-    char *pos = strrchr(f.name(), '/');
-    if (pos != NULL)  {
-      pos++;
-      unsigned char *fid = from_hex(pos, FID_LEN); // from_b64(pos, FID_LEN)
-      if (fid != NULL) {
-        int ndx = feed_index(fid);
-        if (ndx < 0) {
-          ndx = feed_cnt++;
-          memcpy(feeds[ndx].fid, fid, FID_LEN);
-          memcpy(feeds[ndx].prev, fid, HASH_LEN);
-          // leave next_seq and max_prev_seq at 0
-        }
-        File ldir = MyFS.open(f.name());
-        File g = ldir.openNextFile("r");
-        while (g) {
-          pos = strrchr(g.name(), '/');
-          pos++;
-          if (!strcmp(pos, "log")) {
-            int cnt = g.size() / TINYSSB_PKT_LEN;
-            feeds[ndx].next_seq = cnt + 1;
-            entry_cnt += cnt;
-          } else if (pos[0] == '+') { // contains hash (mid) of highest log entry
-            int seq = atoi(pos+1);
-            if (seq > feeds[ndx].max_prev_seq) {
-              g.read(feeds[ndx].prev, HASH_LEN);
-              feeds[ndx].max_prev_seq = seq;
-            }
-          } else if (pos[0] == '.' || pos[0] == '-' || pos[0] == '!') {
-            // the dot is being phased out because of file transfer problems
-            // on UNIX where it becomes a hidden file
-            chunk_cnt += g.size() / TINYSSB_PKT_LEN;
+    char* pos = (char*) f.name();
+    unsigned char *fid = from_hex(pos, FID_LEN); // from_b64(pos, FID_LEN)
+    if (fid != NULL) {
+      // check if feed active
+      //File k = MyFS.open(pathToCntFile, "r");
+	//unsigned int cnt = 0;
+      //k.read((unsigned char*) &cnt, sizeof(cnt));
+	//k.close();
+	//if (cnt % 2 == 1) {
+	//  Serial.printf("repo_load: ignoring inactive feed %s with cnt = %d\r\n", fid, cnt);
+      //  f.close();
+      //  f = fdir.openNextFile("r");
+	//  continue;
+	//}
+	// get index
+      int ndx = feed_index(fid);
+      if (ndx < 0) {
+        ndx = feed_cnt++;
+        memcpy(feeds[ndx].fid, fid, FID_LEN);
+        memcpy(feeds[ndx].prev, fid, HASH_LEN);
+        // leave next_seq and max_prev_seq at 0
+      }
+      char *lpath = _feed_path(fid);
+      File ldir = MyFS.open(lpath);
+      File g = ldir.openNextFile("r");
+      while (g) {
+        pos = (char *) g.name();
+        if (!strcmp(pos, "log")) {
+          int cnt = g.size() / TINYSSB_PKT_LEN;
+          feeds[ndx].next_seq = cnt + 1;
+          entry_cnt += cnt;
+        } else if (pos[0] == '+') { // contains hash (mid) of highest log entry
+          int seq = atoi(pos+1);
+          if (seq > feeds[ndx].max_prev_seq) {
+            g.read(feeds[ndx].prev, HASH_LEN);
+            feeds[ndx].max_prev_seq = seq;
           }
-          if (pos[0] == '.') { // rename the '.' files to use '-'
-            char path1[100], path2[100];
-            strcpy(path1, g.name());
-            strcpy(path2, g.name());
-            g.close();
-            pos = strrchr(path2, '/');
-            pos[1] = '-';
-            MyFS.rename(path1, path2);
-          } else
-            g.close();
-          g = ldir.openNextFile("r");
+        } else if (pos[0] == '-' || pos[0] == '!') {
+          chunk_cnt += g.size() / TINYSSB_PKT_LEN;
         }
+        g.close();
+        g = ldir.openNextFile("r");
       }
     }
     f.close();
@@ -143,9 +151,10 @@ void repo_load()
 void repo_new_feed(unsigned char *fid)
 {
   char *path = _feed_path(fid);
-  Serial.printf("new feed '%s'\n", path);
-  MyFS.remove(path);
-  File f = MyFS.open(path, "w");
+  Serial.printf("new feed '%s'\r\n", path);
+  MyFS.mkdir(path);
+  char *log = _feed_log(fid);
+  File f = MyFS.open(log, "w");
   f.close();
 
   feeds[feed_cnt].next_seq = 1;
@@ -158,7 +167,7 @@ unsigned char* repo_feed_read(unsigned char *fid, int seq)
 {
   if (--seq < 0) return NULL;
   static unsigned char buf[TINYSSB_PKT_LEN];
-  char *path = _feed_path(fid);
+  char *path = _feed_log(fid);
   File f = MyFS.open(path, "r");
   if (f.size()/TINYSSB_PKT_LEN <= seq)
     return NULL;
@@ -171,9 +180,9 @@ unsigned char* repo_feed_read(unsigned char *fid, int seq)
 unsigned char* repo_feed_read_chunk(unsigned char *fid, int seq, int cnr)
 {
   static unsigned char buf[TINYSSB_PKT_LEN];
-  File f = MyFS.open(_feed_path(fid, seq, 0), "r");
+  File f = MyFS.open(_feed_chnk(fid, seq, 0), "r");
   if (!f)
-    f = MyFS.open(_feed_path(fid, seq, 1), "r");
+    f = MyFS.open(_feed_chnk(fid, seq, 1), "r");
   if (!f)
     return NULL;
   f.seek(TINYSSB_PKT_LEN*cnr, SeekSet);
@@ -184,7 +193,7 @@ unsigned char* repo_feed_read_chunk(unsigned char *fid, int seq, int cnr)
 
 int repo_feed_len(unsigned char *fid)
 {
-  File f = MyFS.open(_feed_path(fid), "r");
+  File f = MyFS.open(_feed_log(fid), "r");
   int cnt = f.size() / TINYSSB_PKT_LEN;
   f.close();
   return cnt;
@@ -221,8 +230,8 @@ void repo_feed_append(unsigned char *fid, unsigned char *pkt)
     return;
   }
 
-  File f = MyFS.open(_feed_path(fid), FILE_APPEND);
-  Serial.printf("  writing log entry %d.%d\n", _key_index(theGOset,fid), f.size()/TINYSSB_PKT_LEN + 1);
+  File f = MyFS.open(_feed_log(fid), FILE_APPEND);
+  Serial.printf("  writing log entry %d.%d\r\n", _key_index(theGOset,fid), f.size()/TINYSSB_PKT_LEN + 1);
   f.write(pkt, TINYSSB_PKT_LEN);
   f.close();
   entry_cnt++;
@@ -231,21 +240,21 @@ void repo_feed_append(unsigned char *fid, unsigned char *pkt)
   crypto_hash_sha256(h, buf, sizeof(buf));
   memcpy(feeds[ndx].prev, h, HASH_LEN);
   if (feeds[ndx].next_seq >= 1) {
-    File f = MyFS.open(_feed_path(fid, feeds[ndx].next_seq), "w");
+    File f = MyFS.open(_feed_mid(fid, feeds[ndx].next_seq), "w");
     f.write(feeds[ndx].prev, HASH_LEN);
     f.close();
   }
   if (feeds[ndx].next_seq >= 2) // above new file replaces old MID file that can be deleted now
-    MyFS.remove(_feed_path(fid, feeds[ndx].next_seq - 1));
+    MyFS.remove(_feed_mid(fid, feeds[ndx].next_seq - 1));
   feeds[ndx].next_seq++;
 
   if (pkt[DMX_LEN] == PKTTYPE_chain20) {
     // read length of content
     int len = 4; // max lenght of content length field
     int sz = bipf_varint_decode(pkt, DMX_LEN+1, &len);
-    Serial.printf("  sidechain will have %d bytes\n", sz);
+    Serial.printf("  sidechain will have %d bytes\r\n", sz);
     if (sz > (48 - HASH_LEN - len)) { // create sidechain file
-      f = MyFS.open(_feed_path(fid, feeds[ndx].next_seq-1, 1), FILE_WRITE);
+      f = MyFS.open(_feed_chnk(fid, feeds[ndx].next_seq-1, 1), FILE_WRITE);
       f.close();
     }
   }
@@ -264,9 +273,9 @@ void repo_feed_append(unsigned char *fid, unsigned char *pkt)
 void repo_sidechain_append(unsigned char *buf, int blbt_ndx)
 {
   struct blb_s *bp = blbt + blbt_ndx;
-  File f = MyFS.open(_feed_path(bp->fid, bp->seq, 1), "a");
+  File f = MyFS.open(_feed_chnk(bp->fid, bp->seq, 1), "a");
   if (f && (f.size() / TINYSSB_PKT_LEN) == bp->bnr) {
-    Serial.printf("  persisting chunk %d.%d.%d\n", _key_index(theGOset,bp->fid), bp->seq, bp->bnr);
+    Serial.printf("  persisting chunk %d.%d.%d\r\n", _key_index(theGOset,bp->fid), bp->seq, bp->bnr);
     f.write(buf, TINYSSB_PKT_LEN);
     f.close();
     chunk_cnt++;
@@ -275,7 +284,7 @@ void repo_sidechain_append(unsigned char *buf, int blbt_ndx)
       if (buf[i] != 0)
          break;
     if (i == TINYSSB_PKT_LEN) { // end of chain reached, rename file
-      char *old = _feed_path(bp->fid, bp->seq, 1);
+      char *old = _feed_chnk(bp->fid, bp->seq, 1);
       char *fin = strdup(old);
       char *pos = strrchr(fin, '!');
       *pos = '-';

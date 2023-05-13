@@ -53,8 +53,8 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 #include <Button2.h>
 
 // FS
-#include <littlefs_api.h>
-#include <littleFS.h>
+//#include <littlefs_api.h>
+#include <LittleFS.h>
 
 // crypto
 #include <sodium/crypto_hash_sha256.h>
@@ -82,7 +82,7 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 
 // create instances
 
-#define MyFS LITTLEFS
+#define MyFS LittleFS
 #if !defined(NO_WIFI)
   WiFiUDP udp;
 #endif
@@ -316,16 +316,15 @@ void listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 
     File file = root.openNextFile();
     while(file){
-        char *fn = strrchr(file.name(), '/') + 1;
         if(file.isDirectory()){
             Serial.print("  DIR : ");
-            Serial.println(fn);
+            Serial.println(file.name());
             if(levels){
-                listDir(fs, file.name(), levels -1);
+                listDir(fs, file.path(), levels -1);
             }
         } else {
             Serial.print("  FILE: ");
-            Serial.print(fn);
+            Serial.print(file.name());
             Serial.print("\tSIZE: ");
             Serial.println(file.size());
         }

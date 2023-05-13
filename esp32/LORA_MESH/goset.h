@@ -220,11 +220,11 @@ void goset_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     return;
   }
   if (pkt[0] != 'c' || len != CLAIM_LEN) {
-    Serial.printf("goset_rx t=%c ??\n", pkt[0]);
+    Serial.printf("goset_rx t=%c ??\r\n", pkt[0]);
     return;
   }
   struct claim_s *cp = (struct claim_s *) pkt;
-  Serial.printf("goset_rx t=c, xo=%s, |span|=%d\n", to_hex(cp->xo, GOSET_KEY_LEN), cp->cnt);
+  Serial.printf("goset_rx t=c, xo=%s, |span|=%d\r\n", to_hex(cp->xo, GOSET_KEY_LEN), cp->cnt);
   if (isZero(cp->lo, GOSET_KEY_LEN)) // remove this clause
     return;
   if (cp->cnt > gp->largest_claim_span)

@@ -6,7 +6,8 @@
 #   make monitor SERIAL=/dev/tty.....
 
 
-BINDIR=/opt/homebrew/bin
+#BINDIR=/opt/homebrew/bin
+BINDIR=/usr/local/bin
 MAIN=LORA_MESH
 
 

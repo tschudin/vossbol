@@ -14,25 +14,25 @@ references for direct download:
 ## a) T-beam
 
 ```
-Used library                Version
+Used library                                       Version
 
-esp8266-oled-ssd1306-master 4.3.0
-Wire                        1.0.1
-LoRa                        0.8.0
-SPI                         1.0  
-TinyGPSPlus                 1.0.3
-AXP202X_Library-master      1.1.3
-Button2                     2.0.3
-LittleFS_esp32              1.0.6
-FS                          1.0  
-WiFi                        1.0  
-BluetoothSerial             1.0  
-BLE                         1.0.1
+ESP8266 and ESP32 OLED driver for SSD1306 displays 4.3.0
+Wire                                               2.0.0
+LoRa                                               0.8.0
+SPI                                                2.0.0
+TinyGPSPlus                                        1.0.3
+AXP202X_Library                                    1.1.2
+Button2                                            2.2.2
+LittleFS                                           2.0.0
+FS                                                 2.0.0
+WiFi                                               2.0.0
+BluetoothSerial                                    2.0.0
+ESP32 BLE Arduino                                  2.0.0
 
 
 Used platform Version
 
-esp32:esp32   1.0.6
+esp32:esp32   2.0.6
 ```
 
 
@@ -42,21 +42,21 @@ esp32:esp32   1.0.6
 ```
 Used library            Version
 
-Heltec_ESP32_Dev-Boards 1.1.1
-Wire                    1.0.1
-SPI                     1.0  
-Button2                 2.0.3
-LittleFS_esp32          1.0.6
-FS                      1.0  
-WiFi                    1.0  
-BluetoothSerial         1.0  
-BLE                     1.0.1
-
+Heltec ESP32 Dev-Boards 1.1.1
+Wire                    2.0.0
+SPI                     2.0.0
+Button2                 2.2.2
+LittleFS                2.0.0
+FS                      2.0.0
+WiFi                    2.0.0
+BluetoothSerial         2.0.0
+ESP32 BLE Arduino       2.0.0
 
 Used platform Version
 
-esp32:esp32   1.0.6
+esp32:esp32   2.0.6
 ```
 
 
 --- eof
+
