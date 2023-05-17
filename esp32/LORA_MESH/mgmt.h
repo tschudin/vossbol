@@ -288,13 +288,14 @@ void mgmt_rx_status(unsigned char *pkt, int len) {
   pkt += MGMT_MSG_STATUS_LEN;
 
   int ndxNeighbor;
+  struct msg_status_s *empty = (struct msg_status_s*) calloc(1, MGMT_MSG_STATUS_LEN);
   for (int i = 1; i < entries; i++) {
-    // no next status
-    if (pkt[0] != 's') {
-      break;
-    }
     struct msg_status_s *neighbor = (struct msg_status_s*) calloc(1, MGMT_MSG_STATUS_LEN);
     memcpy(neighbor, pkt, MGMT_MSG_STATUS_LEN);
+    if (!(memcmp(neighbor, empty, MGMT_MSG_STATUS_LEN))) {
+      free(neighbor);
+      break;
+    }
     Serial.printf("%8slearned about %s\r\n", "", to_hex(neighbor->id, 2, 0));
     pkt += MGMT_MSG_STATUS_LEN;
     ndxNeighbor = -1;
@@ -318,6 +319,7 @@ void mgmt_rx_status(unsigned char *pkt, int len) {
     free(neighbor);
   }
 
+  free(empty);
   free(other);
 }
 
