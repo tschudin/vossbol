@@ -90,9 +90,9 @@ class MainActivity : Activity() {
         tinyIO = IO(this, wai)
         tinyGoset._include_key(idStore.identity.verifyKey) // make sure our local key is in
         tinyRepo.repo_load()
-        tinyDemux.arm_dmx(tinyGoset.goset_dmx,  {buf:ByteArray, aux:ByteArray? -> tinyGoset.rx(buf,aux)}, null)
-        tinyDemux.arm_dmx(tinyDemux.want_dmx!!, {buf:ByteArray, aux:ByteArray? -> tinyNode.incoming_want_request(buf,aux)})
-        tinyDemux.arm_dmx(tinyDemux.chnk_dmx!!, { buf:ByteArray, aux:ByteArray? -> tinyNode.incoming_chunk_request(buf,aux)})
+        tinyDemux.arm_dmx(tinyGoset.goset_dmx,  {buf:ByteArray, aux:ByteArray?, _ -> tinyGoset.rx(buf,aux)}, null)
+        tinyDemux.arm_dmx(tinyDemux.want_dmx!!, {buf:ByteArray, aux:ByteArray?, sender:String? -> tinyNode.incoming_want_request(buf,aux,sender)})
+        tinyDemux.arm_dmx(tinyDemux.chnk_dmx!!, { buf:ByteArray, aux:ByteArray?, _ -> tinyNode.incoming_chunk_request(buf,aux)})
 
         webView.clearCache(true)
         /* no image support in tinyTremola

@@ -373,7 +373,7 @@ class Repo(val context: MainActivity) {
         // install handler for next pkt:
         val new_dmx = context.tinyDemux.compute_dmx(fid + feeds[ndx].next_seq.toByteArray()
                                                     + feeds[ndx].prev_hash)
-        val fct = { buf: ByteArray, fid: ByteArray? -> context.tinyNode.incoming_pkt(buf,fid!!) }
+        val fct = { buf: ByteArray, fid: ByteArray?, _: String? -> context.tinyNode.incoming_pkt(buf,fid!!) }
         context.tinyDemux.arm_dmx(new_dmx, fct, fid)
 
         return true

@@ -26,8 +26,8 @@ class Node(val context: MainActivity) {
     var log_offs = 0
     var chunk_offs = 0
 
-    fun incoming_want_request(buf: ByteArray, aux: ByteArray?) {
-        Log.d("node", "incoming WANT ${buf.toHex()}")
+    fun incoming_want_request(buf: ByteArray, aux: ByteArray?, sender: String?) {
+        Log.d("node", "incoming WANT ${buf.toHex()} from sender: $sender")
         val vect = bipf_loads(buf.sliceArray(DMX_LEN..buf.lastIndex))
         if (vect == null || vect.typ != BIPF_LIST) return
         val lst = vect.getList()
@@ -37,6 +37,7 @@ class Node(val context: MainActivity) {
         }
         val offs = lst[0].getInt()
         var v = "WANT vector=["
+        var vector = mutableMapOf<Int, Int>() //send to frontend
         var credit = 3
         for (i in 1..lst.lastIndex) {
             val fid: ByteArray
@@ -46,6 +47,7 @@ class Node(val context: MainActivity) {
                 fid = context.tinyGoset.keys[ndx]
                 seq = lst[i].getInt()
                 v += " $ndx.${seq}"
+                vector[ndx] = seq
             } catch (e: Exception) {
                 Log.d("node", "incoming WANT error ${e.toString()}")
                 continue
@@ -63,6 +65,8 @@ class Node(val context: MainActivity) {
         }
         v += " ]"
         Log.d("node", v)
+        if(sender != null)
+            context.wai.eval("b2f_want_update(\"$sender\", ${vector.toSortedMap().values})") //send want vector to frontend
         if (credit == 3)
             Log.d("node", "  no entry found to serve")
     }
@@ -130,6 +134,7 @@ class Node(val context: MainActivity) {
 
         var v = ""
         val vect = Bipf.mkList()
+        var vector = mutableMapOf<Int, Int>() // want vector for frontend
         var encoding_len = 0
         log_offs = (log_offs + 1) % context.tinyGoset.keys.size
         Bipf.list_append(vect, Bipf.mkInt(log_offs))
@@ -143,9 +148,10 @@ class Node(val context: MainActivity) {
             val dmx = context.tinyDemux.compute_dmx(key + feed.next_seq.toByteArray()
                     + feed.prev_hash)
             // Log.d("node", "dmx is ${dmx.toHex()}")
-            val fct = { buf:ByteArray, fid:ByteArray? -> context.tinyNode.incoming_pkt(buf, fid!!) }
+            val fct = { buf:ByteArray, fid:ByteArray?, _:String? -> context.tinyNode.incoming_pkt(buf, fid!!) }
             context.tinyDemux.arm_dmx(dmx, fct, key)
             v += (if (v.length == 0) "[ " else ", ") + "$ndx.${feed.next_seq}"
+            vector[ndx] = feed.next_seq
             i++
             encoding_len += Bipf.encode(bptr)!!.size
             if (encoding_len > 100)
@@ -157,6 +163,7 @@ class Node(val context: MainActivity) {
             if (buf != null) {
                 context.tinyIO.enqueue(buf, context.tinyDemux.want_dmx)
                 Log.d("node", ">> sent WANT request ${v} ]")
+                context.wai.eval("b2f_want_update(\"me\", ${vector.toSortedMap().values})") //send own want vector to frontend
             }
         }
 

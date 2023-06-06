@@ -24,6 +24,7 @@ import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import nz.scuttlebutt.tremolavossbol.MainActivity
@@ -332,8 +333,9 @@ class BlePeers(val act: MainActivity) {
         gattService.addCharacteristic(chRX)
         gattService.addCharacteristic(chTX)
         gattServer = bluetoothManager.openGattServer(act, gattServerCallback).apply { addService(gattService)}
-        startAdvertising()
         Log.d("GATT_Server", "Server started")
+        startAdvertising()
+
     }
 
     @SuppressLint("MissingPermission")
@@ -370,6 +372,8 @@ class BlePeers(val act: MainActivity) {
 
     @SuppressLint("MissingPermission")
     private val gattServerCallback = object : BluetoothGattServerCallback() {
+
+
         override fun onConnectionStateChange(device: BluetoothDevice?, status: Int, newState: Int) {
             Log.d("GATT_Server", "Connection changed")
             super.onConnectionStateChange(device, status, newState)
@@ -408,12 +412,12 @@ class BlePeers(val act: MainActivity) {
             Log.d("GATT_Server", "Characteristic Write Request! ${characteristic?.uuid}, $responseNeeded")
             if (characteristic != null) {
                 if(characteristic.uuid == TINYSSB_BLE_RX_CHARACTERISTIC) {
-                    Log.d("GATT_Server", "Received characteristic: ${value}")
+                    Log.d("GATT_Server", "Received characteristic: ${value}, sender: ${device?.address}")
                     gattServer?.sendResponse(device, requestId, GATT_SUCCESS,0, null)
 //                    if (value != null) {
                         try {
                             act.ioLock.lock()
-                            val rc = act.tinyDemux.on_rx(value!!)
+                            val rc = act.tinyDemux.on_rx(value!!, device?.address)
                             act.ioLock.unlock()
                             if (!rc)
                                 Log.d("ble rx", "not dmx entry for ${value}")
