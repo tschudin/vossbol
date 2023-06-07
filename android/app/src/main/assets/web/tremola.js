@@ -848,12 +848,10 @@ function b2f_ble_disabled() {
     //ble_status = "disabled"
 }
 
-// (id, want, tmp)
-// want -> 0 %
 
-var max_want = []
-var want = {}
-var old_curr = []
+var want = {} // all received want vectors, id: [[want vector], timestamp], want vectors older than 90 seconds are discarded
+var max_want = [] // current max vector
+var old_curr = [] // own want vector at the time when the maximum want vector was last updated
 
 function b2f_want_update(identifier, wantVector) {
 
@@ -896,10 +894,12 @@ function b2f_want_update(identifier, wantVector) {
 
     // update
     if (!equalArrays(max_want,new_max_want)) {
-        old_curr = want['me']
+        old_curr = want['me'][0]
         max_want = new_max_want
         console.log("new max")
     }
+
+    refresh_connection_progressbar()
 
     console.log("max:", max_want)
 }
@@ -909,7 +909,7 @@ function b2f_local_peer_remaining_updates(identifier, remaining) {
 }
 
 function b2f_local_peer(type, identifier, displayname, status) {
-    console.log( "incoming displayname:", displayname)
+    console.log("incoming displayname:", displayname)
     if (displayname == "null") {
         displayname = identifier
     }
@@ -923,8 +923,11 @@ function b2f_local_peer(type, identifier, displayname, status) {
 
     console.log("local_peer:", type, identifier, displayname, status)
 
-    if (status == "offline")
-        delete localPeers[identifier]
+    if (status == "offline") {
+      delete localPeers[identifier]
+      refresh_connection_progressbar()
+    }
+
 
     if (document.getElementById('connection-overlay').style.display != 'none')
         refresh_connection_entry(identifier)

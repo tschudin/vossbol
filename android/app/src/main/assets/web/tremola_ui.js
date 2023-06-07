@@ -375,6 +375,7 @@ function modal_img(img) {
 
 function menu_connection() {
     closeOverlay();
+    refresh_connection_progressbar()
 
     document.getElementById('connection-overlay-content').innerHTML = '';
 
@@ -422,6 +423,36 @@ function refresh_connection_entry(id) {
 
     document.getElementById('connection-overlay-content').innerHTML += entryHTML
 
+}
+
+function refresh_connection_progressbar() {
+
+  var new_min = old_curr.reduce((acc, curr) => acc + curr, 0)
+  var new_curr = want['me'][0].reduce((acc, curr) => acc + curr, 0)
+  var new_max = max_want.reduce((acc, curr) => acc + curr, 0)
+
+  console.log("newMin:", new_min)
+  console.log("newMax:", new_max)
+  console.log("newCurr:", new_curr)
+
+  if(Object.keys(localPeers) == 0) {
+    document.getElementById('connection-overlay-progressbar').value = 100
+    document.getElementById('connection-overlay-progressbar-label').textContent = "No peers connected"
+    return
+  }
+
+  if(new_curr == new_max || new_min == new_max) {
+    document.getElementById('connection-overlay-progressbar').value = 100
+    document.getElementById('connection-overlay-progressbar-label').textContent = "Synchronized"
+    return
+  }
+
+  var newPos = (new_curr - new_min) / (new_max - new_min) * 100
+
+  console.log("newPos:", newPos)
+
+  document.getElementById('connection-overlay-progressbar').value = newPos
+  document.getElementById('connection-overlay-progressbar-label').textContent = Math.trunc(newPos) + "% - " + (new_max - new_curr) + " entries left"
 }
 
 // ---
