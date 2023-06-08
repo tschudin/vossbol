@@ -157,6 +157,7 @@ class Repo(val context: MainActivity) {
         File(ldir, "log").createNewFile() // create empty log file
         File(ldir, "mid").createNewFile() // create empty log file
         feeds.add(Feed(fid))
+        context.wai.eval("b2f_new_contact(\"${fid.toHex()}\")") // notify frontend
     }
 
     fun feed_read_mid(fid: ByteArray, seq: Int): ByteArray? {

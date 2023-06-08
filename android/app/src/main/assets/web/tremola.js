@@ -933,7 +933,6 @@ function b2f_local_peer(type, identifier, displayname, status) {
         refresh_connection_entry(identifier)
 }
 
-
 function b2f_new_event(e) { // incoming SSB log event: we get map with three entries
                             // console.log('hdr', JSON.stringify(e.header))
     console.log('pub', JSON.stringify(e.public))
@@ -1004,9 +1003,16 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
     }
 }
 
-function b2f_new_contact(contact_str) { // '{"alias": "nickname", "id": "fid", 'img' : base64, date}'
-    var c = JSON.parse(contact_str)
-    load_contact_item(c)
+function b2f_new_contact(fid) {
+    if ((fid in tremola.contacts)) // do not overwrite existing entry
+        return
+    id = id2b32(fid);
+    tremola.contacts[fid] = {
+        "alias": id, "initial": id.substring(0, 1).toUpperCase(),
+        "color": colors[Math.floor(colors.length * Math.random())]
+    };
+    persist()
+    menu_redraw();
 }
 
 function b2f_new_voice(voice_b64) {
