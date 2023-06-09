@@ -62,7 +62,7 @@ uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
 BLECharacteristic *RXChar = nullptr; // receive
 BLECharacteristic *TXChar = nullptr; // transmit (notify)
 BLECharacteristic *STChar = nullptr; // statistics
-bool bleDeviceConnected = 0;
+int bleDeviceConnected = 0;
 char txString[128] = {0};
 
 typedef unsigned char tssb_pkt_t[1+127];
@@ -85,13 +85,13 @@ unsigned char* ble_fetch_received() // first byte has length, up to 127B
 
 class UARTServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      bleDeviceConnected = 1;
+      bleDeviceConnected += 1;
       Serial.println("** Device connected");
       // stop advertising when a peer is connected (we can only serve one client)
-      pServer->getAdvertising()->stop();
+      pServer->getAdvertising()->start();
     };
     void onDisconnect(BLEServer* pServer) {
-      bleDeviceConnected = 0;
+      bleDeviceConnected -= 1;
       Serial.println("** Device disconnected");
       // resume advertising when peer disconnects
       pServer->getAdvertising()->start();
@@ -208,7 +208,7 @@ void ble_send(unsigned char *buf, short len) {
   // no CRC added, we rely on BLE's CRC
   TXChar->setValue(buf, len);
   TXChar->notify();
-  Serial.printf("BLE: sent %dB: %s..\n", len, to_hex(buf,8));
+  Serial.printf("BLE: sent %dB: %s..\r\n", len, to_hex(buf,8));
 }
 
 void ble_send_stats(unsigned char *str, short len) {
@@ -216,7 +216,7 @@ void ble_send_stats(unsigned char *str, short len) {
   // no CRC added, we rely on BLE's CRC
   STChar->setValue(str, len);
   STChar->notify();
-  Serial.printf("BLE: sent stat %dB: %s\n", len, str);
+  Serial.printf("BLE: sent stat %dB: %s\r\n", len, str);
 }
 
 #endif // BLE
