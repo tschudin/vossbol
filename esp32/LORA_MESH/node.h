@@ -4,7 +4,7 @@
 // Aug 2022 <christian.tschudin@unibas.ch>
 
 
-#define NODE_ROUND_LEN  (8000/2) // millis, take turns between log entries and chunks
+#define NODE_ROUND_LEN  (5000) // millis, take turns between log entries and chunks
 unsigned int node_next_vector; // time when one of the two next vectors should be sent
 
 void incoming_want_request(unsigned char *buf, int len, unsigned char *aux, struct face_s *f)
