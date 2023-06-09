@@ -1006,13 +1006,13 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
 function b2f_new_contact(fid) {
     if ((fid in tremola.contacts)) // do not overwrite existing entry
         return
-    id = id2b32(fid);
+    var id = id2b32(fid);
     tremola.contacts[fid] = {
         "alias": id, "initial": id.substring(0, 1).toUpperCase(),
         "color": colors[Math.floor(colors.length * Math.random())]
     };
     persist()
-    menu_redraw();
+    load_contact_list();
 }
 
 function b2f_new_voice(voice_b64) {

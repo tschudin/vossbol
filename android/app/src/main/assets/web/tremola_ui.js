@@ -427,19 +427,28 @@ function refresh_connection_entry(id) {
 
 function refresh_connection_progressbar() {
 
-  var new_min = old_curr.reduce((acc, curr) => acc + curr, 0)
-  var new_curr = want['me'][0].reduce((acc, curr) => acc + curr, 0)
-  var new_max = max_want.reduce((acc, curr) => acc + curr, 0)
+  var new_min = 0
+  var new_curr = 0
+  var new_max = 0
+
+
+  if (('me' in want)) {
+    var new_min = old_curr.reduce((acc, curr) => acc + curr, 0)
+    var new_curr = want['me'][0].reduce((acc, curr) => acc + curr, 0)
+    var new_max = max_want.reduce((acc, curr) => acc + curr, 0)
+  }
 
   console.log("newMin:", new_min)
   console.log("newMax:", new_max)
   console.log("newCurr:", new_curr)
 
+  /*
   if(Object.keys(localPeers) == 0) {
     document.getElementById('connection-overlay-progressbar').value = 100
     document.getElementById('connection-overlay-progressbar-label').textContent = "No peers connected"
     return
   }
+  */
 
   if(new_curr == new_max || new_min == new_max) {
     document.getElementById('connection-overlay-progressbar').value = 100

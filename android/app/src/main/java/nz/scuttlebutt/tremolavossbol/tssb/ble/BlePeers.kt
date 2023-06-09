@@ -1,5 +1,6 @@
 package nz.scuttlebutt.tremolavossbol.tssb.ble
 
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.*
@@ -66,6 +67,7 @@ class BlePeers(val act: MainActivity) {
         return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
     }
 
+    @SuppressLint("MissingPermission")
     fun startBluetooth() {
         val pm: PackageManager = act.getPackageManager()
         if (!pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {

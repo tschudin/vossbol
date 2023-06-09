@@ -402,6 +402,9 @@ class MainActivity : Activity() {
         }
         */
     }
+    fun isWaiInitialized(): Boolean {
+        return this::wai.isInitialized;
+    }
 
     fun rmSockets() {
         try { mc_socket?.leaveGroup(mc_group); mc_socket?.close() } catch (e: Exception) {}

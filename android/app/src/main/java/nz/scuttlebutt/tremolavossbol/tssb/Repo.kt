@@ -16,6 +16,7 @@ import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.PKTTYPE_chain20
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.PKTTYPE_plain48
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_PKT_LEN
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.decodeHex
+import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toByteArray
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
 import java.io.File
@@ -157,7 +158,8 @@ class Repo(val context: MainActivity) {
         File(ldir, "log").createNewFile() // create empty log file
         File(ldir, "mid").createNewFile() // create empty log file
         feeds.add(Feed(fid))
-        context.wai.eval("b2f_new_contact(\"${fid.toHex()}\")") // notify frontend
+        if(context.isWaiInitialized())
+            context.wai.eval("b2f_new_contact(\"@${fid.toBase64()}.ed25519\")") // notify frontend
     }
 
     fun feed_read_mid(fid: ByteArray, seq: Int): ByteArray? {
