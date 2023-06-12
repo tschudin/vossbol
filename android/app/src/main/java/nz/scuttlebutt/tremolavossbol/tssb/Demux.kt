@@ -1,7 +1,6 @@
 package nz.scuttlebutt.tremolavossbol.tssb
 
 import android.util.Log
-
 import nz.scuttlebutt.tremolavossbol.MainActivity
 import nz.scuttlebutt.tremolavossbol.crypto.SodiumAPI.Companion.sha256
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.DMX_LEN
@@ -9,7 +8,6 @@ import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.DMX_PFX
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.HASH_LEN
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_PKT_LEN
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
-import org.junit.Test.None
 
 typealias Dmx_callback = ((ByteArray,ByteArray?,String?) -> Unit)?
 typealias Chk_callback = ((ByteArray, Int) -> Unit)?

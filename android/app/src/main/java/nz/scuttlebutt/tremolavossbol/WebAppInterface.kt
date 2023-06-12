@@ -92,6 +92,12 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 // FIXME: should kill all active connections, or better then the app
                 act.finishAffinity()
             }
+            "add:contact" -> {
+
+                val id = args[1].substring(1,args[1].length-8)
+                Log.d("ADD", id)
+                act.tinyGoset._add_key(Base64.decode(id, Base64.NO_WRAP))
+            }
             /* no alias publishing in tinyTremola
             "add:contact" -> { // ID and alias
                 tremolaState.addContact(args[1],
