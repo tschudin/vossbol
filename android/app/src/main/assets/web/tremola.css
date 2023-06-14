@@ -395,17 +395,17 @@ input:checked + .slider:before {
   grid-area: info;
 }
 
-#connection-overlay-progressbar {
+.connection-overlay-progressbar {
   width: 100%;
   height: 25px;
   background-color: lightgray;
 }
 
-#connection-overlay-progressbar::-webkit-progress-value {
+.connection-overlay-progressbar::-webkit-progress-value {
   transition: width 1s ease;
 }
 
-#connection-overlay-progressbar-label {
+.connection-overlay-progressbar-label {
   position: absolute;
   top: 50%;
   left: 50%;

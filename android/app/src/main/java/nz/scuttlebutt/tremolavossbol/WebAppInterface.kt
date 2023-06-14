@@ -28,6 +28,8 @@ import org.json.JSONArray
 
 class WebAppInterface(val act: MainActivity, val webView: WebView) {
 
+    var frontend_ready = false
+
     @JavascriptInterface
     fun onFrontendRequest(s: String) {
         //handle the data captured from webview}
@@ -39,6 +41,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             }
             "ready" -> {
                 eval("b2f_initialize(\"${act.idStore.identity.toRef()}\")")
+                frontend_ready = true
             }
             "reset" -> { // UI reset
                 // erase DB content
@@ -328,4 +331,5 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         Log.d("CMD", cmd)
         eval(cmd)
     }
+
 }

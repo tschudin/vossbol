@@ -232,11 +232,16 @@
   </div>
 
   <div id='connection-overlay' class='qr-overlay'>
-    <div id='connection-overlay-hdr' style='font-size:18px; padding-bottom: 10px;'><b>Connected Devices</b></div>
-    <div id='connection-overlay-progress-wrapper' style="position: relative; margin-bottom: 10px;">
-      <progress id='connection-overlay-progressbar' value="0" max="100"></progress>
-      <div id="connection-overlay-progressbar-label"></div>
+    <div style='font-size:18px; padding-bottom: 10px;'><b>Replication Status</b></div>
+    <div style="position: relative; margin-bottom: 10px;">
+      <progress id='connection-overlay-progressbar-want' class='connection-overlay-progressbar' value="0" max="100"></progress>
+      <div id='connection-overlay-progressbar-label-want' class="connection-overlay-progressbar-label"></div>
     </div>
+    <div style="position: relative; margin-bottom: 10px;">
+      <progress id='connection-overlay-progressbar-gift' class='connection-overlay-progressbar' value="0" max="100"></progress>
+      <div id='connection-overlay-progressbar-label-gift' class="connection-overlay-progressbar-label"></div>
+    </div>
+    <div id='connection-overlay-hdr' style='font-size:18px; padding-bottom: 10px;'><b>Connected Devices</b></div>
     <div id='connection-overlay-content'></div>
   </div>
 

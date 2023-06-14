@@ -66,7 +66,7 @@ class Node(val context: MainActivity) {
         v += " ]"
         Log.d("node", v)
         if(sender != null)
-            context.wai.eval("b2f_want_update(\"$sender\", ${vector.toSortedMap().values})") //send want vector to frontend
+            update_progress(vector.toSortedMap().values.toList(), sender)
         if (credit == 3)
             Log.d("node", "  no entry found to serve")
     }
@@ -163,7 +163,7 @@ class Node(val context: MainActivity) {
             if (buf != null) {
                 context.tinyIO.enqueue(buf, context.tinyDemux.want_dmx)
                 Log.d("node", ">> sent WANT request ${v} ]")
-                context.wai.eval("b2f_want_update(\"me\", ${vector.toSortedMap().values})") //send own want vector to frontend
+                update_progress(vector.toSortedMap().values.toList(), "me")
             }
         }
 
@@ -260,5 +260,87 @@ class Node(val context: MainActivity) {
         Log.d("node", "publish_public_content --> content ${if (pkt == null) 0 else pkt.toHex()}B")
         if (pkt == null) return false
         return repo.feed_append(context.idStore.identity.verifyKey, pkt)
+    }
+
+    // all want vectors are sorted by the keys
+    var wants = mutableMapOf<String, Pair<List<Int>, Long>>()  // from (device address): ( [want vector], timestamp)
+    var max_want: List<Int>? = null
+    var min_want: List<Int>? = null
+    var old_want: List<Int>? = null
+    var old_min: List<Int>? = null
+    var old_min_from: String? = null
+
+    // calculates current replication progress and sends update to frontend
+    fun update_progress(want_vector: List<Int>, from: String) {
+
+        var deleted = false
+
+        val tmp = wants
+
+        for ((k, v) in tmp) {
+            val (_, ts) = v
+            if (System.currentTimeMillis() - ts > 90000 && k != from) {
+                tmp.remove(k)
+                deleted = true
+            }
+        }
+
+        // if the want vector didn't change, only update timestamp
+        if (from in tmp) {
+            if(want_vector == tmp[from]?.first) {
+                wants[from] = Pair(want_vector, System.currentTimeMillis())
+                if(!deleted)
+                    return //if a want vector was previously removed, the max_want needs to be recalculated otherwise it is just an update without an effect
+            }
+        }
+
+        wants[from] = Pair(want_vector, System.currentTimeMillis())
+
+        var all_vectors = wants.values.map { it.first }
+        var new_max_want = all_vectors.reduce{acc, curr -> if (acc.size >= curr.size) acc else curr }.toMutableList() //return want vector with most entries
+        var new_min_want = new_max_want
+
+        for (vec in all_vectors) {
+            for (i in vec.indices) {
+                if(vec[i] > new_max_want[i]) {
+                    new_max_want[i] = vec[i]
+                }
+
+                if(vec[i] < new_min_want[i]) {
+                    new_min_want[i] = vec[i]
+                }
+            }
+        }
+
+        var updated = false
+        if (max_want != new_max_want) {
+            old_want = wants["me"]?.first
+            max_want = new_max_want
+            updated = true
+        }
+
+        if (min_want != new_min_want) {
+            if ((((new_min_want.sum()) < (old_min?.sum() ?: 0)) || (min_want == null) || !wants.containsKey(old_min_from)) && from != "me") {
+                old_min = new_min_want
+                old_min_from = from
+            }
+            min_want = new_min_want
+            updated = true
+        }
+
+        if (updated || from == "me") {
+            val min_want_entries = min_want?.sum() ?: 0
+            val old_want_entries = old_want?.sum() ?: 0
+            val old_min_entries = old_min?.sum() ?:0
+            val curr_want_entries = wants["me"]?.first?.sum() ?: 0
+            val max_want_entries = max_want?.sum() ?: 0
+
+            Log.d("node","notify frontend: $min_want_entries, $old_min_entries, $old_want_entries, $curr_want_entries, $max_want_entries")
+
+            context.wai.eval("b2f_update_progress($min_want_entries, $old_min_entries, $old_want_entries, $curr_want_entries, $max_want_entries)")
+
+            //TODO send to frontend
+        }
+
     }
 }

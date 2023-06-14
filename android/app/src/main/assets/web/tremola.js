@@ -848,7 +848,7 @@ function b2f_ble_disabled() {
     //ble_status = "disabled"
 }
 
-
+/*
 var want = {} // all received want vectors, id: [[want vector], timestamp], want vectors older than 90 seconds are discarded
 var max_want = [] // current max vector
 var old_curr = [] // own want vector at the time when the maximum want vector was last updated
@@ -903,9 +903,14 @@ function b2f_want_update(identifier, wantVector) {
 
     console.log("max:", max_want)
 }
+*/
 
 function b2f_local_peer_remaining_updates(identifier, remaining) {
     //TODO
+}
+
+function b2f_update_progress(min_entries, old_min_entries, old_want_entries, curr_want_entries, max_entries) {
+    refresh_connection_progressbar(min_entries, old_min_entries, old_want_entries, curr_want_entries, max_entries)
 }
 
 function b2f_local_peer(type, identifier, displayname, status) {
@@ -925,7 +930,7 @@ function b2f_local_peer(type, identifier, displayname, status) {
 
     if (status == "offline") {
       delete localPeers[identifier]
-      refresh_connection_progressbar()
+      //refresh_connection_progressbar()
     }
 
 

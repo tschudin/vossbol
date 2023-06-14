@@ -375,7 +375,7 @@ function modal_img(img) {
 
 function menu_connection() {
     closeOverlay();
-    refresh_connection_progressbar()
+    //refresh_connection_progressbar()
 
     document.getElementById('connection-overlay-content').innerHTML = '';
 
@@ -425,8 +425,15 @@ function refresh_connection_entry(id) {
 
 }
 
-function refresh_connection_progressbar() {
+function refresh_connection_progressbar(min_entries, old_min_entries, old_want_entries, curr_want_entries, max_entries) {
 
+    console.log("min:", min_entries)
+    console.log("old_min:", old_min_entries)
+    console.log("old_curr:", old_want_entries)
+    console.log("curr:", curr_want_entries)
+    console.log("max:", max_entries)
+
+ /*
   var new_min = 0
   var new_curr = 0
   var new_max = 0
@@ -437,10 +444,7 @@ function refresh_connection_progressbar() {
     var new_curr = want['me'][0].reduce((acc, curr) => acc + curr, 0)
     var new_max = max_want.reduce((acc, curr) => acc + curr, 0)
   }
-
-  console.log("newMin:", new_min)
-  console.log("newMax:", new_max)
-  console.log("newCurr:", new_curr)
+  */
 
   /*
   if(Object.keys(localPeers) == 0) {
@@ -450,18 +454,33 @@ function refresh_connection_progressbar() {
   }
   */
 
-  if(new_curr == new_max || new_min == new_max) {
-    document.getElementById('connection-overlay-progressbar').value = 100
-    document.getElementById('connection-overlay-progressbar-label').textContent = "Synchronized"
-    return
+  // update want progress
+
+  if(curr_want_entries == max_entries || old_want_entries == max_entries) {
+    document.getElementById('connection-overlay-progressbar-want').value = 100
+    document.getElementById('connection-overlay-progressbar-label-want').textContent = "Synchronized"
+  } else {
+    var newPos = (curr_want_entries - old_want_entries) / (max_entries - old_want_entries) * 100
+
+    console.log("newPos:", newPos)
+
+    document.getElementById('connection-overlay-progressbar-want').value = newPos
+    document.getElementById('connection-overlay-progressbar-label-want').textContent = Math.trunc(newPos) + "% - " + (max_entries - curr_want_entries) + " entries left"
+
   }
 
-  var newPos = (new_curr - new_min) / (new_max - new_min) * 100
 
-  console.log("newPos:", newPos)
 
-  document.getElementById('connection-overlay-progressbar').value = newPos
-  document.getElementById('connection-overlay-progressbar-label').textContent = Math.trunc(newPos) + "% - " + (new_max - new_curr) + " entries left"
+  // update gift progress
+  if (curr_want_entries <= min_entries || old_min_entries == curr_want_entries) {
+    document.getElementById('connection-overlay-progressbar-gift').value = 100
+    document.getElementById('connection-overlay-progressbar-label-gift').textContent = "No peers are requesting new entries"
+  } else {
+    var newPos = (min_entries - old_min_entries) / (curr_want_entries - old_min_entries) * 100
+
+    document.getElementById('connection-overlay-progressbar-gift').value = newPos
+    document.getElementById('connection-overlay-progressbar-label-gift').textContent = Math.trunc(newPos) + "% - " + (curr_want_entries - min_entries) + " entries left"
+  }
 }
 
 // ---
