@@ -395,7 +395,7 @@ function refresh_connection_entry(id) {
     if (document.getElementById('connection_' + id)) {
         if(id in localPeers) {
             document.getElementById('connection_name_' + id).innerHTML = localPeers[id].name
-            document.getElementById('connection_type_' + id).innerHTML = localPeers[id].type
+            document.getElementById('connection_type_' + id).innerHTML = "via " + localPeers[id].type
             document.getElementById('connection_remaining_' + id).innerHTML = localPeers[id].remaining
         } else {
             document.getElementById('connection_' + id).outerHTML = ""
@@ -411,7 +411,7 @@ function refresh_connection_entry(id) {
     var peer = localPeers[id]
     var name = peer.name;
     var remaining = peer.remaining != null ? peer.remaining : ""//"Remaining: "+ peer.remaining + " messages" : "Remaining messages unknown"
-    var type = peer.type
+    var type = (peer.type != null) && (peer.type != "") ? peer.type : ""
 
     var entryHTML = "<div id='connection_" + id + "' class = 'connection_entry_container'>"
     entryHTML += "<div class='connection_entry_name_container'>"

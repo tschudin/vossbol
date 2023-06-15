@@ -71,9 +71,13 @@ dependencies {
     // androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     // androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
 
+    implementation 'com.squareup.okhttp3:okhttp:4.9.2' //for websocket client
 
     implementation 'com.google.android.material:material:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.test.ext:junit-ktx:1.1.5'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'junit:junit:4.12'
 
     def room_version = "2.2.6"
 

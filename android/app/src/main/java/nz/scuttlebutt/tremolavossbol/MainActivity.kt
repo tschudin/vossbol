@@ -46,6 +46,7 @@ class MainActivity : Activity() {
     @Volatile var mc_group: InetAddress? = null
     @Volatile var mc_socket: MulticastSocket? = null
     var ble: BlePeers? = null
+    var websocket: WebsocketIO? =null
     //var ble: BlePeersBroadcast? = null
     val ioLock = ReentrantLock()
     var broadcastReceiver: BroadcastReceiver? = null
@@ -136,6 +137,7 @@ class MainActivity : Activity() {
             }
         }
         */
+
         broadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 val networkInfo: NetworkInfo? =
@@ -147,12 +149,19 @@ class MainActivity : Activity() {
                     isWifiConnected = true
                     Handler().postDelayed({
                         mkSockets()
+                        if (websocket == null)
+                            websocket = WebsocketIO(this@MainActivity, Constants.TINYSSB_SIMPLEPUB_URL)
+                            websocket!!.start()
                         Log.d("main", "msc_sock ${mc_socket.toString()}")
                     }, 1000)
                 } else if (networkInfo.detailedState == NetworkInfo.DetailedState.DISCONNECTED && isWifiConnected) {
                     rmSockets()
                     isWifiConnected = false
                     Log.d("main", "msc_sock ${mc_socket.toString()}")
+                    if(websocket != null) {
+                        websocket!!.stop()
+                        websocket = null
+                    }
                 }
             }
         }
@@ -306,6 +315,9 @@ class MainActivity : Activity() {
 
         ble = BlePeers(this)
         ble!!.startBluetooth()
+
+        websocket = WebsocketIO(this, Constants.TINYSSB_SIMPLEPUB_URL)
+        websocket!!.start()
         //ble = BlePeersBroadcast(this)
         //ble!!.checkPermissions(true)
         //ble!!.scan()
@@ -318,6 +330,10 @@ class MainActivity : Activity() {
         if (ble != null) {
             ble!!.stopBluetooth()
         }
+
+        if (websocket != null)
+            websocket!!.stop()
+
         /*
         try {
             (getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
@@ -345,6 +361,11 @@ class MainActivity : Activity() {
         if (ble != null) {
             ble!!.stopBluetooth()
         }
+
+        if (websocket != null) {
+            websocket!!.stop()
+        }
+
         unregisterReceiver(broadcastReceiver);
         unregisterReceiver(ble_event_listener)
     }
