@@ -79,6 +79,37 @@ class HelperFunctions {
             if (this >= 0) return this.toInt()
             return 256 - this.toInt()
         }
+
+        const val b32encMap = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+
+        private fun b32encDo40bits(b40: ByteArray): String {
+            var long = 0L
+            var s = ""
+            for (i in 0 until 5) long = long * 256 + b40[i].toInt()
+            for (i in 0 until 8) {
+                s = b32encMap[(long and 0x1f).toInt()] + s
+                long /= 32
+            }
+            return s
+        }
+        @JvmStatic
+        fun ByteArray.b32encode(): String {
+            var b32 = ""
+            var cnt = this.size % 5
+            var buf = if (cnt == 0) ByteArray(this.size) else ByteArray(this.size + 5 - cnt)
+            for (i in this.indices) {
+                buf[i] = this[i]
+            }
+            while (buf.isNotEmpty()) {
+                b32 += b32encDo40bits(buf.sliceArray(0..4))
+                buf = buf.sliceArray(5 until buf.size)
+            }
+            if (cnt != 0) {
+                cnt = (8 * (5 - cnt) / 5).toInt()
+                b32 = b32.substring(0, b32.length - cnt) + "======".substring(0, cnt)
+            }
+            return b32
+        }
     }
 }
 

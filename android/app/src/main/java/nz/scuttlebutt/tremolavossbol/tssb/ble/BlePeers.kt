@@ -29,9 +29,11 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import nz.scuttlebutt.tremolavossbol.MainActivity
+import nz.scuttlebutt.tremolavossbol.crypto.SodiumAPI.Companion.sha256
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_BLE_REPL_SERVICE_2022
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_BLE_RX_CHARACTERISTIC
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_BLE_TX_CHARACTERISTIC
+import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.b32encode
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
 import kotlin.collections.HashMap
 
@@ -94,8 +96,15 @@ class BlePeers(val act: MainActivity) {
             ActivityCompat.requestPermissions(act, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 555)
             return
         }
+        // set ble name
+        val name = act.idStore.identity.verifyKey.sha256().toHex().substring(0,8)
+        bluetoothAdapter.name = name
+
+        //start GATT server + client
         startBleScan()
         startServer()
+
+        //inform frontend that ble is enabled
         act.wai.eval("b2f_ble_enabled()")
     }
 
@@ -345,7 +354,7 @@ class BlePeers(val act: MainActivity) {
         advertiser = bluetoothAdapter.bluetoothLeAdvertiser
 
         val advertiseSettings = AdvertiseSettings.Builder().setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED).setTimeout(0).setConnectable(true).build()
-        val advertiseData = AdvertiseData.Builder().addServiceUuid(ParcelUuid(TINYSSB_BLE_REPL_SERVICE_2022)).setIncludeDeviceName(false).build()
+        val advertiseData = AdvertiseData.Builder().addServiceUuid(ParcelUuid(TINYSSB_BLE_REPL_SERVICE_2022)).setIncludeDeviceName(true).build()
         //advertiser.startAdvertising(advertiseSettings, advertiseData, advertiseCallback)
         advertiser?.let { it.startAdvertising(advertiseSettings,advertiseData,advertiseCallback)}
     }
@@ -457,12 +466,42 @@ class BlePeers(val act: MainActivity) {
 
     @SuppressLint("MissingPermission")
     private fun notifyFrontend(device: BluetoothDevice, status: String) {
+        val name = deviceToShortName(device)
+
         Log.d("ble", "Connected devices: $connectedDevices, Peers: $peers, Server: ${bluetoothManager.getConnectedDevices(BluetoothProfile.GATT)}")
         if (connectedDevices.any { it.address == device.address} && peers.keys.any { it.address == device.address }) {
             Log.d("BLE", "Device online: ${device}")
-            act.wai.eval("b2f_local_peer(\"ble\", \"${device.address}\", \"${device.name}\", \"${status}\")")
+            act.wai.eval("b2f_local_peer(\"ble\", \"${device.address}\", \"${name}\", \"${status}\")")
         } else if (status == "offline") {
-            act.wai.eval("b2f_local_peer(\"ble\", \"${device.address}\", \"${device.name}\", \"${status}\")")
+            act.wai.eval("b2f_local_peer(\"ble\", \"${device.address}\", \"${name}\", \"${status}\")")
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun deviceToShortName(device: BluetoothDevice): String? {
+
+        if (device.name != null) {
+            val key = act.tinyGoset.keys.firstOrNull { it.sha256().toHex().substring(0,8) == device.name }
+            if (key != null) {
+                val b32 = key.b32encode().substring(0 until 10)
+                return "${b32.substring(0 until 5)}-${b32.substring(5)}"
+            } else {
+                return "?? ${device.name} ??"
+            }
+        }
+
+        return null
+    }
+
+    fun refreshShortNameForKey(key: ByteArray) {
+        val key32 = key.b32encode().substring(0 until 10)
+        val name32 = "${key32.substring(0 until 5)}-${key32.substring(5)}"
+
+        for (p in peers.keys) {
+            if(deviceToShortName(p) == name32) {
+                notifyFrontend(p, "online")
+                return
+            }
         }
     }
 }

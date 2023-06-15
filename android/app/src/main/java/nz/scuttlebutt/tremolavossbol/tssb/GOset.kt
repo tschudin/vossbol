@@ -224,6 +224,7 @@ class GOset(val context: MainActivity) {
             else if (pending_novelty.size < MAX_PENDING)
                 pending_novelty.add(n)
         }
+        context.ble?.refreshShortNameForKey(key) // refresh shortname in devices overview
         Log.d("goset", "added key ${key.toHex()}, |keys|=${keys.size}")
     }
 

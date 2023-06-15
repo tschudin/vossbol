@@ -433,6 +433,9 @@ function refresh_connection_progressbar(min_entries, old_min_entries, old_want_e
     console.log("curr:", curr_want_entries)
     console.log("max:", max_entries)
 
+    if(curr_want_entries == 0)
+      return
+
  /*
   var new_min = 0
   var new_curr = 0
@@ -460,12 +463,12 @@ function refresh_connection_progressbar(min_entries, old_min_entries, old_want_e
     document.getElementById('connection-overlay-progressbar-want').value = 100
     document.getElementById('connection-overlay-progressbar-label-want').textContent = "Synchronized"
   } else {
-    var newPos = (curr_want_entries - old_want_entries) / (max_entries - old_want_entries) * 100
+    var newPosReq = (curr_want_entries - old_want_entries) / (max_entries - old_want_entries) * 100
 
-    console.log("newPos:", newPos)
+    console.log("newPosMax:", newPosReq)
 
-    document.getElementById('connection-overlay-progressbar-want').value = newPos
-    document.getElementById('connection-overlay-progressbar-label-want').textContent = Math.trunc(newPos) + "% - " + (max_entries - curr_want_entries) + " entries left"
+    document.getElementById('connection-overlay-progressbar-want').value = newPosReq
+    document.getElementById('connection-overlay-progressbar-label-want').textContent = Math.trunc(newPosReq) + "% - " + (max_entries - curr_want_entries) + " entries left"
 
   }
 
@@ -474,12 +477,12 @@ function refresh_connection_progressbar(min_entries, old_min_entries, old_want_e
   // update gift progress
   if (curr_want_entries <= min_entries || old_min_entries == curr_want_entries) {
     document.getElementById('connection-overlay-progressbar-gift').value = 100
-    document.getElementById('connection-overlay-progressbar-label-gift').textContent = "No peers are requesting new entries"
+    document.getElementById('connection-overlay-progressbar-label-gift').textContent = "Synchronized"
   } else {
-    var newPos = (min_entries - old_min_entries) / (curr_want_entries - old_min_entries) * 100
+    var newPosOff = (min_entries - old_min_entries) / (curr_want_entries - old_min_entries) * 100
 
-    document.getElementById('connection-overlay-progressbar-gift').value = newPos
-    document.getElementById('connection-overlay-progressbar-label-gift').textContent = Math.trunc(newPos) + "% - " + (curr_want_entries - min_entries) + " entries left"
+    document.getElementById('connection-overlay-progressbar-gift').value = newPosOff
+    document.getElementById('connection-overlay-progressbar-label-gift').textContent = Math.trunc(newPosOff) + "% - " + (curr_want_entries - min_entries) + " entries left"
   }
 }
 

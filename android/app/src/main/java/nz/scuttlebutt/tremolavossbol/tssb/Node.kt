@@ -26,6 +26,8 @@ class Node(val context: MainActivity) {
     var log_offs = 0
     var chunk_offs = 0
 
+    private val wantAccessLock = Any()
+
     fun incoming_want_request(buf: ByteArray, aux: ByteArray?, sender: String?) {
         Log.d("node", "incoming WANT ${buf.toHex()} from sender: $sender")
         val vect = bipf_loads(buf.sliceArray(DMX_LEN..buf.lastIndex))
@@ -273,73 +275,70 @@ class Node(val context: MainActivity) {
     // calculates current replication progress and sends update to frontend
     fun update_progress(want_vector: List<Int>, from: String) {
 
-        var deleted = false
+        if (!context.wai.frontend_ready)
+            return
 
-        val tmp = wants
+        var wantsChanged = false // if want vectors did change
 
-        for ((k, v) in tmp) {
-            val (_, ts) = v
-            if (System.currentTimeMillis() - ts > 90000 && k != from) {
-                tmp.remove(k)
-                deleted = true
-            }
-        }
-
-        // if the want vector didn't change, only update timestamp
-        if (from in tmp) {
-            if(want_vector == tmp[from]?.first) {
-                wants[from] = Pair(want_vector, System.currentTimeMillis())
-                if(!deleted)
-                    return //if a want vector was previously removed, the max_want needs to be recalculated otherwise it is just an update without an effect
-            }
-        }
-
-        wants[from] = Pair(want_vector, System.currentTimeMillis())
-
-        var all_vectors = wants.values.map { it.first }
-        var new_max_want = all_vectors.reduce{acc, curr -> if (acc.size >= curr.size) acc else curr }.toMutableList() //return want vector with most entries
-        var new_min_want = new_max_want
-
-        for (vec in all_vectors) {
-            for (i in vec.indices) {
-                if(vec[i] > new_max_want[i]) {
-                    new_max_want[i] = vec[i]
-                }
-
-                if(vec[i] < new_min_want[i]) {
-                    new_min_want[i] = vec[i]
+        synchronized(wantAccessLock) {
+            for ((k, v) in wants) {
+                val (_, ts) = v
+                if (System.currentTimeMillis() - ts > 90000 && k != from && k != "me") {
+                    wants.remove(k)
+                    wantsChanged = true
                 }
             }
-        }
+            if(wants[from]?.first != want_vector)
+                wantsChanged = true
+            wants[from] = Pair(want_vector, System.currentTimeMillis())
 
-        var updated = false
-        if (max_want != new_max_want) {
-            old_want = wants["me"]?.first
-            max_want = new_max_want
-            updated = true
-        }
+            if(!wantsChanged)
+                return
 
-        if (min_want != new_min_want) {
-            if ((((new_min_want.sum()) < (old_min?.sum() ?: 0)) || (min_want == null) || !wants.containsKey(old_min_from)) && from != "me") {
-                old_min = new_min_want
-                old_min_from = from
+
+            val all_vectors = wants.values.map { it.first }
+            val new_max_want = all_vectors.reduce{acc, curr -> if (acc.size >= curr.size) acc else curr }.toMutableList() //return want vector with most entries
+            val new_min_want = new_max_want.toMutableList()
+
+            for (vec in all_vectors) {
+                for (i in vec.indices) {
+                    if(vec[i] > new_max_want[i]) {
+                        new_max_want[i] = vec[i]
+                    }
+
+                    if(vec[i] < new_min_want[i]) {
+                        new_min_want[i] = vec[i]
+                    }
+                }
             }
-            min_want = new_min_want
-            updated = true
-        }
 
-        if (updated || from == "me") {
-            val min_want_entries = min_want?.sum() ?: 0
-            val old_want_entries = old_want?.sum() ?: 0
-            val old_min_entries = old_min?.sum() ?:0
-            val curr_want_entries = wants["me"]?.first?.sum() ?: 0
-            val max_want_entries = max_want?.sum() ?: 0
+            var updated = false
+            if (max_want != new_max_want) {
+                old_want = wants["me"]?.first
+                max_want = new_max_want
+                updated = true
+            }
 
-            Log.d("node","notify frontend: $min_want_entries, $old_min_entries, $old_want_entries, $curr_want_entries, $max_want_entries")
+            if (min_want != new_min_want) {
+                if ((((new_min_want.sum()) < (old_min?.sum() ?: 0)) || (min_want == null) || !wants.containsKey(old_min_from)) && from != "me") {
+                    old_min = new_min_want
+                    old_min_from = from
+                }
+                min_want = new_min_want
+                updated = true
+            }
 
-            context.wai.eval("b2f_update_progress($min_want_entries, $old_min_entries, $old_want_entries, $curr_want_entries, $max_want_entries)")
+            if (updated || from == "me") {
+                val min_want_entries = min_want?.sum() ?: 0
+                val old_want_entries = old_want?.sum() ?: 0
+                val old_min_entries = old_min?.sum() ?:0
+                val curr_want_entries = wants["me"]?.first?.sum() ?: 0
+                val max_want_entries = max_want?.sum() ?: 0
 
-            //TODO send to frontend
+                Log.d("node","notify frontend: $min_want_entries, $old_min_entries, $old_want_entries, $curr_want_entries, $max_want_entries")
+
+                context.wai.eval("b2f_update_progress($min_want_entries, $old_min_entries, $old_want_entries, $curr_want_entries, $max_want_entries)")
+            }
         }
 
     }

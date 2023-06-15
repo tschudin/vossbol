@@ -405,6 +405,8 @@ input:checked + .slider:before {
   transition: width 1s ease;
 }
 
+#connection-overlay-progressbar-gift::-webkit-progress-value { background: #03dbfc; }
+
 .connection-overlay-progressbar-label {
   position: absolute;
   top: 50%;
