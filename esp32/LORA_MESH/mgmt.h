@@ -42,12 +42,7 @@ unsigned char mgmt_dmx[DMX_LEN];
 
 #define KEYS_DIR                      "/keys"
 
-struct msg_beacon_s {
-  unsigned char id[MGMT_ID_LEN];
-};
-
 struct msg_key_s {
-  unsigned char id[MGMT_ID_LEN];
   bool op;
   unsigned char key[GOSET_KEY_LEN];
 };
@@ -58,14 +53,12 @@ struct log_fcnt_s {
 };
 
 struct msg_request_s {
-  unsigned char id[MGMT_ID_LEN]; // TODO rename to src, also move out of payload somewhen, but things like status of neighbours would need to be reimplemented, as the id/src part is needed to id the neighbor. maybe send status_table_entry? overhead?
   unsigned char cmd;
   unsigned char dst[MGMT_ID_LEN];
   bool all = false;
 };
 
-struct msg_status_s {
-  unsigned char id[MGMT_ID_LEN];
+struct state_s {
   bool beacon;
   long voltage;
   int feeds:10;
@@ -73,24 +66,45 @@ struct msg_status_s {
   int chunks:10;
   int free;
   unsigned long int uptime;
-  unsigned long int lastSeen;
   float latitude;
   float longitude;
   int altitude:14;
+  int neighbors:6;
+};
+
+struct statust_s {
+  unsigned char id[MGMT_ID_LEN];
+  state_s state;
+  unsigned long int lastSeen;
+};
+
+struct statust_local_s {
+  unsigned char id[MGMT_ID_LEN];
+  state_s state;
+  unsigned long int lastSeen;
+  unsigned long int received_on;
 };
 
 struct statust_entry_s {
-  msg_status_s state;
-  unsigned long int received_on;
-  msg_status_s neighbors[STATUST_SIZE];
+  statust_local_s entry;
+  statust_local_s neighbors[STATUST_SIZE];
   int neighbor_cnt;
 };
 
-#define MGMT_MSG_BEACON_LEN   sizeof(struct msg_beacon_s)
-#define MGMT_MSG_KEY_LEN      sizeof(struct msg_key_s)
-#define MGMT_MSG_REQUEST_LEN  sizeof(struct msg_request_s)
-#define MGMT_MSG_STATUS_LEN   sizeof(struct msg_status_s)
-#define MGMT_LOG_FCNT_LEN     sizeof(struct log_fcnt_s)
+#define MGMT_MSG_KEY_LEN            sizeof(struct msg_key_s)
+#define MGMT_MSG_REQUEST_LEN        sizeof(struct msg_request_s)
+#define MGMT_STATE_LEN              sizeof(struct state_s)
+#define MGMT_STATUST_LEN            sizeof(struct statust_s)
+#define MGMT_LOG_FCNT_LEN           sizeof(struct log_fcnt_s)
+
+#define MGMT_MSG_STATUS_NEIGHBORS   (int) ((110 - MGMT_STATE_LEN) / MGMT_STATUST_LEN)
+
+struct msg_status_s {
+  state_s state;
+  statust_s neighbors[MGMT_MSG_STATUS_NEIGHBORS];
+};
+
+#define MGMT_MSG_STATUS_LEN         sizeof(struct msg_status_s)
 
 
 
@@ -126,7 +140,6 @@ unsigned char* _mkRequest(unsigned char cmd, unsigned char* id=NULL)
 {
   static struct msg_request_s request;
   request.cmd = cmd;
-  memcpy(request.id, mgmt_id, MGMT_ID_LEN);
   if (id == NULL) {
     request.all = true;
   } else {
@@ -138,58 +151,49 @@ unsigned char* _mkRequest(unsigned char cmd, unsigned char* id=NULL)
 // fill buffer with status packet
 unsigned char* _mkStatus()
 {
-  static struct msg_status_s status[(int) (120 - 11) / MGMT_MSG_STATUS_LEN];
+  static struct msg_status_s status;
   // add self
-  memcpy(status[0].id, mgmt_id, MGMT_ID_LEN);
-  status[0].beacon = mgmt_beacon;
-  status[0].voltage = 0;
+  status.state.beacon = mgmt_beacon;
+  status.state.voltage = 0;
 #if defined(AXP_DEBUG)
-  status[0].voltage = axp.getBattVoltage()/1000;
+  status.state.voltage = axp.getBattVoltage()/1000;
 #endif
-  status[0].feeds = feed_cnt;
-  status[0].entries = entry_cnt;
-  status[0].chunks = chunk_cnt;
+  status.state.feeds = feed_cnt;
+  status.state.entries = entry_cnt;
+  status.state.chunks = chunk_cnt;
   int total = MyFS.totalBytes();
   int avail = total - MyFS.usedBytes();
-  status[0].free = avail / (total/100);
-  status[0].uptime = millis();
+  status.state.free = avail / (total/100);
+  status.state.uptime = millis();
 #if defined(NO_GPS)
-  status[0].latitude = 0;
-  status[0].longitude = 0;
-  status[0].altitude = 0;
+  status.state.latitude = 0;
+  status.state.longitude = 0;
+  status.state.altitude = 0;
 #else
-  status[0].latitude = gps.location.isValid() ? (float) gps.location.lat() : 0;
-  status[0].longitude = gps.location.isValid() ? (float) gps.location.lng() : 0;
-  status[0].altitude = gps.location.isValid() ? (float) gps.altitude.meters() : 0;
+  status.state.latitude = gps.location.isValid() ? (float) gps.location.lat() : 0;
+  status.state.longitude = gps.location.isValid() ? (float) gps.location.lng() : 0;
+  status.state.altitude = gps.location.isValid() ? (float) gps.altitude.meters() : 0;
 #endif
+  status.state.neighbors = statust_cnt;
 
   // add neighbors
-  int maxEntries = (int) (120 - 11) / MGMT_MSG_STATUS_LEN;
   int ndxNeighbor;
-  for (int i = 1; i < maxEntries; i++) {
-    if (i > statust_cnt) { break; }
+  for (int i = 0; i < MGMT_MSG_STATUS_NEIGHBORS; i++) {
+    if (i >= statust_cnt) { break; }
     ndxNeighbor = statust_rrb;
     statust_rrb = ++statust_rrb % statust_cnt;
-    memcpy(&status[i], &statust[ndxNeighbor].state, sizeof(struct msg_status_s));
-    status[i].lastSeen = millis() - statust[ndxNeighbor].received_on;
+    memcpy(&status.neighbors[i].id, &statust[ndxNeighbor].entry.id, MGMT_ID_LEN);
+    memcpy(&status.neighbors[i].state, &statust[ndxNeighbor].entry.state, sizeof(struct state_s));
+    status.neighbors[i].lastSeen = millis() - statust[ndxNeighbor].entry.received_on;
   }
 
   return (unsigned char*) &status;
-}
-
-// fill buffer with beacon packet
-unsigned char* _mkBeacon()
-{
-  static struct msg_beacon_s beacon;
-  memcpy(beacon.id, mgmt_id, MGMT_ID_LEN);
-  return (unsigned char*) &beacon;
 }
 
 // fill buffer with key packet
 unsigned char* _mkKey(bool op, unsigned char* key)
 {
   static struct msg_key_s key_update;
-  memcpy(key_update.id, mgmt_id, MGMT_ID_LEN);
   key_update.op = op;
   memcpy(key_update.key, key, GOSET_KEY_LEN);
   return (unsigned char*) &key_update;
@@ -259,16 +263,13 @@ void mgmt_rx_request(struct msg_request_s *request, int len)
 }
 
 // receive status
-void mgmt_rx_status(unsigned char *pkt, int len) {
+void mgmt_rx_status(unsigned char *pkt, int len, unsigned char* src) {
   unsigned long int received_on = millis();
-  int entries = len / MGMT_MSG_STATUS_LEN;
-  struct msg_status_s *other = (struct msg_status_s*) calloc(1, MGMT_MSG_STATUS_LEN);
-  memcpy(other, pkt, MGMT_MSG_STATUS_LEN);
-  Serial.println(String("mgmt_rx received status update from ") + to_hex(other->id, 2, 0));
-  int ndx = -1;
+  Serial.println(String("mgmt_rx received status update from ") + to_hex(src, 2, 0));
   // check if node is already in table
+  int ndx = -1;
   for (int i = 0; i < statust_cnt; i++) {
-    if (!memcmp(other->id, statust[i].state.id, MGMT_ID_LEN)) {
+    if (!memcmp(src, statust[i].entry.id, MGMT_ID_LEN)) {
       ndx = i;
     }
   }
@@ -278,30 +279,27 @@ void mgmt_rx_status(unsigned char *pkt, int len) {
       ndx = statust_cnt++;
     } else {
       Serial.printf("%8sstatus table is full, skipping...\r\n", "");
-      free(other);
       return;
     }
   }
-  statust[ndx].received_on = received_on;
-  memcpy(&statust[ndx].state, other, sizeof(struct msg_status_s));
-
-  pkt += MGMT_MSG_STATUS_LEN;
+  struct msg_status_s *status = (struct msg_status_s*) calloc(1, MGMT_MSG_STATUS_LEN);
+  memcpy(status, pkt,  MGMT_MSG_STATUS_LEN);
+  statust[ndx].entry.received_on = received_on;
+  statust[ndx].entry.lastSeen = 0;
+  memcpy(&statust[ndx].entry.id, src, MGMT_ID_LEN);
+  memcpy(&statust[ndx].entry.state, &status->state, MGMT_STATE_LEN);
 
   int ndxNeighbor;
-  struct msg_status_s *empty = (struct msg_status_s*) calloc(1, MGMT_MSG_STATUS_LEN);
-  for (int i = 1; i < entries; i++) {
-    struct msg_status_s *neighbor = (struct msg_status_s*) calloc(1, MGMT_MSG_STATUS_LEN);
-    memcpy(neighbor, pkt, MGMT_MSG_STATUS_LEN);
-    if (!(memcmp(neighbor, empty, MGMT_MSG_STATUS_LEN))) {
-      free(neighbor);
+  struct statust_s *empty = (struct statust_s*) calloc(1, MGMT_STATUST_LEN);
+  for (int i = 0; i < MGMT_MSG_STATUS_NEIGHBORS; i++) {
+    if (!(memcmp(&status->neighbors[i], empty, MGMT_STATUST_LEN))) {
       break;
     }
-    Serial.printf("%8slearned about %s\r\n", "", to_hex(neighbor->id, 2, 0));
-    pkt += MGMT_MSG_STATUS_LEN;
+    Serial.printf("%8slearned about %s\r\n", "", to_hex(status->neighbors[i].id, 2, 0));
     ndxNeighbor = -1;
     // check if node is already in table
     for (int i = 0; i < statust[ndx].neighbor_cnt; i++) {
-      if (!memcmp(neighbor->id, statust[ndx].neighbors[i].id, MGMT_ID_LEN)) {
+      if (!memcmp(status->neighbors[i].id, statust[ndx].neighbors[i].id, MGMT_ID_LEN)) {
         ndxNeighbor = i;
       }
     }
@@ -310,17 +308,18 @@ void mgmt_rx_status(unsigned char *pkt, int len) {
       if (statust[ndx].neighbor_cnt < STATUST_SIZE) {
         ndxNeighbor = statust[ndx].neighbor_cnt++;
       } else {
-	Serial.printf("%8sneighbor table of %s is full, skipping...\r\n", "", to_hex(other->id, 2, 0));
-	free(neighbor);
+	Serial.printf("%8sneighbor table of %s is full, skipping...\r\n", "", to_hex(status->neighbors[i].id, 2, 0));
 	continue;
       }
     }
-    memcpy(&statust[ndx].neighbors[ndxNeighbor], neighbor, sizeof(struct msg_status_s));
-    free(neighbor);
+    memcpy(&statust[ndx].neighbors[ndxNeighbor].id, status->neighbors[i].id, MGMT_ID_LEN);
+    memcpy(&statust[ndx].neighbors[ndxNeighbor].state, &status->neighbors[i].state, MGMT_STATE_LEN);
+    statust[ndx].neighbors[ndxNeighbor].lastSeen = status->neighbors[i].lastSeen;
+    statust[ndx].neighbors[ndxNeighbor].received_on = received_on;
   }
 
   free(empty);
-  free(other);
+  free(status);
 }
 
 // incoming packet with mgmt_dmx
@@ -346,16 +345,16 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     Serial.printf("mgmt_rx verification of hmac failed\r\n");
     return;
   }
-  // get fcnt
-  len -= MGMT_FCNT_FIELD_LEN;
-  unsigned int fcnt = (uint32_t)pkt[len+3] << 24 |
-                       (uint32_t)pkt[len+2] << 16 |
-                       (uint32_t)pkt[len+1] << 8  |
-                       (uint32_t)pkt[len];
+  // get message type
+  unsigned char typ = pkt[0];
+  pkt += 1;
+  len -= 1;
   // get src id
   unsigned char src[MGMT_ID_LEN];
-  memcpy(src, pkt+1, MGMT_ID_LEN);
-  Serial.printf("mgmt_rx got packet from %s\r\n", to_hex(src, MGMT_ID_LEN, 0));
+  memcpy(src, pkt, MGMT_ID_LEN);
+  pkt += MGMT_ID_LEN;
+  len -= MGMT_ID_LEN;
+  Serial.printf("mgmt_rx got packet with type '%c' from %s\r\n", typ, to_hex(src, MGMT_ID_LEN, 0));
   // check if we sent this
   if (!memcmp(src, mgmt_id, MGMT_ID_LEN)) { return; }
   // check if node is already in fcnt table
@@ -376,6 +375,11 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     }
   }
   // existing node -> validate fcnt
+  len -= MGMT_FCNT_FIELD_LEN;
+  unsigned int fcnt = (uint32_t)pkt[len+3] << 24 |
+                       (uint32_t)pkt[len+2] << 16 |
+                       (uint32_t)pkt[len+1] << 8  |
+                       (uint32_t)pkt[len];
   Serial.printf("mgmt_rx received fcnt = %d, last fcnt = %d\r\n", fcnt, mgmt_fcnt_table[ndx].fcnt);
   if (fcnt <= mgmt_fcnt_table[ndx].fcnt) { return; }
   // update fcnt
@@ -387,13 +391,8 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   mgmt_fcnt_table_log.close();
 
 
-  // get type of message
-  unsigned char typ = pkt[0];
-  pkt += 1;
-  len -= 1;
-
   // receive beacon
-  if (typ == 'b' && len == MGMT_MSG_BEACON_LEN) {
+  if (typ == 'b' && len == 0) {
     Serial.println(String("mgmt_rx received beacon from ") + to_hex(src, MGMT_ID_LEN, 0));
     return;
   }
@@ -405,13 +404,13 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     Serial.printf("mgmt_rx: %s key %s\r\n", key_update->op ? "allow" : "deny", to_hex(key_update->key, GOSET_KEY_LEN));
     mgmt_rx_key(key_update);
     free(key_update);
-    io_send(pkt - 1 - DMX_LEN, len + DMX_LEN + 1 + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
+    io_send(pkt - MGMT_ID_LEN - 1 - DMX_LEN, len + DMX_LEN + 1 + MGMT_ID_LEN + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
     return;
   }
 
   // receive status
-  if (typ == 's' && len % MGMT_MSG_STATUS_LEN == 0) {
-    mgmt_rx_status(pkt, len);
+  if (typ == 's' && len == MGMT_MSG_STATUS_LEN) {
+    mgmt_rx_status(pkt, len, src);
     return;
   }
 
@@ -420,7 +419,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
     struct msg_request_s *request = (struct msg_request_s*) calloc(1, MGMT_MSG_REQUEST_LEN);
     memcpy(request, pkt, MGMT_MSG_REQUEST_LEN);
     if (memcmp(request->dst, mgmt_id, MGMT_ID_LEN || request->all == true)) {
-      io_send(pkt - 1 - DMX_LEN, len + DMX_LEN + 1 + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
+      io_send(pkt - MGMT_ID_LEN - 1 - DMX_LEN, len + DMX_LEN + 1 + MGMT_ID_LEN + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
     }
     if (!memcmp(request->dst, mgmt_id, MGMT_ID_LEN) || request->all == true) {
       mgmt_rx_request(request, len);
@@ -439,11 +438,11 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
 // STATUS TABLE
 
 // print status table entry
-void _print_status(msg_status_s* status, unsigned long int received_on = NULL, unsigned char* src = NULL)
+void _print_status(state_s* state, unsigned char* id, unsigned long int received_on = NULL, unsigned char* src = NULL, unsigned long int lastSeen = NULL)
 {
   // id
-  Serial.printf("  %s", to_hex(status->id, MGMT_ID_LEN, 0));
-  // src
+  Serial.printf("  %s", to_hex(id, MGMT_ID_LEN, 0));
+  // src (who said this)
   Serial.printf(" | %s", src == NULL ? "self" : to_hex(src, MGMT_ID_LEN, 0));
   // when was this information received
   int r = received_on == NULL ? 0 : millis() - received_on;
@@ -452,36 +451,37 @@ void _print_status(msg_status_s* status, unsigned long int received_on = NULL, u
   int rh = (r / 1000 / 60 / 60) % 24;
   Serial.printf(" | %02d:%02d:%02d", rh, rm ,rs);
   // when was the node seen for the last time
-  int l = received_on == NULL ? 0 : millis() - received_on;
-  l += status->lastSeen;
+  int l = r + (lastSeen == NULL ? 0 : lastSeen);
   int ls = (l / 1000) % 60;
   int lm = (l / 1000 / 60) % 60;
   int lh = (l / 1000 / 60 / 60) % 24;
   Serial.printf(" | %02d:%02d:%02d", lh, lm ,ls);
   // beacon
-  Serial.printf(" | %6s", status->beacon == true ? "on" : "off");
+  Serial.printf(" | %6s", state->beacon == true ? "on" : "off");
   // voltage
-  Serial.printf(" | %6dV", status->voltage);
+  Serial.printf(" | %6dV", state->voltage);
   // feeds, entries & chunks
-  int feeds = status->feeds;
-  int entries = status->entries;
-  int chunks = status->chunks;
+  int feeds = state->feeds;
+  int entries = state->entries;
+  int chunks = state->chunks;
   Serial.printf(" | %5d | %7d | %6d", feeds, entries, chunks);
   // free
-  Serial.printf(" | %3d%%", status->free);
+  Serial.printf(" | %3d%%", state->free);
   // what uptime did it report when it was last seen
-  int u = status->uptime;
+  int u = state->uptime;
   int us = (u / 1000) % 60;
   int um = (u / 1000 / 60) % 60;
   int uh = (u / 1000 / 60 / 60) % 24;
   int ud = u / 1000 / 60 / 60 / 24;
   Serial.printf(" | %4dd %2dh %2dm %2ds", ud, uh, um ,us);
   // latitude
-  Serial.printf(" | %10f", status->latitude);
+  Serial.printf(" | %10f", state->latitude);
   // longitude
-  Serial.printf(" | %10f", status->longitude);
+  Serial.printf(" | %10f", state->longitude);
   // altitude
-  Serial.printf(" | %7dm", status->altitude);
+  Serial.printf(" | %7dm", state->altitude);
+  // neighbors
+  Serial.printf(" | %9d", state->neighbors);
   // newline
   Serial.printf("\r\n");
 }
@@ -490,7 +490,7 @@ void _print_status(msg_status_s* status, unsigned long int received_on = NULL, u
 void mgmt_print_statust()
 {
   // header
-  Serial.println("  id   | src  | received | lastSeen | beacon | battery | feeds | entries | chunks | free | uptime            | latitude   | longitude  | altitude");
+  Serial.println("  id   | src  | received | lastSeen | beacon | battery | feeds | entries | chunks | free | uptime            | latitude   | longitude  | altitude | neighbors");
   Serial.printf("  ");
   for (int i = 0; i < 4; i++) { Serial.printf("-"); } // id
   for (int i = 0; i < 7; i++) { Serial.printf("-"); } // src
@@ -504,20 +504,21 @@ void mgmt_print_statust()
   for (int i = 0; i < 13; i++) { Serial.printf("-"); } // latitude
   for (int i = 0; i < 13; i++) { Serial.printf("-"); } // longitude
   for (int i = 0; i < 11; i++) { Serial.printf("-"); } // altitude
+  for (int i = 0; i < 12; i++) { Serial.printf("-"); } // neighbors
   Serial.printf("\r\n");
 
   // self
-  struct msg_status_s *own = (struct msg_status_s*) calloc(1, MGMT_MSG_STATUS_LEN);
-  memcpy(own, _mkStatus(), MGMT_MSG_STATUS_LEN);
-  _print_status(own);
+  struct state_s *own = (struct state_s*) calloc(1, MGMT_STATE_LEN);
+  memcpy(own, _mkStatus(), MGMT_STATE_LEN);
+  _print_status(own, mgmt_id);
   free(own);
 
   // table entries
   for (int i = 0; i < statust_cnt; i++) {
-    _print_status(&statust[i].state, statust[i].received_on, statust[i].state.id);
+    _print_status(&statust[i].entry.state, statust[i].entry.id, statust[i].entry.received_on, statust[i].entry.id, statust[i].entry.lastSeen);
     // neighbors
     for (int j = 0; j < statust[i].neighbor_cnt; j++) {
-      _print_status(&statust[i].neighbors[j], statust[i].received_on, statust[i].state.id);
+      _print_status(&statust[i].neighbors[j].state, statust[i].neighbors[j].id, statust[i].neighbors[j].received_on, statust[i].entry.id, statust[i].neighbors[j].lastSeen);
     }
   }
 
@@ -535,7 +536,7 @@ void mgmt_statust_housekeeping()
   while (true) {
     int old_cnt = statust_cnt;
     for (int i = 0; i < old_cnt; i++) {
-      if (millis() - statust[i].received_on > STATUST_EOL) {
+      if (millis() - statust[i].entry.received_on > STATUST_EOL) {
         if (i < old_cnt - 1) {
           memcpy(&statust[i], &statust[old_cnt - 1], sizeof(struct statust_entry_s));
 	}
@@ -547,11 +548,11 @@ void mgmt_statust_housekeeping()
         while (true) {
           int old_neighbor_cnt = statust[i].neighbor_cnt;
           for (int j = 0; j < old_neighbor_cnt; j++) {
-            if (millis() - statust[i].received_on + statust[i].neighbors[j].lastSeen > STATUST_EOL) {
+            if (millis() - statust[i].neighbors[j].received_on + statust[i].neighbors[j].lastSeen > STATUST_EOL) {
               if (i < old_neighbor_cnt - 1) {
-                memcpy(&statust[i].neighbors[j], &statust[i].neighbors[old_neighbor_cnt - 1], sizeof(struct msg_status_s));
+                memcpy(&statust[i].neighbors[j], &statust[i].neighbors[old_neighbor_cnt - 1], sizeof(struct statust_local_s));
 	      }
-	      statust[i].neighbors[old_neighbor_cnt - 1] = (const struct msg_status_s) { 0 };
+	      statust[i].neighbors[old_neighbor_cnt - 1] = (const struct statust_local_s) { 0 };
 	      statust[i].neighbor_cnt--;
 	      break;
             }
@@ -572,7 +573,7 @@ void mgmt_statust_housekeeping()
 // send mgmt packet
 void mgmt_tx(unsigned char typ, unsigned char* payload, int payload_len)
 {
-  int len = DMX_LEN + 1 + payload_len + MGMT_FCNT_FIELD_LEN + MGMT_MAC_FIELD_LEN;
+  int len = DMX_LEN + 1 + MGMT_ID_LEN + payload_len + MGMT_FCNT_FIELD_LEN + MGMT_MAC_FIELD_LEN;
   unsigned char message[len] = { 0 };
   int offset = 0;
   // add DMX
@@ -582,9 +583,14 @@ void mgmt_tx(unsigned char typ, unsigned char* payload, int payload_len)
   int typ_len = 1;
   message[offset] = typ;
   offset += typ_len;
+  // add src
+  memcpy(message + offset, mgmt_id, MGMT_ID_LEN);
+  offset += MGMT_ID_LEN;
   // add payload
-  memcpy(message + offset, payload, payload_len);
-  offset += payload_len;
+  if (payload_len > 0) {
+    memcpy(message + offset, payload, payload_len);
+    offset += payload_len;
+  }
   // add fcnt
   memcpy(message + offset, (unsigned char*) &++mgmt_fcnt, MGMT_FCNT_FIELD_LEN);
   offset += MGMT_FCNT_FIELD_LEN;
@@ -594,18 +600,19 @@ void mgmt_tx(unsigned char typ, unsigned char* payload, int payload_len)
   mgmt_fcnt_log.close();
   // add mac
   unsigned char hash[crypto_auth_hmacsha512_BYTES];
-  crypto_auth_hmacsha512(hash, message + DMX_LEN, typ_len + payload_len + MGMT_FCNT_FIELD_LEN, MGMT_KEY);
+  crypto_auth_hmacsha512(hash, message + DMX_LEN, typ_len + MGMT_ID_LEN + payload_len + MGMT_FCNT_FIELD_LEN, MGMT_KEY);
   memcpy(message + offset, hash, MGMT_MAC_FIELD_LEN);
   offset += MGMT_MAC_FIELD_LEN;
   // send
   if (offset != len) { Serial.printf("mgmt_tx: final offset and length differ\r\n"); return; }
+  Serial.printf("mgmt_tx: message = %s\r\n", to_hex(message, len));
   io_send(message, len, NULL);
 }
 
 // send beacon
 void mgmt_send_beacon()
 {
-  mgmt_tx('b', _mkBeacon(), MGMT_MSG_BEACON_LEN);
+  mgmt_tx('b', NULL, 0);
 }
 
 // send key
@@ -626,7 +633,7 @@ void mgmt_send_status()
   // housekeeping
   mgmt_statust_housekeeping();
   // send status
-  mgmt_tx('s', _mkStatus(), ((int) ((120 - 11) / MGMT_MSG_STATUS_LEN)) * MGMT_MSG_STATUS_LEN);
+  mgmt_tx('s', _mkStatus(), MGMT_MSG_STATUS_LEN);
   // set next event
   mgmt_next_send_status = millis() + MGMT_SEND_STATUS_INTERVAL + random(5000);
 }
