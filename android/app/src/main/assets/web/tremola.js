@@ -1002,7 +1002,6 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
             console.log("New kanban event")
             kanban_new_event(e)
         }
-
         persist();
         must_redraw = true;
     }

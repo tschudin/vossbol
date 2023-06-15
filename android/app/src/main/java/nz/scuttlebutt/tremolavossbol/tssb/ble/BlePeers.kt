@@ -71,6 +71,10 @@ class BlePeers(val act: MainActivity) {
 
     @SuppressLint("MissingPermission")
     fun startBluetooth() {
+
+        if (!act.settings!!.isBleEnabled())
+            return
+
         val pm: PackageManager = act.getPackageManager()
         if (!pm.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(act, "this device does NOT have Bluetooth LE - user Wifi to sync",

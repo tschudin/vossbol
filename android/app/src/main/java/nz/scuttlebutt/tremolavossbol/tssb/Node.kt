@@ -173,7 +173,7 @@ class Node(val context: MainActivity) {
         // FIXME: limit vector to 100B, rotate through set
         v = ""
         val chunkReqList = Bipf.mkList()
-        val fdir = File(context.getDir(context.tinyRepo.TINYSSB_DIR, Context.MODE_PRIVATE), context.tinyRepo.FEED_DIR)
+        val fdir = File(context.getDir(Constants.TINYSSB_DIR, Context.MODE_PRIVATE), context.tinyRepo.FEED_DIR)
         val r = context.tinyRepo
         for (f in fdir.listFiles()) {
             if (!f.isDirectory || f.name.length != 2* Constants.FID_LEN) continue

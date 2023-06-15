@@ -334,13 +334,13 @@ function kanban_new_event(e) {
         }
 
         // creates Personal Board
-        if (board.flags.includes(FLAG.PERSONAL)) {
-            if (op == Operation.BOARD_CREATE)
-                createColumn(bid, 'Welcome')
-            else if (Object.values(board.columns)[0].item_ids.length == 0)
-                createColumnItem(bid, Object.values(board.columns)[0].id, 'Welcome!')
-            else if (board.items[Object.values(board.columns)[0].item_ids[0]].description == "") {
-                setItemDescription(bid, Object.values(board.columns)[0].item_ids[0], "You can create/edit cards and lists to organize your projects")
+        if (board.flags.includes(FLAG.PERSONAL) ) {
+            if (op == Operation.BOARD_CREATE && Object.values(board.columns).length == 0)
+                createColumn(bid, 'Your Kanban Board')
+            else if (Object.values(board.columns).length == 1 && Object.values(board.columns)[0].item_ids.length == 0)
+                createColumnItem(bid, Object.values(board.columns)[0].id, 'Click me!')
+            else if (Object.values(board.columns)[0].item_ids.length == 1 && board.items[Object.values(board.columns)[0].item_ids[0]].description == "") {
+                setItemDescription(bid, Object.values(board.columns)[0].item_ids[0], "Use cards and lists to organize your projects")
                 board.unreadEvents = 1
             }
         }

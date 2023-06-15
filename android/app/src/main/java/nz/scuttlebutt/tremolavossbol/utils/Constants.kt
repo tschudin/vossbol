@@ -39,5 +39,7 @@ class Constants{
         val TINYSSB_BLE_TX_CHARACTERISTIC = UUID.fromString("6e400003-7646-4b5b-9a50-71becce51558") // for receiving from the remote device
 
         val TINYSSB_SIMPLEPUB_URL = "ws://localhost:8080"
+
+        val TINYSSB_DIR = "tinyssb"
     }
 }

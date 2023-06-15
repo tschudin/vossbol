@@ -399,6 +399,31 @@
     <!--  TOGGLES -->
 
     <div class="settings">
+      <div class="settingsText">Connect to Peers via BLE</div>
+      <div style="float: right;"><label class="switch">
+        <input id="ble" type="checkbox" onchange="toggle_changed(this);">
+        <span class="slider round"></span></label></div>
+    </div>
+    <hr>
+
+    <div class="settings">
+      <div class="settingsText">Connect to Peers via UDP Multicast</div>
+      <div><label class="switch">
+        <input id="udp_multicast" type="checkbox" onchange="toggle_changed(this);">
+        <span class="slider round"></span>
+      </label></div>
+    </div>
+    <hr>
+
+    <div class="settings">
+      <div class="settingsText">Connect to Pub via Websocket</div>
+      <div style="float: right;"><label class="switch">
+        <input id="websocket" type="checkbox" onchange="toggle_changed(this);">
+        <span class="slider round"></span></label></div>
+    </div>
+    <hr>
+
+    <div class="settings">
       <div class="settingsText">Preview before sending</div>
       <div style="float: right;"><label class="switch">
         <input id="enable_preview" type="checkbox" onchange="toggle_changed(this);">
@@ -434,23 +459,6 @@
       <div class="settingsText"><del>Show shortname instead of SSB id</del></div>
       <div style="float: right;"><label class="switch">
         <input id="show_shortnames" type="checkbox" onchange="toggle_changed(this);">
-        <span class="slider round"></span></label></div>
-    </div>
-    <hr>
-
-    <div class="settings">
-      <div class="settingsText"><del>Autoconnect to WiFi peers</del></div>
-      <div><label class="switch">
-        <input id="wifi_autoconnect" type="checkbox" onchange="toggle_changed(this);">
-        <span class="slider round"></span>
-      </label></div>
-    </div>
-    <hr>
-
-    <div class="settings">
-      <div class="settingsText"><del>Autoconnect to Internet pubs</del></div>
-      <div style="float: right;"><label class="switch">
-        <input id="pub_autoconnect" type="checkbox" onchange="toggle_changed(this);">
         <span class="slider round"></span></label></div>
     </div>
     <hr>

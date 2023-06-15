@@ -17,6 +17,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.util.Log
 import android.view.Window
+import android.webkit.WebStorage
 import android.webkit.WebView
 import com.google.zxing.integration.android.IntentIntegrator
 import nz.scuttlebutt.tremolavossbol.crypto.IdStore
@@ -43,6 +44,7 @@ class MainActivity : Activity() {
     val tinyRepo = Repo(this)
     val tinyDemux = Demux(this)
     val tinyGoset = GOset(this)
+    var settings: Settings? = null
     @Volatile var mc_group: InetAddress? = null
     @Volatile var mc_socket: MulticastSocket? = null
     var ble: BlePeers? = null
@@ -70,6 +72,7 @@ class MainActivity : Activity() {
     // private var old_ip_addr: Int = 0 // wifiManager?.connectionInfo!!.ipAddress
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        settings = Settings(this)
         super.onCreate(savedInstanceState)
 
         setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
@@ -118,6 +121,7 @@ class MainActivity : Activity() {
             }
         }
         */
+        val webStorage = WebStorage.getInstance()
         webView.addJavascriptInterface(wai, "Android")
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
@@ -151,7 +155,7 @@ class MainActivity : Activity() {
                         mkSockets()
                         if (websocket == null)
                             websocket = WebsocketIO(this@MainActivity, Constants.TINYSSB_SIMPLEPUB_URL)
-                            websocket!!.start()
+                        websocket!!.start()
                         Log.d("main", "msc_sock ${mc_socket.toString()}")
                     }, 1000)
                 } else if (networkInfo.detailedState == NetworkInfo.DetailedState.DISCONNECTED && isWifiConnected) {
@@ -370,7 +374,7 @@ class MainActivity : Activity() {
         unregisterReceiver(ble_event_listener)
     }
 
-    private fun mkSockets() {
+    fun mkSockets() {
         /* disable UDP advertisements in the tinyTremola version
 
         try { broadcast_socket?.close() } catch (e: Exception) {}
@@ -387,6 +391,10 @@ class MainActivity : Activity() {
         }
         Log.d("new bcast sock", "${broadcast_socket}, UDP port ${broadcast_socket?.localPort}")
         */
+
+        if(!settings!!.isUdpMulticastEnabled())
+            return
+
         rmSockets()
         try {
             mc_group = InetAddress.getByName(Constants.SSB_VOSSBOL_MC_ADDR);

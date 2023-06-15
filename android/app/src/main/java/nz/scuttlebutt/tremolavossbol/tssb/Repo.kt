@@ -14,6 +14,7 @@ import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.FID_LEN
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.HASH_LEN
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.PKTTYPE_chain20
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.PKTTYPE_plain48
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_DIR
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_PKT_LEN
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.decodeHex
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
@@ -42,7 +43,6 @@ class LogTinyEntry(fid: ByteArray, seq: Int, mid: ByteArray, body: ByteArray) {
 }
 
 class Repo(val context: MainActivity) {
-    val TINYSSB_DIR = "tinyssb"
     val FEED_DIR = "feeds"
     val feeds = ArrayList<Feed>()
 

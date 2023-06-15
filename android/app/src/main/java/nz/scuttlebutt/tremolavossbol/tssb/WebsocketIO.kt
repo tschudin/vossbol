@@ -15,6 +15,10 @@ class WebsocketIO(val context: MainActivity, val url: String) {
 
 
     fun start() {
+
+        if (!context.settings!!.isWebsocketEnabled())
+            return
+
         Log.d("Websocket","starting Websocket")
         val client = OkHttpClient()
 
@@ -25,6 +29,7 @@ class WebsocketIO(val context: MainActivity, val url: String) {
 
     fun stop() {
         ws?.close(WS_CLOSE_NORMAL, "connection closed by client")
+        reconnectJob?.cancel()
     }
 
     private val wslistener = object : WebSocketListener() {

@@ -3,6 +3,7 @@ package nz.scuttlebutt.tremolavossbol
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Base64
@@ -90,6 +91,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     Toast.LENGTH_LONG).show()
             }
             "wipe" -> {
+                act.settings!!.resetToDefault()
                 act.idStore.setNewIdentity(null) // creates new identity
                 // eval("b2f_initialize(\"${tremolaState.idStore.identity.toRef()}\")")
                 // FIXME: should kill all active connections, or better then the app
@@ -202,6 +204,13 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 Log.d("KanbanPostARGS", args.toString())
 
                 kanban(bid, prev , op, argsList)
+            }
+            "settings:set" -> {
+                when(args[1]) {
+                    "ble" -> {act.settings!!.setBleEnabled(args[2].toBooleanStrict())}
+                    "udp_multicast" -> {act.settings!!.setUdpMulticastEnabled(args[2].toBooleanStrict())}
+                    "websocket" -> {act.settings!!.setWebsocketEnabled(args[2].toBooleanStrict())}
+                }
             }
             else -> {
                 Log.d("onFrontendRequest", "unknown")
@@ -331,5 +340,6 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         Log.d("CMD", cmd)
         eval(cmd)
     }
+
 
 }

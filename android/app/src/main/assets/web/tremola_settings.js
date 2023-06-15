@@ -6,17 +6,19 @@ function get_default_settings() {
     return {
         'enable_preview': false,
         'background_map': true,
-        'pub_autoconnect': true,
-        'wifi_autoconnect': true,
+        'websocket': true,
         'show_shortnames': true,
         'hide_forgotten_conv': true,
-        'hide_forgotten_contacts': true
+        'hide_forgotten_contacts': true,
+        'udp_multicast': true,
+        'ble': true
     }
 }
 
 function toggle_changed(e) {
     // console.log("toggle ", e.id);
     tremola.settings[e.id] = e.checked;
+    backend("settings:set " + e.id + " " + e.checked)
     persist()
     applySetting(e.id, e.checked);
 }
@@ -41,6 +43,7 @@ function applySetting(nm, val) {
 function setSetting(nm, val) {
     // console.log("setting", nm, val)
     applySetting(nm, val);
+    console.log("DEBUG: " + nm)
     document.getElementById(nm).checked = val;
 }
 
