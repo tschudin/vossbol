@@ -88,7 +88,8 @@ class UARTServerCallbacks: public BLEServerCallbacks {
       bleDeviceConnected += 1;
       Serial.println("** Device connected");
       // stop advertising when a peer is connected (we can only serve one client)
-      pServer->getAdvertising()->start();
+      if (bleDeviceConnected == 3) { pServer->getAdvertising()->stop(); }
+      else { pServer->getAdvertising()->start(); }
     };
     void onDisconnect(BLEServer* pServer) {
       bleDeviceConnected -= 1;
