@@ -1,6 +1,7 @@
 package nz.scuttlebutt.tremolavossbol.utils
 
 import android.util.Base64
+import kotlin.math.abs
 
 class HelperFunctions {
 
@@ -77,15 +78,15 @@ class HelperFunctions {
         @JvmStatic
         fun Byte.fromEncodedUByte(): Int {
             if (this >= 0) return this.toInt()
-            return 256 - this.toInt()
+            return 256 - abs(this.toInt())
         }
 
-        const val b32encMap = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+        private const val b32encMap = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
         private fun b32encDo40bits(b40: ByteArray): String {
             var long = 0L
             var s = ""
-            for (i in 0 until 5) long = long * 256 + b40[i].toInt()
+            for (i in 0 until 5) long = long * 256 + b40[i].fromEncodedUByte()
             for (i in 0 until 8) {
                 s = b32encMap[(long and 0x1f).toInt()] + s
                 long /= 32
@@ -101,7 +102,7 @@ class HelperFunctions {
                 buf[i] = this[i]
             }
             while (buf.isNotEmpty()) {
-                b32 += b32encDo40bits(buf.sliceArray(0..4))
+                b32 += b32encDo40bits(buf.sliceArray(0 until 5))
                 buf = buf.sliceArray(5 until buf.size)
             }
             if (cnt != 0) {

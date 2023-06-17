@@ -487,7 +487,7 @@ class BlePeers(val act: MainActivity) {
         if (device.name != null) {
             val key = act.tinyGoset.keys.firstOrNull { it.sha256().toHex().substring(0,8) == device.name }
             if (key != null) {
-                val b32 = key.b32encode().substring(0 until 10)
+                val b32 = key.sliceArray(0 until 7).b32encode().substring(0 until 10)
                 return "${b32.substring(0 until 5)}-${b32.substring(5)}"
             } else {
                 return "?? ${device.name} ??"
