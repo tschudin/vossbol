@@ -461,7 +461,7 @@ function refresh_connection_progressbar(min_entries, old_min_entries, old_want_e
 
   if(curr_want_entries == max_entries || old_want_entries == max_entries) {
     document.getElementById('connection-overlay-progressbar-want').value = 100
-    document.getElementById('connection-overlay-progressbar-label-want').textContent = "Synchronized"
+    document.getElementById('connection-overlay-progressbar-label-want').textContent = "Requesting — Synchronized"
   } else {
     var newPosReq = (curr_want_entries - old_want_entries) / (max_entries - old_want_entries) * 100
 
@@ -477,7 +477,7 @@ function refresh_connection_progressbar(min_entries, old_min_entries, old_want_e
   // update gift progress
   if (curr_want_entries <= min_entries || old_min_entries == curr_want_entries) {
     document.getElementById('connection-overlay-progressbar-gift').value = 100
-    document.getElementById('connection-overlay-progressbar-label-gift').textContent = "Synchronized"
+    document.getElementById('connection-overlay-progressbar-label-gift').textContent = "Offering — Synchronized"
   } else {
     var newPosOff = (min_entries - old_min_entries) / (curr_want_entries - old_min_entries) * 100
 
