@@ -38,7 +38,7 @@ class WebsocketIO(val context: MainActivity, val url: String) {
             context.ioLock.lock()
             val rc = context.tinyDemux.on_rx(bytes.toByteArray(), url)
             context.ioLock.unlock()
-            Log.d("Websocket", "received binary data")
+            Log.d("Websocket", "received binary data, len: ${bytes.size}")
             if(!rc)
                 Log.d("Websocket", "on rx failed")
         }
