@@ -43,6 +43,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             "ready" -> {
                 eval("b2f_initialize(\"${act.idStore.identity.toRef()}\")")
                 frontend_ready = true
+                act.tinyNode.beacon()
             }
             "reset" -> { // UI reset
                 // erase DB content
@@ -93,6 +94,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             "wipe" -> {
                 act.settings!!.resetToDefault()
                 act.idStore.setNewIdentity(null) // creates new identity
+                act.tinyRepo.repo_reset()
                 // eval("b2f_initialize(\"${tremolaState.idStore.identity.toRef()}\")")
                 // FIXME: should kill all active connections, or better then the app
                 act.finishAffinity()

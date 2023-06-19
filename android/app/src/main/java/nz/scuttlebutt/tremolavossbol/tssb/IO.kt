@@ -95,6 +95,10 @@ class IO(val context: MainActivity, val wai: WebAppInterface?) {
                 } catch (e: Exception) {
                     Log.d("BLE sender exc", e.toString())
                 }
+                // websocket
+                if (context.websocket != null) {
+                    context.websocket!!.send(buf)
+                }
             }
             Thread.sleep(1000) // slow pace
         }

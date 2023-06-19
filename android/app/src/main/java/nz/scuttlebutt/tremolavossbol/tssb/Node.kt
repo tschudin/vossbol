@@ -281,10 +281,13 @@ class Node(val context: MainActivity) {
         var wantsChanged = false // if want vectors did change
 
         synchronized(wantAccessLock) {
-            for ((k, v) in wants) {
+            val iterator = wants.iterator()
+            while (iterator.hasNext()) {
+                val (k, v) = iterator.next()
                 val (_, ts) = v
-                if (System.currentTimeMillis() - ts > 90000 && k != from && k != "me") {
-                    wants.remove(k)
+                if (System.currentTimeMillis() - ts > 30000 && k != from && k != "me") {
+                    iterator.remove() // Safely remove the element using the iterator
+                    print("remove old want")
                     wantsChanged = true
                 }
             }

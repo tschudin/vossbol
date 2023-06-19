@@ -89,7 +89,7 @@ Save icon by Zwoelf, http://www.zwoelf.hu/, free for commercial use license, con
         doneBtn.setOnClickListener {
             stopRecording()
             val _result = intent // Intent(this, MainActivity::class.java) // intent
-            val c2mode = Codec2.CODEC2_MODE_700C
+            val c2mode = Codec2.CODEC2_MODE_1300
             val c2data = Codec2.makeHeader(c2mode) + Codec2.pcm_to_codec2(c2mode, pcmData)
             _result.putExtra("codec2", c2data)
             setResult(RESULT_OK, _result)

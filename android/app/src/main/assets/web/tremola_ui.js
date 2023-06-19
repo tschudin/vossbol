@@ -15,7 +15,7 @@ var prev_scenario = 'chats';
 var curr_scenario = 'chats';
 
 var scenarioDisplay = {
-    'chats': ['div:qr', 'core', 'lst:chats', 'div:footer', 'plus'],
+    'chats': ['div:qr', 'core', 'lst:chats', 'div:footer'], // 'plus' TODO reactivate when encrypted chats are implemented
     'contacts': ['div:qr', 'core', 'lst:contacts', 'div:footer', 'plus'],
     'posts': ['div:back', 'core', 'lst:posts', 'div:textarea'],
     'connex': ['div:qr', 'core', 'the:connex', 'div:footer', 'plus'],
@@ -26,8 +26,7 @@ var scenarioDisplay = {
 }
 
 var scenarioMenu = {
-    'chats': [['New conversation', 'menu_new_conversation'],
-        ['Connected Devices', 'menu_connection'],
+    'chats': [['Connected Devices', 'menu_connection'], // '['New conversation', 'menu_new_conversation'],' TODO reactivate when encrypted chats are implemented
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
     'contacts': [['New contact', 'menu_new_contact'],
@@ -394,7 +393,10 @@ function refresh_connection_entry(id) {
     // only update existing entry
     if (document.getElementById('connection_' + id)) {
         if(id in localPeers) {
-            document.getElementById('connection_name_' + id).innerHTML = localPeers[id].name
+            var name = localPeers[id].alias != null ? localPeers[id].alias : localPeers[id].name
+            if (name.length > 28)
+                name = name.slice(0,27)
+            document.getElementById('connection_name_' + id).innerHTML = name
             document.getElementById('connection_type_' + id).innerHTML = "via " + localPeers[id].type
             document.getElementById('connection_remaining_' + id).innerHTML = localPeers[id].remaining
         } else {
@@ -409,13 +411,15 @@ function refresh_connection_entry(id) {
     // create new entry
 
     var peer = localPeers[id]
-    var name = peer.name;
+    var name = localPeers[id].alias != null ? peer.alias : peer.name
+    if (name.length > 28)
+        name = name.slice(0,27)
     var remaining = peer.remaining != null ? peer.remaining : ""//"Remaining: "+ peer.remaining + " messages" : "Remaining messages unknown"
     var type = (peer.type != null) && (peer.type != "") ? peer.type : ""
 
     var entryHTML = "<div id='connection_" + id + "' class = 'connection_entry_container'>"
     entryHTML += "<div class='connection_entry_name_container'>"
-    entryHTML += "<div id='connection_name_" + id + "' style='grid-area: name; margin-left: 5px; margin-top: 4px;font-size: 16px; font-weight: bold;'>" + name + "</div>"
+    entryHTML += "<div id='connection_name_" + id + "' style='grid-area: name; margin-left: 5px; margin-top: 4px;font-size: 16px; font-weight: bold;white-space: nowrap;'>" + name + "</div>"
     entryHTML += "<div id='connection_type_" + id + "' style='grid-area: type; margin-left: 5px; font-size: 13px'>via " + type + "</div>"
     entryHTML += "</div>"
     entryHTML += "<div id='connection_remaining_" + id + "' style='grid-area: remaining;align-self: center; text-align: end; padding-right: 5px; '>" + remaining + "</div>"
@@ -436,30 +440,9 @@ function refresh_connection_progressbar(min_entries, old_min_entries, old_want_e
     if(curr_want_entries == 0)
       return
 
- /*
-  var new_min = 0
-  var new_curr = 0
-  var new_max = 0
-
-
-  if (('me' in want)) {
-    var new_min = old_curr.reduce((acc, curr) => acc + curr, 0)
-    var new_curr = want['me'][0].reduce((acc, curr) => acc + curr, 0)
-    var new_max = max_want.reduce((acc, curr) => acc + curr, 0)
-  }
-  */
-
-  /*
-  if(Object.keys(localPeers) == 0) {
-    document.getElementById('connection-overlay-progressbar').value = 100
-    document.getElementById('connection-overlay-progressbar-label').textContent = "No peers connected"
-    return
-  }
-  */
-
   // update want progress
 
-  if(curr_want_entries == max_entries || old_want_entries == max_entries) {
+  if(curr_want_entries >= max_entries || old_want_entries == max_entries) {
     document.getElementById('connection-overlay-progressbar-want').value = 100
     document.getElementById('connection-overlay-progressbar-label-want').textContent = "Requesting — Synchronized"
   } else {
@@ -471,8 +454,6 @@ function refresh_connection_progressbar(min_entries, old_min_entries, old_want_e
     document.getElementById('connection-overlay-progressbar-label-want').textContent = Math.trunc(newPosReq) + "% - " + (max_entries - curr_want_entries) + " entries left"
 
   }
-
-
 
   // update gift progress
   if (curr_want_entries <= min_entries || old_min_entries == curr_want_entries) {

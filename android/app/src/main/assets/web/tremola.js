@@ -418,7 +418,7 @@ function load_chat_list() {
     var meOnly = recps2nm([myId])
     // console.log('meOnly', meOnly)
     document.getElementById('lst:chats').innerHTML = '';
-    load_chat_item(meOnly)
+    // load_chat_item(meOnly) TODO reactivate when encrypted chats are implemented
     var lop = [];
     for (var p in tremola.chats) {
         if (p != meOnly && !tremola.chats[p]['forgotten'])
@@ -546,6 +546,16 @@ function save_content_alias() {
     var val = document.getElementById('old_contact_alias').value;
     if (val == '')
         val = id2b32(new_contact_id);
+
+    for (var l in localPeers) {
+        var old = tremola.contacts[new_contact_id].alias
+         console.log("SHOULD CHANGE?", localPeers[l].alias , old)
+        if (localPeers[l].alias == old) {
+
+            localPeers[l].alias = val
+            refresh_connection_entry(localPeers[l].id)
+        }
+    }
     tremola.contacts[new_contact_id].alias = val;
     tremola.contacts[new_contact_id].initial = val.substring(0, 1).toUpperCase();
     tremola.contacts[new_contact_id].color = colors[Math.floor(colors.length * Math.random())];
@@ -791,11 +801,16 @@ function resetTremola() { // wipes browser-side content
         "board": {}
     }
     var n = recps2nm([myId])
+
+    //TODO reactivate when encrypted chats are implemented
+    /*
     tremola.chats[n] = {
         "alias": "local notes (for my eyes only)", "posts": {}, "forgotten": false,
         "members": [myId], "touched": Date.now(), "lastRead": 0,
         "timeline": new Timeline()
     };
+    */
+
     tremola.chats["ALL"] = {
         "alias": "Public channel", "posts": {},
         "members": ["ALL"], "touched": Date.now(), "lastRead": 0,
@@ -923,8 +938,20 @@ function b2f_local_peer(type, identifier, displayname, status) {
         'type' : type,
         'name': displayname,
         'status': status,
+        'alias': null,
         'remaining': null
     }
+
+
+    if (tremola != null) // can be the case during the first initialisation
+        for (var c in tremola["contacts"]) {
+            if (id2b32(c) == displayname) {
+                console.log("FOUND ALIAS")
+                localPeers[identifier].alias = tremola.contacts[c].alias
+            }
+
+        }
+
 
     console.log("local_peer:", type, identifier, displayname, status)
 
