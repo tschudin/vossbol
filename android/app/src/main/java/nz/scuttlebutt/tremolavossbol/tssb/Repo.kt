@@ -14,8 +14,10 @@ import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.FID_LEN
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.HASH_LEN
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.PKTTYPE_chain20
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.PKTTYPE_plain48
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_DIR
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_PKT_LEN
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.decodeHex
+import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toByteArray
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
 import java.io.File
@@ -37,11 +39,10 @@ class LogTinyEntry(fid: ByteArray, seq: Int, mid: ByteArray, body: ByteArray) {
     val fid = fid // author
     val seq = seq
     val mid = mid // msg hash
-    val body = body // Bipf(XRF,APP,DATA)
+    val body = body // Bipf(APP,XRF,OTHERDATA)
 }
 
 class Repo(val context: MainActivity) {
-    val TINYSSB_DIR = "tinyssb"
     val FEED_DIR = "feeds"
     val feeds = ArrayList<Feed>()
 
@@ -157,6 +158,8 @@ class Repo(val context: MainActivity) {
         File(ldir, "log").createNewFile() // create empty log file
         File(ldir, "mid").createNewFile() // create empty log file
         feeds.add(Feed(fid))
+        if(context.isWaiInitialized())
+            context.wai.eval("b2f_new_contact(\"@${fid.toBase64()}.ed25519\")") // notify frontend
     }
 
     fun feed_read_mid(fid: ByteArray, seq: Int): ByteArray? {
@@ -251,6 +254,7 @@ class Repo(val context: MainActivity) {
         val sz_enc = varint_encode(content.size)
         val intro: ByteArray
         var ptr: ByteArray
+        Log.d("repo", "varint size: ${sz_enc.size}")
         if (sz_enc.size + content.size <= 28) {
             intro = sz_enc + content + ByteArray(28 - sz_enc.size - content.size)
             ptr = ByteArray(HASH_LEN)
@@ -272,6 +276,7 @@ class Repo(val context: MainActivity) {
                 else
                     remaining = remaining.sliceArray(0..remaining.lastIndex - len)
             }
+            Log.d("repo", "number of chunks= ${chunks.size}")
             if (chunks.size > 0) {
                 val chain = _openFile(fid, "rw", frec.next_seq, 0)
                 for (b in chunks.reversed())
@@ -280,6 +285,7 @@ class Repo(val context: MainActivity) {
             }
         }
         Log.d("repo", "mkLogEntry |intro|=${intro.size} |ptr|=${ptr.size}")
+        Log.d("repo", "mkLogEnty intro=${intro.toHex()}" )
         val nm0 = fid + frec.next_seq.toByteArray() + frec.prev_hash
         val dmx = context.tinyDemux.compute_dmx(nm0)
         val msg = dmx + ByteArray(1) {PKTTYPE_chain20.toByte()} + intro + ptr
@@ -296,7 +302,7 @@ class Repo(val context: MainActivity) {
         }
         // check dmx
         val seq = feeds[ndx].next_seq
-        Log.d("repo", "append seq=${seq}")
+        Log.d("repo", "append seq=${seq}, pkt= ${pkt.toHex()}")
         val nm0 = fid + seq.toByteArray() + feeds[ndx].prev_hash
         val dmx = context.tinyDemux.compute_dmx(nm0)
         if (!pkt.sliceArray(0..DMX_LEN-1).contentEquals(dmx)) { // wrong dmx field
@@ -333,27 +339,34 @@ class Repo(val context: MainActivity) {
         feeds[ndx].next_seq++
         Log.d("repo", "append next_seq now ${feeds[ndx].next_seq}")
 
+
         if (pkt[DMX_LEN].toInt() == PKTTYPE_plain48) {
+            Log.d("repo", "plain 48")
             val e = LogTinyEntry(fid, seq, h, pkt.sliceArray(DMX_LEN + 1..DMX_LEN + 1 + 48 - 1))
             context.wai.sendTinyEventToFrontend(e)
         }
         if (pkt[DMX_LEN].toInt() == PKTTYPE_chain20) {
             val (sz, len) = varint_decode(pkt, DMX_LEN + 1, DMX_LEN + 4)
             // Log.d("repo", "load sidechain of length ${sz}B")
-            if (sz <= 48 - len) {
+            Log.d("repo", "sz: ${sz}")
+            Log.d("repo", "len: ${len}")
+            if (sz <= 28 - len) {
                 val content = pkt.sliceArray(DMX_LEN + 1 + len..DMX_LEN + 1 + len + sz - 1)
                 val e = LogTinyEntry(fid, seq, h, content)
+                Log.d("repo", "Logentry content:${content.toHex()} ")
                 context.wai.sendTinyEventToFrontend(e)
                 // File(d,"-"+seq.toString()).createNewFile()
             } else {
                 if (File(d, "-" + seq.toString()).exists()) {
                     val (content,mid) = feed_read_content(fid, seq)
                     if (content != null) {
+                        Log.d("repo", "Logentry content > 48:${content} ")
                         val e = LogTinyEntry(fid, seq, mid!!, content)
                         context.wai.sendTinyEventToFrontend(e)
                     }
                 } else {
                     File(d, "!" + seq.toString()).createNewFile()
+                    Log.d("repo", "Logentry wait for sidechain ")
                     // and wait until the sidechain has been loaded to announce it to the frontend
                 }
             }
@@ -363,7 +376,7 @@ class Repo(val context: MainActivity) {
         // install handler for next pkt:
         val new_dmx = context.tinyDemux.compute_dmx(fid + feeds[ndx].next_seq.toByteArray()
                                                     + feeds[ndx].prev_hash)
-        val fct = { buf: ByteArray, fid: ByteArray? -> context.tinyNode.incoming_pkt(buf,fid!!) }
+        val fct = { buf: ByteArray, fid: ByteArray?, _: String? -> context.tinyNode.incoming_pkt(buf,fid!!) }
         context.tinyDemux.arm_dmx(new_dmx, fct, fid)
 
         return true

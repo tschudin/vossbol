@@ -1,6 +1,8 @@
 package nz.scuttlebutt.tremolavossbol.tssb
 
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import nz.scuttlebutt.tremolavossbol.MainActivity
 import nz.scuttlebutt.tremolavossbol.WebAppInterface
 import nz.scuttlebutt.tremolavossbol.utils.Constants
@@ -64,6 +66,7 @@ class IO(val context: MainActivity, val wai: WebAppInterface?) {
         return x.contentEquals(crcBuf)
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun senderLoop() {
         while (true) {
             if (outqueue.size > 0) {
@@ -84,12 +87,17 @@ class IO(val context: MainActivity, val wai: WebAppInterface?) {
                     }
                 }
                 try { // BLE, no CRC added
-                    if (context.ble != null && context.ble!!.peers.size > 0) {
+                    if (context.ble != null && context.ble!!.peers.size > 0) { // && context.ble!!.peers.size > 0
                         Log.d("tinyIO", "send ${buf.size} bytes via BLE")
                         context.ble!!.write(buf)
+                        //context.ble!!.advertise(buf)
                     }
                 } catch (e: Exception) {
                     Log.d("BLE sender exc", e.toString())
+                }
+                // websocket
+                if (context.websocket != null) {
+                    context.websocket!!.send(buf)
                 }
             }
             Thread.sleep(1000) // slow pace

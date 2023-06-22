@@ -5,6 +5,7 @@ package nz.scuttlebutt.tremolavossbol
 // import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeers
 
 import android.app.Activity
+import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -16,11 +17,14 @@ import android.os.Bundle
 import android.os.Handler
 import android.util.Log
 import android.view.Window
+import android.webkit.WebStorage
 import android.webkit.WebView
 import com.google.zxing.integration.android.IntentIntegrator
 import nz.scuttlebutt.tremolavossbol.crypto.IdStore
 import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeers
 import nz.scuttlebutt.tremolavossbol.tssb.*
+import nz.scuttlebutt.tremolavossbol.tssb.ble.BlePeersBroadcast
+import nz.scuttlebutt.tremolavossbol.tssb.ble.BluetoothEventListener
 import nz.scuttlebutt.tremolavossbol.utils.Constants
 import tremolavossbol.R
 import java.net.*
@@ -40,12 +44,16 @@ class MainActivity : Activity() {
     val tinyRepo = Repo(this)
     val tinyDemux = Demux(this)
     val tinyGoset = GOset(this)
+    var settings: Settings? = null
     @Volatile var mc_group: InetAddress? = null
     @Volatile var mc_socket: MulticastSocket? = null
     var ble: BlePeers? = null
+    var websocket: WebsocketIO? =null
+    //var ble: BlePeersBroadcast? = null
     val ioLock = ReentrantLock()
     var broadcastReceiver: BroadcastReceiver? = null
     var isWifiConnected = false
+    var ble_event_listener: BluetoothEventListener? = null
 
     /*
     var broadcast_socket: DatagramSocket? = null
@@ -64,6 +72,7 @@ class MainActivity : Activity() {
     // private var old_ip_addr: Int = 0 // wifiManager?.connectionInfo!!.ipAddress
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        settings = Settings(this)
         super.onCreate(savedInstanceState)
 
         setRequestedOrientation (ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
@@ -85,9 +94,9 @@ class MainActivity : Activity() {
         tinyIO = IO(this, wai)
         tinyGoset._include_key(idStore.identity.verifyKey) // make sure our local key is in
         tinyRepo.repo_load()
-        tinyDemux.arm_dmx(tinyGoset.goset_dmx,  {buf:ByteArray, aux:ByteArray? -> tinyGoset.rx(buf,aux)}, null)
-        tinyDemux.arm_dmx(tinyDemux.want_dmx!!, {buf:ByteArray, aux:ByteArray? -> tinyNode.incoming_want_request(buf,aux)})
-        tinyDemux.arm_dmx(tinyDemux.chnk_dmx!!, { buf:ByteArray, aux:ByteArray? -> tinyNode.incoming_chunk_request(buf,aux)})
+        tinyDemux.arm_dmx(tinyGoset.goset_dmx,  {buf:ByteArray, aux:ByteArray?, _ -> tinyGoset.rx(buf,aux)}, null)
+        tinyDemux.arm_dmx(tinyDemux.want_dmx!!, {buf:ByteArray, aux:ByteArray?, sender:String? -> tinyNode.incoming_want_request(buf,aux,sender)})
+        tinyDemux.arm_dmx(tinyDemux.chnk_dmx!!, { buf:ByteArray, aux:ByteArray?, _ -> tinyNode.incoming_chunk_request(buf,aux)})
 
         webView.clearCache(true)
         /* no image support in tinyTremola
@@ -112,6 +121,7 @@ class MainActivity : Activity() {
             }
         }
         */
+        val webStorage = WebStorage.getInstance()
         webView.addJavascriptInterface(wai, "Android")
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
@@ -131,6 +141,7 @@ class MainActivity : Activity() {
             }
         }
         */
+
         broadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 val networkInfo: NetworkInfo? =
@@ -142,16 +153,26 @@ class MainActivity : Activity() {
                     isWifiConnected = true
                     Handler().postDelayed({
                         mkSockets()
+                        if (websocket == null)
+                            websocket = WebsocketIO(this@MainActivity, Constants.TINYSSB_SIMPLEPUB_URL)
+                        websocket!!.start()
                         Log.d("main", "msc_sock ${mc_socket.toString()}")
                     }, 1000)
                 } else if (networkInfo.detailedState == NetworkInfo.DetailedState.DISCONNECTED && isWifiConnected) {
                     rmSockets()
                     isWifiConnected = false
                     Log.d("main", "msc_sock ${mc_socket.toString()}")
+                    if(websocket != null) {
+                        websocket!!.stop()
+                        websocket = null
+                    }
                 }
             }
         }
         registerReceiver(broadcastReceiver, IntentFilter(WifiManager.NETWORK_STATE_CHANGED_ACTION))
+
+        ble_event_listener = BluetoothEventListener(this)
+        registerReceiver(ble_event_listener, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED))
 
         // val lck = ReentrantLock()
         /* disable TCP server and UDP advertisements in the tinyTremola version
@@ -244,7 +265,7 @@ class MainActivity : Activity() {
             // val text = data.getStringExtra("text")
             val voice = data.getByteArrayExtra("codec2")
             if (voice != null)
-                wai.return_voice(voice) // public_post_voice(text, voice)
+                wai.return_voice(voice) // public_post_with_voice(text, voice)
             return
         }
         if (result != null) {
@@ -277,7 +298,7 @@ class MainActivity : Activity() {
             tremolaState.wai.eval("b2f_new_voice('${voice}')")
         */
         }  else if (requestCode == 555 && resultCode == RESULT_OK) { // enable fine grained location
-            ble!!.startBleScan()
+            ble!!.startBluetooth()
         }
 
         super.onActivityResult(requestCode, resultCode, data)
@@ -294,14 +315,26 @@ class MainActivity : Activity() {
         */
 
         ble = BlePeers(this)
-        ble!!.startBleScan()
+        ble!!.startBluetooth()
+
+        websocket = WebsocketIO(this, Constants.TINYSSB_SIMPLEPUB_URL)
+        websocket!!.start()
+        //ble = BlePeersBroadcast(this)
+        //ble!!.checkPermissions(true)
+        //ble!!.scan()
+
     }
 
     override fun onPause() {
         Log.d("onPause", "")
         super.onPause()
-        if (ble != null)
-            ble!!.stopBleScan()
+        if (ble != null) {
+            ble!!.stopBluetooth()
+        }
+
+        if (websocket != null)
+            websocket!!.stop()
+
         /*
         try {
             (getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager)
@@ -326,10 +359,19 @@ class MainActivity : Activity() {
         server_socket = null
         */
         super.onDestroy()
+        if (ble != null) {
+            ble!!.stopBluetooth()
+        }
+
+        if (websocket != null) {
+            websocket!!.stop()
+        }
+
         unregisterReceiver(broadcastReceiver);
+        unregisterReceiver(ble_event_listener)
     }
 
-    private fun mkSockets() {
+    fun mkSockets() {
         /* disable UDP advertisements in the tinyTremola version
 
         try { broadcast_socket?.close() } catch (e: Exception) {}
@@ -346,6 +388,10 @@ class MainActivity : Activity() {
         }
         Log.d("new bcast sock", "${broadcast_socket}, UDP port ${broadcast_socket?.localPort}")
         */
+
+        if(!settings!!.isUdpMulticastEnabled())
+            return
+
         rmSockets()
         try {
             mc_group = InetAddress.getByName(Constants.SSB_VOSSBOL_MC_ADDR);
@@ -381,6 +427,9 @@ class MainActivity : Activity() {
             )
         }
         */
+    }
+    fun isWaiInitialized(): Boolean {
+        return this::wai.isInitialized;
     }
 
     fun rmSockets() {

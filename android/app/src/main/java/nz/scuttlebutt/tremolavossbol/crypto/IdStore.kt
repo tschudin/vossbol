@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Base64
 import android.util.Log
 import nz.scuttlebutt.tremolavossbol.MainActivity
+import nz.scuttlebutt.tremolavossbol.utils.Constants
 import org.json.JSONObject
 import java.io.FileOutputStream
 
@@ -24,7 +25,7 @@ class IdStore(val context: MainActivity) {
         } else
             identity = id
         // for tinyssb:
-        val fdir = File(context.getDir(context.tinyRepo.TINYSSB_DIR, Context.MODE_PRIVATE), context.tinyRepo.FEED_DIR)
+        val fdir = File(context.getDir(Constants.TINYSSB_DIR, Context.MODE_PRIVATE), context.tinyRepo.FEED_DIR)
         if (!File(fdir, "${identity.verifyKey.toHex()}").exists()) {
             Log.d("idstore","create new feed repo")
             context.tinyRepo.new_feed(identity.verifyKey)

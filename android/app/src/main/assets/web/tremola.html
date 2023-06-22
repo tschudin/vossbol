@@ -3,11 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <link rel="stylesheet" type="text/css" href="tremola.css" media="screen" />
+  <script type="text/javascript" charset="UTF-8" src="scuttlesort.js"></script>
   <script type="text/javascript" charset="UTF-8" src="tremola.js"></script>
   <script type="text/javascript" charset="UTF-8" src="tremola_settings.js"></script>
   <script type="text/javascript" charset="UTF-8" src="tremola_ui.js"></script>
   <script type="text/javascript" charset="UTF-8" src="qrcode.min.js"></script>
   <script type="text/javascript" charset="UTF-8" src="pinch-zoom.min.js"></script>
+  <script type="text/javascript" charset="UTF-8" src="board.js"></script>
+  <script type="text/javascript" charset="UTF-8" src="board_ui.js"></script>
 </head>
 <body style="background-image: url('img/splash-as-background.jpg'); background-size: cover; background-color: white; overflow: hidden" onload="backend('ready');">
 <div style="width: 100%; height: 100%; margin: 0px">
@@ -60,6 +63,17 @@
   <div id='lst:members' style="display: none; margin: 3px;">
     <div style="margin-top: 10pt;"><label><input type="checkbox" id="toggleSwitches1" style="margin-right: 10pt;">
       <div class="contact_item_button light" style="display: inline-block;padding: 5pt;">Choice1<br>more text</div></label>
+    </div>
+  </div>
+
+  <div id='lst:kanban' class=w100 style="overflow: hidden; display: none;"></div>
+
+  <div id='kanban-invitations-overlay' class='qr-overlay'>
+    <div style="text-align: center;font-size:20px;">
+      Invitations
+    </div>
+    <div id='kanban_invitations_list' style="padding-top: 15px;">
+
     </div>
   </div>
 
@@ -116,6 +130,123 @@
     <div id="alias_id" style="font-family: Courier; font-size: small;"></div>
   </div>
 
+  <div id="div:board" style="display: none; height: calc(100% - 10px); margin-top: 10px;">
+
+    <div id='div:debug' class="qr-overlay">
+      <textarea rows="20" id="txt:debug"></textarea>
+    </div>
+
+    <div id="div:board_ui" style="height: 100%; overflow-x: scroll;overflow-y: hidden;">
+      <div class='columns_container' id='div:columns_container'>
+        <div class='column_wrapper' style='order: 100000;'>
+        </div>
+      </div>
+    </div>
+
+    <div id="div:menu_history" class="qr-overlay">
+      <div class="menu_history_hdr" style="overflow:auto;padding-bottom: 10px;">
+        <b style="float: left;">History</b>
+      </div>
+      <div>
+        <label for='history_sort_select'>Sort by:</label>
+        <select id='history_sort_select' onchange="history_sort_select(this)">
+          <option value='latest_first'>Latest event first</option>
+          <option value='oldest_first'>Oldest event first</option>
+        </select>
+      </div>
+      <div id="menu_history_content" style="overflow-x: hidden;overflow-y: scroll;max-height: 70vh;display: flex;flex-direction: column;margin-top: 10px;"></div>
+    </div>
+
+    <div id="div:invite_menu" class="qr-overlay">
+      <div id="menu_invite_hdr">
+        <b>Invite Users</b>
+      </div>
+
+      <div id="menu_invite_content" style="overflow-x: hidden;overflow-y: scroll;max-height: 70vh;"></div>
+    </div>
+
+    <div id="div:item_menu" class="qr-overlay">
+      <div style="padding-bottom:20px;" onclick="close_board_context_menu()">
+        <div id="item_menu_title" style="text-align: center;"></div>
+      </div>
+
+      <div id="div:item_menu_content" class="item_menu_content" onclick="close_board_context_menu()">
+        <div id="div:item_menu_description">
+          <b style="margin-top:10px;">Description:</b>
+          <textarea class='item_menu_desc' id='div:item_menu_description_text' rows='8'></textarea>
+          <button id='btn:item_menu_description_save' style="display:none;" onclick="item_menu_save_description()">Save</button>
+          <button id='btn:item_menu_description_cancel' style="display:none;" onclick="item_menu_cancel_description()">Cancel</button>
+        </div>
+
+        <div style="padding-top: 10px; padding-bottom: 20px" onclick="close_board_context_menu()">
+          <b style="margin-top:10px;">Assignees:</b>
+          <div id="div:item_menu_assignees" class="div:item_menu_assignees_container"></div>
+        </div>
+
+        <div style="padding-top: 40px">
+          <b>Comments:</b>
+          <div id="div:item_menu_comments" style="overflow:auto;">
+            <textarea id="item_menu_comment_text" placeholder="Add comment..." style="float:left;width:84%;height: 50px;"></textarea>
+            <button class="flat passive buttontext" style="background-image: url('img/send.svg');float:right;width: 15%;" onclick="btn_post_comment()"></button>
+          </div>
+
+          <div id="lst:item_menu_posts" style="max-height: 33vh;overflow-x: hidden;overflow-y:scroll;">
+          </div>
+
+        </div>
+      </div>
+
+      <div class="item_menu_buttons">
+
+        <button class="item_menu_button" onclick="menu_edit('board_rename_item', 'Enter New Name', '')">rename card</button>
+
+        <!-- div class='dropdown_menu'>
+          <button id='btn:item_menu_change_column' class="item_menu_button"  onclick="contextmenu_change_column()">Change Column</button>
+          <div id="change_column_options">
+          </div>
+        </div -->
+
+        <!-- div class='dropdown_menu' id="item_menu_change_position">
+          <button id='btn:item_menu_change_position' class="item_menu_button"  onclick="contextmenu_item_change_position()">Change Position</button>
+          <div id="change_position_options">
+          </div>
+        </div -->
+
+        <div class='dropdown_menu' id="item_menu_assign">
+          <button id='btn:item_menu_assign' class="item_menu_button"  onclick="contextmenu_item_assign()">(un-) assign members</button>
+          <div id="assign_options">
+          </div>
+        </div>
+
+        <div class='dropdown_menu'>
+          <button id='btn:item_menu_change_color' class="item_menu_button"  onclick="contextmenu_change_color()">set name color</button>
+          <div id="change_color_options">
+          </div>
+        </div>
+
+        <button class="item_menu_button" onclick="btn_remove_item()">delete Card</button>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div id='connection-overlay' class='qr-overlay'>
+    <div style='font-size:18px; padding-bottom: 10px;'><b>Replication Status</b></div>
+    <div style="position: relative; margin-bottom: 10px;">
+      <img src='img/fountain.png' alt="Icon" class="progress-icon">
+      <progress id='connection-overlay-progressbar-gift' class='connection-overlay-progressbar' value="0" max="100"></progress>
+      <div id='connection-overlay-progressbar-label-gift' class="connection-overlay-progressbar-label"></div>
+    </div>
+    <div style="position: relative; margin-bottom: 10px;">
+      <img src='img/receive.png' alt="Icon" class="progress-icon">
+      <progress id='connection-overlay-progressbar-want' class='connection-overlay-progressbar' value="0" max="100"></progress>
+      <div id='connection-overlay-progressbar-label-want' class="connection-overlay-progressbar-label"></div>
+    </div>
+    <div id='connection-overlay-hdr' style='font-size:18px; padding-bottom: 10px;'><b>Connected Devices</b></div>
+    <div id='connection-overlay-content'></div>
+  </div>
+
   <div id='qr-overlay' class='qr-overlay'>
     <div id="qr-code" style="padding-bottom: 5pt; align: center;"></div>
     <div id="qr-text" align=left style='overflow-wrap: anywhere; font-family: Courier;font-size: small;'>did</div>
@@ -144,7 +275,7 @@
 
   <div id='edit-overlay' class='qr-overlay'>
     <div id="edit_title" style='margin-bottom: 25px;'>Edit X:</div>
-    <input type="text" id="edit_text" minlength="1" size="64" style="width: calc(100% - 10px); height: 30px;">&nbsp;
+    <input type="text" id="edit_text" onkeypress="edit_checkEnter(event)" minlength="1" size="64" style="width: calc(100% - 10px); height: 30px;">&nbsp;
     <div style='text-align: right;'><button class="passive buttontext" onclick="edit_confirmed();" style="background-image: url('img/checked.svg'); margin-right: 5px; border: 0pt; height: 30px; width: 30px;">&nbsp;</button></div>
   </div>
 
@@ -154,10 +285,12 @@
     <div style="text-align: center;">
       <font size=+1><em>About</em></font><br><img src="img/map-1862.jpg" style="height: 8em;">
       <font size=-2>
-        <p>Tremola v0.1, August 2021
+        <p>tinyTremola v0.1, September 2022
 
         <hr>
         <p>Software<br>
+          Jannick Heisch<br>
+          Etienne Mettaz<br>
           Cedrik Schimschar<br>
           Christian Tschudin<br>
           &nbsp;
@@ -241,9 +374,9 @@
 <div id='div:footer' class=neutral style="height: 56px; align-content: center; border: 3px inset #ebf4fa /*var(--light)*/; border-radius: 2px; margin: 3px; width: calc(100% - 12px);">
 
   <table width=100% cellpadding="2pt"><tr>
-    <td width=35%><button id='btn:chats'    class="w100 flat active buttontext" onclick="btnBridge(this);" style="background-image: url('img/chat.svg');">&nbsp;<!-- font size=+3>&#x1F4E8;</font><br><font size=small>Chats</font --></button>
-    <td width=35%><button id='btn:contacts' class="w100 flat passive buttontext" onclick="btnBridge(this);" style="background-image: url('img/contacts.svg');">&nbsp;<!-- font size=+3>&#x1F465;</font><br><font size=small>Contacts</font --></button>
-    <td width=35%><button id='btn:connex'   class="w100 flat passive buttontext" onclick="btnBridge(this);" style="background-image: url('img/signal.svg');">&nbsp;<!-- font size=+3>&#x1F5E3;</font><br><font size=small>Connex</font --></button>
+    <td width=33%><button id='btn:chats'    class="w100 flat active buttontext" onclick="btnBridge(this);" style="background-image: url('img/chat.svg');">&nbsp;<!-- font size=+3>&#x1F4E8;</font><br><font size=small>Chats</font --></button>
+    <td width=33%><button id='btn:kanban'   class="w100 flat passive buttontext" onclick="btnBridge(this);" style="background-image: url('img/kanban.svg');">&nbsp;<!-- font size=+3>&#x1F5E3;</font><br><font size=small>Board</font --></button>
+    <td width=33%><button id='btn:contacts' class="w100 flat passive buttontext" onclick="btnBridge(this);" style="background-image: url('img/contacts.svg');">&nbsp;<!-- font size=+3>&#x1F465;</font><br><font size=small>Contacts</font --></button>
   </table>
 
 </div>
@@ -257,7 +390,7 @@
 
   <div id='div:confirm-members' class=neutral style="height: 36px; align-content: center; border: 3px inset #ebf4fa /*var(--light)*/; border-radius: 2pt; margin: 3px; margin-top: 20px; display: none; flex-direction: row; justify-content: center; align-items: center;">
     <!-- button class="flat passive buttontext" style="background-image: url('img/cancel.svg'); width: 50%; height: 50px; margin: 5px;" onclick="onBackPressed();">&nbsp;</--button -->
-    <button class="flat passive buttontext" style="background-image: url('img/checked.svg'); width: 100%; height: 30px; margin: 3px;" onclick="new_conversation();">&nbsp;</button>
+    <button class="flat passive buttontext" style="background-image: url('img/checked.svg'); width: 100%; height: 30px; margin: 3px;" onclick="members_confirmed();">&nbsp;</button>
   </div>
 
   <div id="div:settings" style="display: none; height: calc(100% - 45px);"><div style="height: 100%; overflow: scroll; margin: 6px;">
@@ -265,6 +398,31 @@
     <hr>
 
     <!--  TOGGLES -->
+
+    <div class="settings">
+      <div class="settingsText">Connect to Peers via BLE</div>
+      <div style="float: right;"><label class="switch">
+        <input id="ble" type="checkbox" onchange="toggle_changed(this);">
+        <span class="slider round"></span></label></div>
+    </div>
+    <hr>
+
+    <div class="settings">
+      <div class="settingsText">Connect to Peers via UDP Multicast</div>
+      <div><label class="switch">
+        <input id="udp_multicast" type="checkbox" onchange="toggle_changed(this);">
+        <span class="slider round"></span>
+      </label></div>
+    </div>
+    <hr>
+
+    <div class="settings">
+      <div class="settingsText">Connect to Pub via Websocket</div>
+      <div style="float: right;"><label class="switch">
+        <input id="websocket" type="checkbox" onchange="toggle_changed(this);">
+        <span class="slider round"></span></label></div>
+    </div>
+    <hr>
 
     <div class="settings">
       <div class="settingsText">Preview before sending</div>
@@ -283,6 +441,14 @@
     <hr>
 
     <div class="settings">
+      <div class="settingsText">Hide forgotten Kanban Boards</div>
+      <div style="float: right;"><label class="switch">
+        <input id="hide_forgotten_boards" type="checkbox" onchange="toggle_changed(this);">
+        <span class="slider round"></span></label></div>
+    </div>
+    <hr>
+
+    <div class="settings">
       <div class="settingsText">Hide forgotten conversations</div>
       <div style="float: right;"><label class="switch">
         <input id="hide_forgotten_conv" type="checkbox" onchange="toggle_changed(this);">
@@ -294,23 +460,6 @@
       <div class="settingsText"><del>Show shortname instead of SSB id</del></div>
       <div style="float: right;"><label class="switch">
         <input id="show_shortnames" type="checkbox" onchange="toggle_changed(this);">
-        <span class="slider round"></span></label></div>
-    </div>
-    <hr>
-
-    <div class="settings">
-      <div class="settingsText"><del>Autoconnect to WiFi peers</del></div>
-      <div><label class="switch">
-        <input id="wifi_autoconnect" type="checkbox" onchange="toggle_changed(this);">
-        <span class="slider round"></span>
-      </label></div>
-    </div>
-    <hr>
-
-    <div class="settings">
-      <div class="settingsText"><del>Autoconnect to Internet pubs</del></div>
-      <div style="float: right;"><label class="switch">
-        <input id="pub_autoconnect" type="checkbox" onchange="toggle_changed(this);">
         <span class="slider round"></span></label></div>
     </div>
     <hr>

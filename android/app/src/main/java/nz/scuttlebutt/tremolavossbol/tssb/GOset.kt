@@ -65,7 +65,7 @@ class GOset(val context: MainActivity) {
     // unsigned long zap_next;
 
     fun rx(pkt: ByteArray, aux: ByteArray?) {
-        // Log.d("goset", "rx ${pkt.size}")
+        Log.d("goset", "rx ${pkt.size}")
 
         if (pkt.size <= DMX_LEN)
             return
@@ -147,6 +147,7 @@ class GOset(val context: MainActivity) {
 
         val retain = ArrayList<Claim>()
         for (c in pending_claims) {
+            Log.d("goset", "pending claim loop")
             if (c.sz == 0) continue // ignore bogous claims
             var lo = keys.indexOfFirst({k -> byteArrayCmp(k,c.lo) == 0})
             var hi = keys.indexOfFirst({k -> byteArrayCmp(k,c.hi) == 0})
@@ -167,13 +168,15 @@ class GOset(val context: MainActivity) {
             }
             if (max_help-- > 0) { // we have larger claim span, offer help (but limit # of claims)
                 hi--; lo++
-                // Serial.print("offer help span=" + String(partial->cnt - 2));
+                // Log.d("goset","offer help span= " + String(partial->cnt - 2));
                 // Serial.print(String(" ") + to_hex(gp->goset_keys+lo*GOSET_KEY_LEN,4) + String(".."));
                 // Serial.println(String(" ") + to_hex(gp->goset_keys+hi*GOSET_KEY_LEN,4) + String(".."));
+                Log.d("goset", "max_help ${lo}, ${hi}")
                 if (hi <= lo)
                     context.tinyIO.enqueue(mkNovelty_from_key(keys[lo]).wire, goset_dmx, null)
-                else if (hi - lo <= 2) // span of 2 or 3
+                else if (hi - lo <= 2) { // span of 2 or 3
                     context.tinyIO.enqueue(mkClaim(lo, hi).wire, goset_dmx, null)
+                }
                 else { // split span in two intervals
                     val sz = (hi+1 - lo) / 2
                     context.tinyIO.enqueue(mkClaim(lo, lo+sz-1).wire, goset_dmx, null)
@@ -224,6 +227,7 @@ class GOset(val context: MainActivity) {
             else if (pending_novelty.size < MAX_PENDING)
                 pending_novelty.add(n)
         }
+        context.ble?.refreshShortNameForKey(key) // refresh shortname in devices overview
         Log.d("goset", "added key ${key.toHex()}, |keys|=${keys.size}")
     }
 

@@ -3,34 +3,33 @@ package nz.scuttlebutt.tremolavossbol
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.core.content.ContextCompat.checkSelfPermission
-import androidx.core.content.FileProvider
 import com.google.zxing.integration.android.IntentIntegrator
 import org.json.JSONObject
-import java.io.File
-import java.util.*
 
 import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_KANBAN
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
+import org.json.JSONArray
 
 
 // pt 3 in https://betterprogramming.pub/5-android-webview-secrets-you-probably-didnt-know-b23f8a8b5a0c
 
 class WebAppInterface(val act: MainActivity, val webView: WebView) {
+
+    var frontend_ready = false
 
     @JavascriptInterface
     fun onFrontendRequest(s: String) {
@@ -43,6 +42,8 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             }
             "ready" -> {
                 eval("b2f_initialize(\"${act.idStore.identity.toRef()}\")")
+                frontend_ready = true
+                act.tinyNode.beacon()
             }
             "reset" -> { // UI reset
                 // erase DB content
@@ -91,10 +92,18 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     Toast.LENGTH_LONG).show()
             }
             "wipe" -> {
+                act.settings!!.resetToDefault()
                 act.idStore.setNewIdentity(null) // creates new identity
+                act.tinyRepo.repo_reset()
                 // eval("b2f_initialize(\"${tremolaState.idStore.identity.toRef()}\")")
                 // FIXME: should kill all active connections, or better then the app
                 act.finishAffinity()
+            }
+            "add:contact" -> {
+
+                val id = args[1].substring(1,args[1].length-8)
+                Log.d("ADD", id)
+                act.tinyGoset._add_key(Base64.decode(id, Base64.NO_WRAP))
             }
             /* no alias publishing in tinyTremola
             "add:contact" -> { // ID and alias
@@ -110,27 +119,40 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     return
             }
             */
-            "publ:post" -> { // publ:post txt voice
+            "publ:post" -> { // publ:post tips txt voice
+                val a = JSONArray(args[1])
+                val tips = ArrayList<String>(0)
+                for (i in 0..a.length()-1) {
+                    val s = (a[i] as JSONObject).toString()
+                    Log.d("publ:post", s)
+                    tips.add(s)
+                }
                 var t: String? = null
-                if (args[1] != "null")
-                    t = Base64.decode(args[1], Base64.NO_WRAP).decodeToString()
+                if (args[2] != "null")
+                    t = Base64.decode(args[2], Base64.NO_WRAP).decodeToString()
                 var v: ByteArray? = null
-                if (args.size > 2 && args[2] != "null")
-                    v = Base64.decode(args[2], Base64.NO_WRAP)
-                public_post_voice(t, v)
+                if (args.size > 3 && args[3] != "null")
+                    v = Base64.decode(args[3], Base64.NO_WRAP)
+                public_post_with_voice(tips, t, v)
                 return
             }
-            /* no pivate post (yet) in tyinTremola
-            "priv:post" -> { // atob(text) rcp1 rcp2 ...
-                val rawStr = tremolaState.msgTypes.mkPost(
-                                 Base64.decode(args[1], Base64.NO_WRAP).decodeToString(),
-                                 args.slice(2..args.lastIndex))
-                val evnt = tremolaState.msgTypes.jsonToLogEntry(rawStr,
-                                            rawStr.encodeToByteArray())
-                evnt?.let { rx_event(it) } // persist it, propagate horizontally and also up
+            "priv:post" -> { // priv:post tips atob(text) atob(voice) rcp1 rcp2 ...
+                val a = JSONObject(args[1]) as JSONArray
+                val tips = ArrayList<String>(0)
+                for (i in 0..a.length()-1) {
+                    val s = (a[i] as JSONObject).toString()
+                    Log.d("priv;post", s)
+                    tips.add(s)
+                }
+                var t: String? = null
+                if (args[2] != "null")
+                    t = Base64.decode(args[2], Base64.NO_WRAP).decodeToString()
+                var v: ByteArray? = null
+                if (args.size > 3 && args[3] != "null")
+                    v = Base64.decode(args[3], Base64.NO_WRAP)
+                private_post_with_voice(tips, t, v, args.slice(4..args.lastIndex))
                 return
             }
-            */
             "get:media" -> {
                 if (checkSelfPermission(act, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                     Toast.makeText(act, "No permission to access media files",
@@ -143,21 +165,48 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             }
 
             "get:voice" -> { // get:voice
-                val intent = Intent(act, RecordActivity::class.java)
-                act.startActivityForResult(intent, 808)
+                Log.e("get:voice", "Trying to record audio")
                 return
+//                val intent = Intent(act, RecordActivity::class.java)
+//                act.startActivityForResult(intent, 808)
+//                return
             }
             "play:voice" -> { // play:voice b64enc(codec2) from date)
-                Log.d("wai", s)
-                val voice = Base64.decode(args[1], Base64.NO_WRAP)
-                val intent = Intent(act, PlayActivity::class.java)
-                intent.putExtra("c2Data", voice)
-                if (args.size > 2)
-                    intent.putExtra("from", Base64.decode(args[2], Base64.NO_WRAP).decodeToString())
-                if (args.size > 3)
-                    intent.putExtra("date", Base64.decode(args[3], Base64.NO_WRAP).decodeToString())
-                act.startActivity(intent)
+                Log.e("get:voice", "Trying to play audio")
                 return
+            }
+            "kanban" -> { // kanban bid atob(prev) atob(operation) atob(arg1) atob(arg2) atob(...)
+                /*var bid: String = args[1]
+                var prevs: List<String>? = null
+                if(args[2] != "null") // prevs == "null" for the first board event (create bord event)
+                    prevs = Base64.decode(args[2], Base64.NO_WRAP).decodeToString().split(" ")
+                var operation: String = Base64.decode(args[3], Base64.NO_WRAP).decodeToString()
+                var argList: List<String>? = null
+                if(args[4] != "null")
+                    argList = Base64.decode(args[4], Base64.NO_WRAP).decodeToString().split(" ")
+
+                 */
+                //var data = JSONObject(Base64.decode(args[1], Base64.NO_WRAP).decodeToString())
+                val bid: String? = if (args[1] != "null") args[1] else null
+                val prev: List<String>? = if (args[2] != "null") Base64.decode(args[2], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
+                val op: String = args[3]
+                val argsList: List<String>? = if(args[4] != "null") Base64.decode(args[4], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
+
+                if (bid != null) {
+                    Log.d("KanbanPostBID", bid)
+                    Log.d("KanbanPostPREV", prev.toString())
+                }
+                Log.d("KanbanPostOP", op)
+                Log.d("KanbanPostARGS", args.toString())
+
+                kanban(bid, prev , op, argsList)
+            }
+            "settings:set" -> {
+                when(args[1]) {
+                    "ble" -> {act.settings!!.setBleEnabled(args[2].toBooleanStrict())}
+                    "udp_multicast" -> {act.settings!!.setUdpMulticastEnabled(args[2].toBooleanStrict())}
+                    "websocket" -> {act.settings!!.setWebsocketEnabled(args[2].toBooleanStrict())}
+                }
             }
             else -> {
                 Log.d("onFrontendRequest", "unknown")
@@ -183,13 +232,14 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         return false
     }
 
-    fun public_post_voice(text: String?, voice: ByteArray?) {
+    fun public_post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?) {
         if (text != null)
             Log.d("wai", "post_voice t- ${text}/${text.length}")
         if (voice != null)
             Log.d("wai", "post_voice v- ${voice}/${voice.size}")
         val lst = Bipf.mkList()
         Bipf.list_append(lst, TINYSSB_APP_TEXTANDVOICE)
+        // add tips
         Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
         Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
         val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
@@ -198,6 +248,63 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         val body = Bipf.encode(lst)
         if (body != null)
             act.tinyNode.publish_public_content(body)
+    }
+
+    fun private_post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?, rcps: List<String>) {
+        if (text != null)
+            Log.d("wai", "post_voice t- ${text}/${text.length}")
+        if (voice != null)
+            Log.d("wai", "post_voice v- ${voice}/${voice.size}")
+        val lst = Bipf.mkList()
+        Bipf.list_append(lst, TINYSSB_APP_TEXTANDVOICE)
+        // add tips
+        Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
+        Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
+        val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
+        Log.d("wai", "send time is ${tst.getInt()}")
+        Bipf.list_append(lst, tst)
+        val body = Bipf.encode(lst)
+        if (body != null)
+            act.tinyNode.publish_public_content(body)
+    }
+
+    fun kanban(bid: String?, prev: List<String>?, operation: String, args: List<String>?) {
+        val lst = Bipf.mkList()
+        Bipf.list_append(lst, TINYSSB_APP_KANBAN)
+        if (bid != null)
+            Bipf.list_append(lst, Bipf.mkString(bid))
+        else
+            Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
+
+        if(prev != null) {
+            val prevList = Bipf.mkList()
+            for(p in prev) {
+                Bipf.list_append(prevList, Bipf.mkString(p))
+            }
+            Bipf.list_append(lst, prevList)
+        } else {
+            Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
+        }
+
+        Bipf.list_append(lst, Bipf.mkString(operation))
+
+        if(args != null) {
+            for(arg in args) {
+                Bipf.list_append(lst, Bipf.mkString(arg))
+            }
+        }
+
+        val body = Bipf.encode(lst)
+
+        if (body != null) {
+            Log.d("kanban", "published bytes: " + Bipf.decode(body))
+            act.tinyNode.publish_public_content(body)
+        }
+        //val body = Bipf.encode(lst)
+        //Log.d("KANBAN BIPF ENCODE", Bipf.bipf_list2JSON(Bipf.decode(body!!)!!).toString())
+        //if (body != null)
+            //act.tinyNode.publish_public_content(body)
+
     }
 
     fun return_voice(voice: ByteArray) {
@@ -214,7 +321,10 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     fun sendToFrontend(fid: ByteArray, seq: Int, mid: ByteArray, payload: ByteArray) {
         Log.d("wai", "sendToFrontend seq=${seq} ${payload.toHex()}")
         val bodyList = Bipf.decode(payload)
-        if (bodyList == null || bodyList.typ != BIPF_LIST) return
+        if (bodyList == null || bodyList.typ != BIPF_LIST) {
+            Log.d("sendToFrontend", "decoded payload == null")
+            return
+        }
         val param = Bipf.bipf_list2JSON(bodyList)
         var hdr = JSONObject()
         hdr.put("fid", "@" + fid.toBase64() + ".ed25519")

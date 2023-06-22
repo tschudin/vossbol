@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="tremolavossbol">
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -30,9 +31,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:requestLegacyExternalStorage="true"
-        android:theme="@style/AppTheme">
-        <activity android:name="nz.scuttlebutt.tremolavossbol.PlayActivity"></activity>
-        <activity android:name="nz.scuttlebutt.tremolavossbol.RecordActivity"></activity>
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true">
+<!--        <activity android:name="nz.scuttlebutt.tremolavossbol.PlayActivity"></activity>-->
+<!--        <activity android:name="nz.scuttlebutt.tremolavossbol.RecordActivity"></activity>-->
         <activity
             android:name="nz.scuttlebutt.tremolavossbol.MainActivity"
             android:exported="true"
@@ -42,6 +44,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullSensor"
+            tools:replace="screenOrientation" />
     </application>
 
 </manifest>
