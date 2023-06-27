@@ -91,6 +91,10 @@ class SSBid { // ed25519
 
     fun encryptPrivateMessage(message: String, recps: List<ByteArray>): String {
         val txt = message.encodeToByteArray()
+        return encryptPrivateMessage(txt, recps)
+    }
+
+    fun encryptPrivateMessage(txt: ByteArray, recps: List<ByteArray>): String {
         val nonce = SecureRandom().generateSeed(24)
         val cdek = SecureRandom().generateSeed(33) // count plus data encryption key
         cdek[0] = recps.size.toByte()

@@ -15,7 +15,7 @@ var prev_scenario = 'chats';
 var curr_scenario = 'chats';
 
 var scenarioDisplay = {
-    'chats': ['div:qr', 'core', 'lst:chats', 'div:footer'], // 'plus' TODO reactivate when encrypted chats are implemented
+    'chats': ['div:qr', 'core', 'lst:chats', 'div:footer',  'plus'],
     'contacts': ['div:qr', 'core', 'lst:contacts', 'div:footer', 'plus'],
     'posts': ['div:back', 'core', 'lst:posts', 'div:textarea'],
     'connex': ['div:qr', 'core', 'the:connex', 'div:footer', 'plus'],
@@ -26,7 +26,8 @@ var scenarioDisplay = {
 }
 
 var scenarioMenu = {
-    'chats': [['Connected Devices', 'menu_connection'], // '['New conversation', 'menu_new_conversation'],' TODO reactivate when encrypted chats are implemented
+    'chats': [['Connected Devices', 'menu_connection'],
+        ['New conversation', 'menu_new_conversation'],
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
     'contacts': [['New contact', 'menu_new_contact'],
@@ -50,8 +51,9 @@ var scenarioMenu = {
       ['Dump', 'menu_dump'],
       ['Reset', 'menu_reset']]
     */
-    'posts': [/* ['Take picture', 'menu_take_picture'],
+    'posts': [/* ['Take picture', 'menu_take_picture'], // conversation
                 ['Pick image', 'menu_pick_image'], */
+        ['Connected Devices', 'menu_connection'],
         ['Rename this chat', 'menu_edit_convname'],
         ['(un)Forget', 'menu_forget_conv'],
         ['Settings', 'menu_settings'],

@@ -254,12 +254,12 @@ class Node(val context: MainActivity) {
         context.tinyRepo.sidechain_append(buf, blbt_ndx)
     }
 
-    fun publish_public_content(content: ByteArray): Boolean {
+    fun publish_content(content: ByteArray): Boolean {
         val repo = context.tinyRepo
-        Log.d("node", "publish_public_content ${content.size}B")
+        Log.d("node", "publish_content ${content.size}B")
         val pkt = repo.mk_contentLogEntry(content)
-        Log.d("node", "publish_public_content --> pkt ${if (pkt == null) 0 else pkt.size}B")
-        Log.d("node", "publish_public_content --> content ${if (pkt == null) 0 else pkt.toHex()}B")
+        Log.d("node", "publish_content --> pkt ${if (pkt == null) 0 else pkt.size}B")
+        Log.d("node", "publish_content --> content ${if (pkt == null) 0 else pkt.toHex()}B")
         if (pkt == null) return false
         return repo.feed_append(context.idStore.identity.verifyKey, pkt)
     }

@@ -3,7 +3,6 @@ package nz.scuttlebutt.tremolavossbol
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Base64
@@ -13,16 +12,19 @@ import android.webkit.WebView
 import android.widget.Toast
 import androidx.core.content.ContextCompat.checkSelfPermission
 import com.google.zxing.integration.android.IntentIntegrator
-import org.json.JSONObject
-
 import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
-import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_STRING
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_list2JSON
+import nz.scuttlebutt.tremolavossbol.utils.Bipf_e
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_KANBAN
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
+import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.deRef
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
 import org.json.JSONArray
+import org.json.JSONObject
 
 
 // pt 3 in https://betterprogramming.pub/5-android-webview-secrets-you-probably-didnt-know-b23f8a8b5a0c
@@ -37,24 +39,27 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         Log.d("FrontendRequest", s)
         val args = s.split(" ")
         when (args[0]) {
-            "onBackPressed" -> {
+            "onBackPressed" -> { // When 'back' is pressed, will close app
                 (act as MainActivity)._onBackPressed()
             }
-            "ready" -> {
+
+            "ready" -> { // Initialisation, send localID to frontend
                 eval("b2f_initialize(\"${act.idStore.identity.toRef()}\")")
                 frontend_ready = true
                 act.tinyNode.beacon()
             }
+
             "reset" -> { // UI reset
                 // erase DB content
                 eval("b2f_initialize(\"${act.idStore.identity.toRef()}\")")
             }
-            "restream" -> {
+
+            "restream" -> { // Resend all the logs
                 for (fid in act.tinyRepo.listFeeds()) {
                     Log.d("wai", "restreaming ${fid.toHex()}")
                     var i = 1
                     while (true) {
-                        val (payload,mid) = act.tinyRepo.feed_read_content(fid, i)
+                        val (payload, mid) = act.tinyRepo.feed_read_content(fid, i)
                         if (payload == null) break
                         Log.d("restream", "${i}, ${payload.size} Bytes")
                         sendToFrontend(fid, i, mid!!, payload)
@@ -62,7 +67,8 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     }
                 }
             }
-            "qrscan.init" -> {
+
+            "qrscan.init" -> { // start scanning the qr code (open the camera)
                 val intentIntegrator = IntentIntegrator(act)
                 intentIntegrator.setBeepEnabled(false)
                 intentIntegrator.setCameraId(0)
@@ -71,7 +77,8 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 intentIntegrator.initiateScan()
                 return
             }
-            "secret:" -> {
+
+            "secret:" -> { // import a new ID (is not used)
                 if (importIdentity(args[1])) {
                     /*
                     tremolaState.logDAO.wipe()
@@ -82,7 +89,8 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 }
                 return
             }
-            "exportSecret" -> {
+
+            "exportSecret" -> { // Show the secret key (both as string and qr code)
                 val json = act.idStore.identity.toExportString()!!
                 eval("b2f_showSecret('${json}');")
                 val clipboard = act.getSystemService(ClipboardManager::class.java)
@@ -91,7 +99,8 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 Toast.makeText(act, "secret key was also\ncopied to clipboard",
                     Toast.LENGTH_LONG).show()
             }
-            "wipe" -> {
+
+            "wipe" -> { // Delete all data about the peer, included ID (not revertible)
                 act.settings!!.resetToDefault()
                 act.idStore.setNewIdentity(null) // creates new identity
                 act.tinyRepo.repo_reset()
@@ -99,9 +108,10 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 // FIXME: should kill all active connections, or better then the app
                 act.finishAffinity()
             }
-            "add:contact" -> {
 
-                val id = args[1].substring(1,args[1].length-8)
+            "add:contact" -> { // Add a new contact
+                // Only store in database and advertise it to connected peers via SSB event.
+                val id = args[1].substring(1, args[1].length - 8)
                 Log.d("ADD", id)
                 act.tinyGoset._add_key(Base64.decode(id, Base64.NO_WRAP))
             }
@@ -119,12 +129,14 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     return
             }
             */
-            "publ:post" -> { // publ:post tips txt voice
+
+            "post" -> { // post tips atob(text) atob(voice) rcp1 rcp2 ...
+                // for public chats, rcp1 is "null"
                 val a = JSONArray(args[1])
-                val tips = ArrayList<String>(0)
-                for (i in 0..a.length()-1) {
+                val tips = ArrayList<String>(0)  // for voice
+                for (i in 0..a.length() - 1) {
                     val s = (a[i] as JSONObject).toString()
-                    Log.d("publ:post", s)
+                    Log.d("post", s)
                     tips.add(s)
                 }
                 var t: String? = null
@@ -133,26 +145,11 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 var v: ByteArray? = null
                 if (args.size > 3 && args[3] != "null")
                     v = Base64.decode(args[3], Base64.NO_WRAP)
-                public_post_with_voice(tips, t, v)
+                Log.d( "post", "tips = $tips, text = $t, voice = $v, rcps = ${args.slice(4..args.lastIndex)}")
+                post_with_voice(tips, t, v, args.slice(4..args.lastIndex))
                 return
             }
-            "priv:post" -> { // priv:post tips atob(text) atob(voice) rcp1 rcp2 ...
-                val a = JSONObject(args[1]) as JSONArray
-                val tips = ArrayList<String>(0)
-                for (i in 0..a.length()-1) {
-                    val s = (a[i] as JSONObject).toString()
-                    Log.d("priv;post", s)
-                    tips.add(s)
-                }
-                var t: String? = null
-                if (args[2] != "null")
-                    t = Base64.decode(args[2], Base64.NO_WRAP).decodeToString()
-                var v: ByteArray? = null
-                if (args.size > 3 && args[3] != "null")
-                    v = Base64.decode(args[3], Base64.NO_WRAP)
-                private_post_with_voice(tips, t, v, args.slice(4..args.lastIndex))
-                return
-            }
+
             "get:media" -> {
                 if (checkSelfPermission(act, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                     Toast.makeText(act, "No permission to access media files",
@@ -171,10 +168,12 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
 //                act.startActivityForResult(intent, 808)
 //                return
             }
+
             "play:voice" -> { // play:voice b64enc(codec2) from date)
                 Log.e("get:voice", "Trying to play audio")
                 return
             }
+
             "kanban" -> { // kanban bid atob(prev) atob(operation) atob(arg1) atob(arg2) atob(...)
                 /*var bid: String = args[1]
                 var prevs: List<String>? = null
@@ -188,9 +187,11 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                  */
                 //var data = JSONObject(Base64.decode(args[1], Base64.NO_WRAP).decodeToString())
                 val bid: String? = if (args[1] != "null") args[1] else null
-                val prev: List<String>? = if (args[2] != "null") Base64.decode(args[2], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
+                val prev: List<String>? = if (args[2] != "null") Base64.decode(args[2], Base64.NO_WRAP)
+                    .decodeToString().split(",").map { Base64.decode(it, Base64.NO_WRAP).decodeToString() } else null
                 val op: String = args[3]
-                val argsList: List<String>? = if(args[4] != "null") Base64.decode(args[4], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
+                val argsList: List<String>? = if (args[4] != "null") Base64.decode(args[4], Base64.NO_WRAP)
+                    .decodeToString().split(",").map { Base64.decode(it, Base64.NO_WRAP).decodeToString() } else null
 
                 if (bid != null) {
                     Log.d("KanbanPostBID", bid)
@@ -199,8 +200,9 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 Log.d("KanbanPostOP", op)
                 Log.d("KanbanPostARGS", args.toString())
 
-                kanban(bid, prev , op, argsList)
+                kanban(bid, prev, op, argsList)
             }
+
             "settings:set" -> {
                 when(args[1]) {
                     "ble" -> {act.settings!!.setBleEnabled(args[2].toBooleanStrict())}
@@ -208,6 +210,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     "websocket" -> {act.settings!!.setWebsocketEnabled(args[2].toBooleanStrict())}
                 }
             }
+
             else -> {
                 Log.d("onFrontendRequest", "unknown")
             }
@@ -220,6 +223,10 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         })
     }
 
+    /**
+     * Only called (but commented out) from tremola.js::menu_import_id,
+     * which is never called (Menu item leading to it is commented out)
+     */
     private fun importIdentity(secret: String): Boolean {
         Log.d("D/importIdentity", secret)
         if (act.idStore.setNewIdentity(Base64.decode(secret, Base64.DEFAULT))) {
@@ -232,9 +239,9 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         return false
     }
 
-    fun public_post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?) {
+    fun post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?, rcps: List<String>?) {
         if (text != null)
-            Log.d("wai", "post_voice t- ${text}/${text.length}")
+            Log.d("wai", "post_text t- ${text}/${text.length}")
         if (voice != null)
             Log.d("wai", "post_voice v- ${voice}/${voice.size}")
         val lst = Bipf.mkList()
@@ -242,30 +249,40 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         // add tips
         Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
         Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
+
         val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
         Log.d("wai", "send time is ${tst.getInt()}")
         Bipf.list_append(lst, tst)
-        val body = Bipf.encode(lst)
-        if (body != null)
-            act.tinyNode.publish_public_content(body)
+
+        val body: ByteArray?
+        if (rcps!![0] == "null") {
+            Bipf.list_append(lst, Bipf.mkNone())
+            body = Bipf.encode(lst) // public post
+        } else {
+            body = Bipf.encode(encrypt_post(lst, rcps)!!) // private post
+        }
+        Log.d("wai", "Sending: ${Bipf.bipf_list2JSON(Bipf.decode(body!!)!!)}")
+        act.tinyNode.publish_content(body)
     }
 
-    fun private_post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?, rcps: List<String>) {
-        if (text != null)
-            Log.d("wai", "post_voice t- ${text}/${text.length}")
-        if (voice != null)
-            Log.d("wai", "post_voice v- ${voice}/${voice.size}")
-        val lst = Bipf.mkList()
-        Bipf.list_append(lst, TINYSSB_APP_TEXTANDVOICE)
-        // add tips
-        Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
-        Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
-        val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
-        Log.d("wai", "send time is ${tst.getInt()}")
-        Bipf.list_append(lst, tst)
+    fun encrypt_post(lst: Bipf_e, rcps: List<String>): Bipf_e? {
+        Log.d("priv:post", "sending ${bipf_list2JSON(lst).toString()}")
+        val recps = Bipf.mkList()
+        val keys: MutableList<ByteArray> = mutableListOf()
+        val me = act.idStore.identity.toRef()
+        for (r in rcps) {
+            if (r != me) {
+                Bipf.list_append(recps, Bipf.mkString(r))
+                keys.add(r.deRef())
+            }
+        }
+        Bipf.list_append(recps, Bipf.mkString(me))
+        keys.add(me.deRef())
+        Bipf.list_append(lst, recps)
         val body = Bipf.encode(lst)
-        if (body != null)
-            act.tinyNode.publish_public_content(body)
+
+        val encrypted = body?.let { act.idStore.identity.encryptPrivateMessage(it, keys) }
+        return encrypted?.let { Bipf.mkString(it) }
     }
 
     fun kanban(bid: String?, prev: List<String>?, operation: String, args: List<String>?) {
@@ -276,9 +293,9 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         else
             Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
 
-        if(prev != null) {
+        if (prev != null) {
             val prevList = Bipf.mkList()
-            for(p in prev) {
+            for (p in prev) {
                 Bipf.list_append(prevList, Bipf.mkString(p))
             }
             Bipf.list_append(lst, prevList)
@@ -288,8 +305,8 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
 
         Bipf.list_append(lst, Bipf.mkString(operation))
 
-        if(args != null) {
-            for(arg in args) {
+        if (args != null) {
+            for (arg in args) {
                 Bipf.list_append(lst, Bipf.mkString(arg))
             }
         }
@@ -298,12 +315,12 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
 
         if (body != null) {
             Log.d("kanban", "published bytes: " + Bipf.decode(body))
-            act.tinyNode.publish_public_content(body)
+            act.tinyNode.publish_content(body)
         }
         //val body = Bipf.encode(lst)
         //Log.d("KANBAN BIPF ENCODE", Bipf.bipf_list2JSON(Bipf.decode(body!!)!!).toString())
         //if (body != null)
-            //act.tinyNode.publish_public_content(body)
+        //act.tinyNode.publish_public_content(body)
 
     }
 
@@ -314,24 +331,38 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     }
 
     fun sendTinyEventToFrontend(entry: LogTinyEntry) {
-        Log.d("wai","sendTinyEvent ${entry.body.toHex()}")
+        Log.d("wai", "sendTinyEvent ${entry.body.toHex()}")
         sendToFrontend(entry.fid, entry.seq, entry.mid, entry.body)
     }
 
     fun sendToFrontend(fid: ByteArray, seq: Int, mid: ByteArray, payload: ByteArray) {
         Log.d("wai", "sendToFrontend seq=${seq} ${payload.toHex()}")
-        val bodyList = Bipf.decode(payload)
+        var confid = false
+        var bodyList = Bipf.decode(payload)
+        if (bodyList!!.typ == BIPF_STRING) { //private, decrypt
+            Log.d("send", bodyList.getString())
+            val x = act.idStore.identity.decryptPrivateMessage(bodyList.getString())
+            bodyList = Bipf.decode(x!!)
+            confid = true
+        }
+
         if (bodyList == null || bodyList.typ != BIPF_LIST) {
             Log.d("sendToFrontend", "decoded payload == null")
             return
         }
-        val param = Bipf.bipf_list2JSON(bodyList)
-        var hdr = JSONObject()
+        val param = bipf_list2JSON(bodyList)
+        val hdr = JSONObject()
         hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
         hdr.put("ref", mid.toBase64())
         hdr.put("seq", seq)
-        var cmd = "b2f_new_event({header:${hdr.toString()},"
-        cmd += "public:${param.toString()}"
+        var cmd = "b2f_new_event({\"header\":${hdr},"
+        if (confid) {
+            cmd += "\"public\":${null},"
+            cmd += "\"confid\":${param.toString()}"
+        } else {
+            cmd += "\"public\":${param.toString()},"
+            cmd += "\"confid\":${null}"
+        }
         cmd += "});"
         Log.d("CMD", cmd)
         eval(cmd)

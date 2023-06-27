@@ -274,10 +274,10 @@ function new_text_post(s) {
     var recps;
     if (curr_chat == "ALL") {
         recps = "ALL";
-        backend("publ:post [] " + btoa(draft) + " null"); //  + recps)
+        backend("post [] " + btoa(draft) + " null null")
     } else {
         recps = tremola.chats[curr_chat].members.join(' ');
-        backend("priv:post [] " + btoa(draft) + " null " + recps);
+        backend("post [] " + btoa(draft) + " null " + recps);
     }
     document.getElementById('draft').value = '';
     closeOverlay();
@@ -292,8 +292,13 @@ function new_voice_post(voice_b64) {
   if (draft.length == 0)
     draft = "null"
   else
-    draft = btoa(draft)
-  backend("publ:post " + draft + " " + voice_b64) //  + recps)
+    if (curr_chat == "ALL") { // public message
+        recps = "ALL";
+        backend("post " + btoa(draft) + " " + voice_b64 + " null");
+    } else {  // private message
+        recps = tremola.chats[curr_chat].members.join(' ');
+        backend("post " + btoa(draft) + " " + voice_b64+ " " + recps);
+    }
   document.getElementById('draft').value = '';
 }
 
@@ -313,7 +318,7 @@ function new_image_post() {
     if (caption && caption.length > 0)
         draft += caption;
     var recps = tremola.chats[curr_chat].members.join(' ')
-    backend("priv:post " + btoa(draft) + " " + recps);
+    backend("post " + btoa(draft) + " " + recps);
     curr_img_candidate = null;
     closeOverlay();
     setTimeout(function () { // let image rendering (fetching size) take place before we scroll
@@ -408,11 +413,12 @@ function load_chat_title(ch) {
     c.innerHTML = box;
 }
 
+// load the list of chats from the "chat" scenario
 function load_chat_list() {
     var meOnly = recps2nm([myId])
     // console.log('meOnly', meOnly)
     document.getElementById('lst:chats').innerHTML = '';
-    // load_chat_item(meOnly) TODO reactivate when encrypted chats are implemented
+    load_chat_item(meOnly)
     var lop = [];
     for (var p in tremola.chats) {
         if (p != meOnly && !tremola.chats[p]['forgotten'])
@@ -431,6 +437,7 @@ function load_chat_list() {
                 load_chat_item(p)
 }
 
+// load one item from the "chat" scenario
 function load_chat_item(nm) { // appends a button for conversation with name nm to the conv list
     var cl, mem, item, bg, row, badge, badgeId, cnt;
     cl = document.getElementById('lst:chats');
@@ -536,6 +543,10 @@ function toggle_forget_contact(e) {
     load_contact_list();
 }
 
+/**
+ * Save a nickname for a user.
+ * If not present, save its shortname as alias.
+ */
 function save_content_alias() {
     var val = document.getElementById('old_contact_alias').value;
     if (val == '')
@@ -623,6 +634,7 @@ function show_peer_details(id) {
     menu_edit("trust_wifi_peer", "Trust and Autoconnect<br>&nbsp;<br><strong>" + new_contact_id + "</strong><br>&nbsp;<br>Should this WiFi peer be trusted (and autoconnected to)? Also enter an alias for the peer - only you will see this alias", "?")
 }
 
+// Count number of unread messages for one conversation to display in "chat" scenario
 function getUnreadCnt(nm) {
     var c = tremola.chats[nm], cnt = 0;
     for (var p in c.posts) {
@@ -632,6 +644,7 @@ function getUnreadCnt(nm) {
     return cnt;
 }
 
+// get the number of unread messages for each chat item in the "chat" scenario
 function set_chats_badge(nm) {
     var e = document.getElementById(nm + '-badge'), cnt;
     cnt = getUnreadCnt(nm)
@@ -738,7 +751,7 @@ function backend(cmdStr) { // send this to Kotlin (or simulate in case of browse
     else if (cmdStr[0] == "wipe") {
         resetTremola()
         location.reload()
-    } else if (cmdStr[0] == 'priv:post') {
+    } else if (cmdStr[0] == 'post') {
         var draft = atob(cmdStr[1])
         cmdStr.splice(0, 2)
         var e = {
@@ -794,16 +807,13 @@ function resetTremola() { // wipes browser-side content
         "settings": get_default_settings(),
         "board": {}
     }
-//    var n = recps2nm([myId]) // TODO Should uncomment?
+    var n = recps2nm([myId])
 
-    // TODO reactivate when encrypted chats are implemented (Actually not sure)
-    /*
     tremola.chats[n] = {
         "alias": "local notes (for my eyes only)", "posts": {}, "forgotten": false,
         "members": [myId], "touched": Date.now(), "lastRead": 0,
         "timeline": new Timeline()
     };
-    */
 
     tremola.chats["ALL"] = {
         "alias": "Public channel", "posts": {},
@@ -961,18 +971,53 @@ function b2f_local_peer(type, identifier, displayname, status) {
 
 function b2f_new_event(e) { // incoming SSB log event: we get map with three entries
                             // console.log('hdr', JSON.stringify(e.header))
-    console.log('pub', JSON.stringify(e.public))
-    // console.log('cfd', JSON.stringify(e.confid))
-    console.log("New Frontend Event: " + JSON.stringify(e.header))
+    console.log('pub', "New Frontend Event: " + JSON.stringify(e))
 
-    //add
+    // add new contact
     if (!(e.header.fid in tremola.contacts)) {
+        console.log('cfd', "Adding myself as a new contact: " + e.header.fid)
         var a = id2b32(e.header.fid);
         tremola.contacts[e.header.fid] = {
             "alias": a, "initial": a.substring(0, 1).toUpperCase(),
             "color": colors[Math.floor(colors.length * Math.random())]
         }
         load_contact_list()
+    }
+    if (e.confid !== null && e.confid[0] === 'TAV') {
+        var conv_name = recps2nm(e.confid[4]);
+        console.log('cfd', "Which means it WORKS!!!   2: i = " + "i" + ", conv_name = " + conv_name)
+        if (!(conv_name in tremola.chats)) { // create new conversation if needed
+            tremola.chats[conv_name] = {
+                "alias": "Unnamed conversation", "posts": {},
+                "members": e.confid[4], "touched": Date.now(), "lastRead": 0,
+                "timeline": new Timeline()
+            };
+            console.log('cfd', 'Creating new chat: ' + conv_name + ': ' + JSON.stringify(e.tremola.chats[conv_name]))
+            load_chat_list()
+        }
+        var i;
+        for (i in e.confid[4]) {
+            var id, r = e.confid[4][i];
+            if (!(r in tremola.contacts))
+                id2b32(r, 'b2f_new_event_back')
+        }
+        var ch = tremola.chats[conv_name];
+        if (ch.timeline === null)
+            ch["timeline"] = new Timeline();
+            console.log('cfd', "new timeline: " + JSON.stringify(ch))
+        if (!(e.header.ref in ch.posts)) { // new post
+            var p = {"key": e.header.ref, "from": e.header.fid, "body": e.confid[1], "when": e.confid[3] * 1000};
+            ch["posts"][e.header.ref] = p;
+            console.log('cfd', "New post: " + JSON.stringify(p))
+            if (ch["touched"] < e.header.tst)
+                ch["touched"] = e.header.tst
+            if (curr_scenario === "posts" && curr_chat === conv_name) {
+                load_chat(conv_name); // reload all messages (not very efficient ...)
+                ch["lastRead"] = Date.now();
+            }
+            set_chats_badge(conv_name)
+        }
+        load_chat_list();
     }
 
     if (e.public) {
