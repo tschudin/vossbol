@@ -59,6 +59,30 @@ function menu_new_pub() {
     menu_edit('new_pub_target', "Enter address of trustworthy pub<br><br>Format:<br><tt>net:IP_ADDR:PORT~shs:ID_OF_PUB</tt>", "");
 }
 
+function menu_new_game() {
+    var choices = '';
+    for (var m in tremola.contacts) {
+//        if (m != myId) {
+            choices += '<div style="margin-bottom: 10px;"><label><input type="checkbox" id="' + m;
+            choices += '" style="vertical-align: middle;"><div class="contact_item_button light" style="white-space: nowrap; width: calc(100% - 40px); padding: 5px; vertical-align: middle;">';
+            choices += '<div style="text-overflow: ellipis; overflow: hidden;">' + escapeHTML(fid2display(m)) + '</div>';
+            choices += '<div style="text-overflow: ellipis; overflow: hidden;"><font size=-2>' + m + '</font></div>';
+            choices += '</div></label></div>\n';
+//        }
+    }
+    document.getElementById('lst:members').innerHTML = choices;
+    prev_scenario = 'game-init';
+    setScenario("members");
+    document.getElementById("div:textarea").style.display = 'none';
+    document.getElementById("div:confirm-members").style.display = 'flex';
+    document.getElementById("tremolaTitle").style.display = 'none';
+    var c = document.getElementById("conversationTitle");
+    c.style.display = null;
+    c.innerHTML = "<font size=+1><strong>Create New Game</strong></font><br>Select one members";
+    document.getElementById('plus').style.display = 'none';
+    closeOverlay();
+}
+
 function menu_invite() {
     menu_edit('new_invite_target', "Enter invite code<br><br>Format:<br><tt>IP_ADDR:PORT:@ID_OF_PUB.ed25519~INVITE_CODE</tt>", "");
 }
@@ -205,9 +229,11 @@ function edit_confirmed() {
 
 function members_confirmed() {
     if (prev_scenario == 'chats') {
-        new_conversation()
+        new_conversation();
     } else if (prev_scenario == 'kanban') {
-        menu_new_board_name()
+        menu_new_board_name();
+    } else if (prev_scenario == 'game-init') {
+        new_game();
     }
 }
 
@@ -573,6 +599,8 @@ function new_conversation() {
     // { "alias":"local notes (for my eyes only)", "posts":{}, "members":[myId], "touched": millis }
     var recps = []
     for (var m in tremola.contacts) {
+        console.log("New chat with " + m);
+        console.log("New chat with " + document.getElementById(m));
         if (document.getElementById(m).checked)
             recps.push(m);
     }
@@ -805,7 +833,8 @@ function resetTremola() { // wipes browser-side content
         "profile": {},
         "id": myId,
         "settings": get_default_settings(),
-        "board": {}
+        "board": {},
+        "games": {}
     }
     var n = recps2nm([myId])
 
@@ -933,7 +962,7 @@ function b2f_update_progress(min_entries, old_min_entries, old_want_entries, cur
 }
 
 function b2f_local_peer(type, identifier, displayname, status) {
-    console.log("incoming displayname:", displayname)
+//    console.log("incoming displayname:", displayname)
     if (displayname == "null") {
         displayname = identifier
     }
@@ -957,7 +986,7 @@ function b2f_local_peer(type, identifier, displayname, status) {
         }
 
 
-    console.log("local_peer:", type, identifier, displayname, status)
+//    console.log("local_peer:", type, identifier, displayname, status)
 
     if (status == "offline") {
       delete localPeers[identifier]
@@ -1110,7 +1139,7 @@ function b2f_new_image_blob(ref) {
 }
 
 function b2f_initialize(id) {
-    myId = id
+    myId = id;
     if (window.localStorage.tremola) {
         tremola = JSON.parse(window.localStorage.getItem('tremola'));
 
@@ -1119,23 +1148,28 @@ function b2f_initialize(id) {
     } else
         tremola = null;
     if (tremola == null) {
-        resetTremola();
-        console.log("reset tremola")
+        resetTremola();;
+        console.log("reset tremola");
     }
     if (typeof Android == 'undefined')
-        console.log("loaded ", JSON.stringify(tremola))
+        console.log("loaded ", JSON.stringify(tremola));
     if (!('settings' in tremola))
-        tremola.settings = {}
+        tremola.settings = {};
     var nm, ref;
     for (nm in tremola.settings)
-        setSetting(nm, tremola.settings[nm])
-    load_chat_list()
-    load_contact_list()
-    load_board_list()
+        setSetting(nm, tremola.settings[nm]);
 
+    tremola.games = {};
+    load_chat_list();
+    load_contact_list();
+    load_board_list();
+    load_game_list();
     closeOverlay();
-    setScenario('chats');
+    add_game_with_self();
+    setScenario('game-init');
+    load_game(myId)
     // load_chat("ALL");
+    persist();
 }
 
 // --- eof

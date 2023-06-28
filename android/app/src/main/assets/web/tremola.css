@@ -618,3 +618,48 @@ input:checked + .slider:before {
   grid-area: text;
 }
 
+.game-body {
+  margin: 0;
+  padding: 10px;
+}
+
+.game-main-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(90vw / var(--cols)), 1fr));
+  grid-gap: 0;
+  margin-right: 10px;
+  margin-left: 10px;
+  height: calc(60vh - 20px); /* 3/5 of screen height minus 20px (top and bottom padding) */
+}
+
+.game-grid-item {
+  text-align: center;
+  margin: 0;
+}
+
+.game-grid-item button, .game-grid-item div {
+  width: 100%;
+  height: 100%;
+  background-color: blue;
+  color: white;
+  border: 1px solid black;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 6px;
+  border-radius: 0;
+}
+
+.game-small-container {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 200px;
+  height: 200px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(200px / var(--cols)), 1fr));
+  grid-gap: 0;
+  margin: 0;
+  font-size: 6px;
+}

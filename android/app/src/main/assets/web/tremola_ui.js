@@ -6,9 +6,9 @@ var overlayIsActive = false;
 
 var display_or_not = [
     'div:qr', 'div:back',
-    'core', 'lst:chats', 'lst:posts', 'lst:contacts', 'lst:members', 'the:connex',
+    'core', 'lst:chats', 'lst:posts', 'lst:contacts', 'lst:members', 'lst:game', 'the:connex',
     'lst:kanban', 'div:footer', 'div:textarea', 'div:confirm-members', 'plus',
-    'div:settings', 'div:board'
+    'div:settings', 'div:board', 'game:main-grid', 'game:small-grid'
 ];
 
 var prev_scenario = 'chats';
@@ -22,11 +22,14 @@ var scenarioDisplay = {
     'members': ['div:back', 'core', 'lst:members', 'div:confirm-members'],
     'settings': ['div:back', 'div:settings'],
     'kanban': ['div:qr', 'core', 'lst:kanban', 'div:footer', 'plus'],
-    'board': ['div:back', 'core', 'div:board']
+    'board': ['div:back', 'core', 'div:board'],
+    'game-init': ['div:back', 'core', 'lst:game', 'div:footer', 'plus' ],
+    'game': ['div:back', 'game:main-grid', 'game:small-grid' ]
 }
 
 var scenarioMenu = {
-    'chats': [['Connected Devices', 'menu_connection'],
+    'chats': [['Launch my game', 'menu_new_game'],
+        ['Connected Devices', 'menu_connection'],
         ['New conversation', 'menu_new_conversation'],
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
@@ -51,6 +54,9 @@ var scenarioMenu = {
       ['Dump', 'menu_dump'],
       ['Reset', 'menu_reset']]
     */
+    'game-init': [['Connected Devices', 'menu_connection'],
+        ['Settings', 'menu_settings'],
+        ['About', 'menu_about']],
     'posts': [/* ['Take picture', 'menu_take_picture'], // conversation
                 ['Pick image', 'menu_pick_image'], */
         ['Connected Devices', 'menu_connection'],
@@ -76,7 +82,11 @@ var scenarioMenu = {
         ['Reload', 'reload_curr_board'],
         ['Leave', 'leave_curr_board'],
         ['(un)Forget', 'board_toggle_forget'],
-        ['Debug', 'ui_debug']]
+        ['Debug', 'ui_debug']],
+
+    'game': [['Remove game', 'terminate'],
+        ['Settings', 'menu_settings'],
+        ['About', 'menu_about']]
 }
 
 function onBackPressed() {
@@ -84,11 +94,13 @@ function onBackPressed() {
         closeOverlay();
         return;
     }
-    if (['chats', 'contacts', 'connex', 'board'].indexOf(curr_scenario) >= 0) {
+    if (['chats', 'contacts', 'connex', 'board', 'game', 'game-init'].indexOf(curr_scenario) >= 0) {
         if (curr_scenario == 'chats')
             backend("onBackPressed");
         else if (curr_scenario == 'board')
             setScenario('kanban')
+        else if (curr_scenario == 'game')
+            setScenario('game-init')
         else
             setScenario('chats')
     } else {
@@ -106,7 +118,7 @@ function setScenario(s) {
     var lst = scenarioDisplay[s];
     if (lst) {
         // if (s != 'posts' && curr_scenario != "members" && curr_scenario != 'posts') {
-        if (['chats', 'contacts', 'connex', 'kanban'].indexOf(curr_scenario) >= 0) {
+        if (['chats', 'contacts', 'connex', 'kanban', 'game-init'].indexOf(curr_scenario) >= 0) {
             var cl = document.getElementById('btn:' + curr_scenario).classList;
             cl.toggle('active', false);
             cl.toggle('passive', true);
@@ -140,7 +152,7 @@ function setScenario(s) {
             prev_scenario = s;
         }
         curr_scenario = s;
-        if (['chats', 'contacts', 'connex', 'kanban'].indexOf(curr_scenario) >= 0) {
+        if (['chats', 'contacts', 'connex', 'kanban', 'game-init'].indexOf(curr_scenario) >= 0) {
             var cl = document.getElementById('btn:' + curr_scenario).classList;
             cl.toggle('active', true);
             cl.toggle('passive', false);
@@ -154,7 +166,7 @@ function setScenario(s) {
 
 function btnBridge(e) {
     var e = e.id, m = '';
-    if (['btn:chats', 'btn:posts', 'btn:contacts', 'btn:connex', 'btn:kanban'].indexOf(e) >= 0) {
+    if (['btn:chats', 'btn:posts', 'btn:contacts', 'btn:connex', 'btn:kanban', 'btn:game-init'].indexOf(e) >= 0) {
         setScenario(e.substring(4));
     }
     if (e == 'btn:menu') {
@@ -269,6 +281,8 @@ function plus_button() {
         menu_new_pub();
     } else if (curr_scenario == 'kanban') {
         menu_new_board();
+    } else if (curr_scenario == 'game-init') {
+        menu_new_game();
     }
 }
 
