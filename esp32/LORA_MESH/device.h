@@ -17,7 +17,7 @@
 #define BUTTON_PIN KEY_BUILTIN  // for heltec?
 
 // ----------------------------------------------------------------------
-#elif #ARDUINO_VARIANT == tbeam // ARDUINO_TBeam
+#else // ARDUINO_TBeam
 
 # include <axp20x.h>
 # include <Wire.h>
@@ -46,8 +46,6 @@
 // user button
 #define BUTTON_PIN 38 // this is for T_BEAM_V10; V7 used pin 39
 
-#else
-#warning "unknown board"
 #endif // device specific
 // ----------------------------------------------------------------------
 

@@ -27,8 +27,8 @@ GOsetClass *theGOset = new GOsetClass();
 
 int ble_clients = 0;
 
-#if !defined(NO_OLED) && #ARDUINO_VARIANT == tbeam
-SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
+#if !defined(NO_OLED) && !defined(WIFI_LoRa_32_V2) && !defined(WIFI_LORA_32_V2)
+  SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 #endif
 
 /* FTP server would be neat:
