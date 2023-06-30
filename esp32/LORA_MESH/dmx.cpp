@@ -64,7 +64,7 @@ void DmxClass::arm_dmx(unsigned char *dmx,
 
 void DmxClass::arm_blb(unsigned char *h,
              void (*fct)(unsigned char*, int, int, struct face_s*),
-             unsigned char *fid, int seq, int bnr)
+                       unsigned char *fid, int seq, int bnr, int last)
 {
   int ndx = this->_blbt_index(h);
   if (ndx >= 0) // this entry will be either erased or newly written to
@@ -90,6 +90,7 @@ void DmxClass::arm_blb(unsigned char *h,
   memcpy(this->blbt[ndx].fid, fid, FID_LEN);
   this->blbt[ndx].seq = seq;
   this->blbt[ndx].bnr = bnr;
+  this->blbt[ndx].last_bnr = last;
 }
 
 void DmxClass::compute_dmx(unsigned char *dst, unsigned char *buf, int len)

@@ -336,11 +336,7 @@ void RepoClass::sidechain_append(unsigned char *buf, int blbt_ndx)
     f.write(buf, TINYSSB_PKT_LEN);
     f.close();
     this->chunk_cnt++;
-    int i;
-    for (i = TINYSSB_PKT_LEN - HASH_LEN; i < TINYSSB_PKT_LEN; i++)
-      if (buf[i] != 0)
-         break;
-    if (i == TINYSSB_PKT_LEN) { // end of chain reached, rename file
+    if (bp->bnr >= bp->last_bnr) { // end of chain reached, rename file
       char *old = _feed_chnk(bp->fid, bp->seq, 1);
       char *fin = strdup(old);
       char *pos = strrchr(fin, '!');
@@ -349,14 +345,13 @@ void RepoClass::sidechain_append(unsigned char *buf, int blbt_ndx)
       free(fin);
     } else { // chain extends, install next chunk handler
       unsigned char *hptr = buf + TINYSSB_PKT_LEN - HASH_LEN;
-      dmx->arm_blb(hptr, incoming_chunk, bp->fid, bp->seq, bp->bnr+1);
+      dmx->arm_blb(hptr, incoming_chunk, bp->fid, bp->seq, bp->bnr+1, bp->last_bnr);
       // Serial.printf("   armed %s for %d.%d.%d\r\n", to_hex(hptr, HASH_LEN),
       //               ndx, bp->seq, bp->bnr+1);
-
     }
   } else
-    Serial.printf("  invalid chunk %d.%d.%d or file problem?\r\n",
-                  ndx, bp->seq, bp->bnr);
+    Serial.printf("  invalid chunk %d.%d.%d/%d or file problem?\r\n",
+                  ndx, bp->seq, bp->bnr, bp->last_bnr);
   dmx->arm_blb(bp->h); // remove old CHUNK handler for this packet
 }
 

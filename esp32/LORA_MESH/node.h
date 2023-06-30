@@ -206,31 +206,33 @@ void node_tick()
     while (g) {
       char *pos = strchr(g.name(), '!');
       if (pos != NULL) { // unfinished chain
-        int seq = atoi(pos+1);
+        int last_chunknr;
         unsigned char h[HASH_LEN];
-        int sz = g.size();
-        if (sz == 0) { // must fetch first ptr from log
-          unsigned char *pkt = repo->feed_read(fid, seq);
-          if (pkt != NULL)
-            memcpy(h, pkt+DMX_LEN+1+28, HASH_LEN);
-          else
+        int seq = atoi(pos+1);
+        unsigned char *pkt = repo->feed_read(fid, seq);
+        if (pkt != NULL && pkt[DMX_LEN] == PKTTYPE_chain20) {
+          // read length of content
+          int len = 4; // max length of content length field
+          int content_len = bipf_varint_decode(pkt, DMX_LEN+1, &len);
+          content_len -= 48 - HASH_LEN - len; // content in the sidechain proper
+          last_chunknr = (content_len + TINYSSB_PKT_LEN - 1) / TINYSSB_SCC_LEN;
+          int chainfile_len = g.size();
+          if (last_chunknr <= chainfile_len / TINYSSB_PKT_LEN)  // something is wrong
             seq = -1;
-        } else { // must fetch latest ptr from chain file
-          // Serial.printf("    must fetch latest ptr from chain file\r\n");
-          g.seek(sz - HASH_LEN, SeekSet);
-          if (g.read(h, HASH_LEN) != HASH_LEN) {
-            // Serial.println("could not read() after seek");
-            seq = -1;
-          } else {
-            int j;
-            for (j = 0; j < HASH_LEN; j++) {
-              if (h[j] != 0)
-                break;
+          else {
+            if (chainfile_len == 0) // fetch first ptr from log entry
+              memcpy(h, pkt+DMX_LEN+1+28, HASH_LEN);
+            else {
+              // Serial.printf("    must fetch latest ptr from chain file\r\n");
+              g.seek(chainfile_len - HASH_LEN, SeekSet);
+              if (g.read(h, HASH_LEN) != HASH_LEN) {
+                // Serial.println("could not read() after seek");
+                seq = -1;
+              }
             }
-            if (j == HASH_LEN) // reached end of chain
-              seq = -1;
           }
-        }
+        } else
+          seq = -1;
         if (seq > 0) {
           int next_chunk = g.size() / TINYSSB_PKT_LEN;
           // FIXME: check if sidechain is already full, then swap '.' for '!' (e.g. after a crash)
@@ -239,9 +241,9 @@ void node_tick()
           bipf_list_append(slptr, bipf_mkInt(seq));
           bipf_list_append(slptr, bipf_mkInt(next_chunk));
           bipf_list_append(lptr, slptr);
-          dmx->arm_blb(h, incoming_chunk, fid, seq, next_chunk);
-          // Serial.printf("   armed %s for %d.%d.%d\r\n", to_hex(h, HASH_LEN),
-          //               ndx, seq, next_chunk);
+          dmx->arm_blb(h, incoming_chunk, fid, seq, next_chunk, last_chunknr);
+          // Serial.printf("   armed %s for %d.%d.%d/%d\r\n", to_hex(h, HASH_LEN),
+          //               ndx, seq, next_chunk, last_chunknr);
           v += (v.length() == 0 ? "[ " : " ") + String(ndx) + "." + String(seq) + "." + String(next_chunk);
           encoding_len += bipf_encodingLength(slptr);
           if (requested_first == -1)

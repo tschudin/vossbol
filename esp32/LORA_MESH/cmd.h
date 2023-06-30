@@ -158,7 +158,7 @@ void cmd_rx(String cmd) {
                 File h = MyFS.open(path, FILE_READ);
                 int sz2 = h.size();
                 h.close();
-                if ((sz2 / TINYSSB_PKT_LEN) != ((sz - (48 - HASH_LEN - len) + TINYSSB_PKT_LEN-1)/ TINYSSB_PKT_LEN)) {
+                if ((sz2 / TINYSSB_PKT_LEN) != ((sz - (48 - HASH_LEN - len) + TINYSSB_SCC_LEN-1)/ TINYSSB_SCC_LEN)) {
                   Serial.printf(" !! sidechain size mismatch %s: sz=%d, len=%d\r\n", path, sz, sz2);
                   if (doit) {
                     Serial.printf("    removing sidechain file %s\r\n", path);

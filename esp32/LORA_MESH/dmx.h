@@ -24,6 +24,7 @@ struct blb_s {
   unsigned char *fid;
   int seq;
   int bnr;
+  int last_bnr;
 };
 
 class DmxClass {
@@ -46,7 +47,7 @@ class DmxClass {
                unsigned char *aux=NULL);
   void arm_blb(unsigned char *h,
                void (*fct)(unsigned char*, int, int, struct face_s*)=NULL,
-               unsigned char *fid=NULL, int seq=-1, int bnr=-1);
+               unsigned char *fid=NULL, int seq=-1, int bnr=-1, int last=0);
   void compute_dmx(unsigned char *dst, unsigned char *buf, int len);
   int on_rx(unsigned char *buf, int len, struct face_s *f);
   void set_want_dmx();

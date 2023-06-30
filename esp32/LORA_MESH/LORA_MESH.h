@@ -40,7 +40,8 @@
 #define DMX_LEN          7
 #define GOSET_DMX_STR    "tinySSB-0.1 GOset 1"
 
-#define TINYSSB_PKT_LEN   120
+#define TINYSSB_PKT_LEN  120
+#define TINYSSB_SCC_LEN  (TINYSSB_PKT_LEN - HASH_LEN) // sidechain content per packet
 
 #define tSSB_WIFI_SSID   "tinySSB"
 #define tSSB_WIFI_PW     "dWeb2022"
