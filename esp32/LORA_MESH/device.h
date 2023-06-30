@@ -5,6 +5,7 @@
 
 // collect all external libraries here
 
+// ----------------------------------------------------------------------
 #if defined(WIFI_LoRa_32_V2) || defined(WIFI_LORA_32_V2)
 
 # include <heltec.h>
@@ -15,20 +16,19 @@
 // user button
 #define BUTTON_PIN KEY_BUILTIN  // for heltec?
 
-
-#else // ARDUINO_TBeam
+// ----------------------------------------------------------------------
+#elif #ARDUINO_VARIANT == tbeam // ARDUINO_TBeam
 
 # include <axp20x.h>
 # include <Wire.h>
 
-# if !defined(NO_LORA)
-#  include <LoRa.h>
-# endif
+#if !defined(NO_LORA)
+# include <LoRa.h>
+#endif
 
 #if !defined(NO_OLED)
 # include <SSD1306.h> // display
-kk;
-SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
+  extern SSD1306 theDisplay; // lilygo t-beam
 #endif
 
 // GPS
@@ -46,8 +46,13 @@ SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
 // user button
 #define BUTTON_PIN 38 // this is for T_BEAM_V10; V7 used pin 39
 
+#else
+#warning "unknown board"
 #endif // device specific
+// ----------------------------------------------------------------------
 
+
+// device-unspecific includes:
 
 // user button
 #include <Button2.h>

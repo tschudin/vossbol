@@ -1,7 +1,7 @@
 # Makefile
 
 # usage:
-#   make compile [BOARD=heltec]
+#   make compile [BOARD=heltec], default is for T-Beam
 #   make upload  SERIAL=/dev/tty.....
 #   make monitor SERIAL=/dev/tty.....
 
@@ -17,14 +17,10 @@ ifeq ($(BOARD),heltec)
 endif
 
 ifndef SERIAL
-  ifeq ($(BOARD),heltec)
-    SERIAL=/dev/tty.usbserial-47           # heltec LORA32
+  ifeq ($(BOARD),heltec) # heltec LORA32
     SERIAL = $(shell ls /dev/tty.usbserial-*)
-  else
-    # SERIAL=/dev/tty.wchusbserial54750108741  # fc84
-    #SERIAL=/dev/tty.wchusbserial54750108751  # fcd4
-    # SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
-    SERIAL=/dev/tty.wchusbserial54750389471  # f948
+  else # T-Beam
+    SERIAL = $(shell ls /dev/tty.wchusbserial*)
   endif
 endif
 
@@ -43,16 +39,11 @@ compile:
 		--build-properties build.partitions=partitions.csv,upload.maximum_size=1572864
 
 upload:
-	$(info ** uploading to $(SERIAL))
-	$(info )
-	$(BINDIR)/arduino-cli upload -v --fqbn $(FQBN) -p $(SERIAL) .
+	$(foreach var,$(SERIAL), $(BINDIR)/arduino-cli upload -v --fqbn $(FQBN) -p $(var) .;)
 
 monitor:
 	$(info use CTRL-A CTRL-\ to quit the screen program)
 	screen $(SERIAL) 115200
-
-upload2:
-	$(foreach var,$(SERIAL), $(BINDIR)/arduino-cli upload -v --fqbn $(FQBN) -p $(var) .;)
 
 clean:
 	rm -rf *~

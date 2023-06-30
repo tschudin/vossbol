@@ -22,6 +22,8 @@ void incoming_want_request(unsigned char *buf, int len, unsigned char *aux, stru
   int offs = lst[0]->u.i;
   String v = "";
   int credit = 3;
+  // FIXME: should assemble sequence of log entries from different feeds, if possible.
+  // otherwise a lost tSSB packet will render the subsequent packets useless
   for (int i = 1; i < lptr->cnt; i++) {
     if (lst[i]->typ != BIPF_INT) continue;
     int fNDX = (offs + i-1) % theGOset->goset_len;
@@ -50,6 +52,8 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux, stru
   String v = "";
   struct bipf_s **slpptr = lptr->u.list;
   int credit = 2; // 3;
+  // FIXME: should assemble sequence of chunks from different sidechains, if possible.
+  // otherwise a lost tSSB packet will render the subsequent chained packets useless
   for (int i = 0; i < lptr->cnt; i++, slpptr++) {
     if ((*slpptr)->typ != BIPF_LIST || (*slpptr)->cnt < 3 ||
         (*slpptr)->u.list[0]->typ != BIPF_INT || (*slpptr)->u.list[1]->typ != BIPF_INT)

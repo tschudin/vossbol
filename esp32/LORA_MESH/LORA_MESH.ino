@@ -27,6 +27,9 @@ GOsetClass *theGOset = new GOsetClass();
 
 int ble_clients = 0;
 
+#if !defined(NO_OLED) && #ARDUINO_VARIANT == tbeam
+SSD1306 theDisplay(0x3c, 21, 22); // lilygo t-beam
+#endif
 
 /* FTP server would be neat:
 // #define DEFAULT_STORAGE_TYPE_ESP32 STORAGE_LITTLEFS
