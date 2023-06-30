@@ -7,7 +7,8 @@
 
 
 # place where the arduino-cli executable sits:
-BINDIR=/opt/homebrew/bin    # /usr/local/bin
+BINDIR=/opt/homebrew/bin
+# /usr/local/bin
 
 # name of the ino file:
 MAIN=LORA_MESH.ino
