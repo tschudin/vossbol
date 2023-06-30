@@ -154,9 +154,21 @@ void cmd_rx(String cmd) {
             // Serial.printf("   sidechain will have %d bytes\r\n", sz);
             if (sz > (48 - HASH_LEN - len)) { // entry HAS/SHOULD have a sidechain file
               path = repo->_feed_chnk(fid, i, 0);
-              if (MyFS.exists(path))
+              if (MyFS.exists(path)) {
+                File h = MyFS.open(path, FILE_READ);
+                int sz2 = h.size();
+                h.close();
+                if ((sz2 / TINYSSB_PKT_LEN) != ((sz - (48 - HASH_LEN - len) + TINYSSB_PKT_LEN-1)/ TINYSSB_PKT_LEN)) {
+                  Serial.printf(" !! sidechain size mismatch %s: sz=%d, len=%d\r\n", path, sz, sz2);
+                  if (doit) {
+                    Serial.printf("    removing sidechain file %s\r\n", path);
+                    MyFS.remove(path);
+                    // esp_restart(); // because chunk count got changed
+                  }
+                }
                 continue;
                 // FIXME: should also check whether length is OK, and no !nn file exists
+              }
               path = repo->_feed_chnk(fid, i, 1);
               if (MyFS.exists(path))
                 continue;
@@ -164,7 +176,8 @@ void cmd_rx(String cmd) {
               if (doit) {
                 Serial.printf(" !! creating the missing sidechain file %s\r\n", path);
                 MyFS.open(path, FILE_WRITE).close();
-              }
+              } else
+                Serial.printf(" !! missing sidechain file %s\r\n", path);
             } else { // encoding error, no sidechain file should exist for this small content
               path = repo->_feed_chnk(fid, i, 1);
               if (MyFS.exists(path)) {
