@@ -121,12 +121,16 @@ void node_tick()
     return;
   node_next_vector = now + NODE_ROUND_LEN + esp_random() % 500;
 
+  lora_pps = 0.75 * lora_pps + 0.25 * 1000.0 * lora_pkt_cnt / NODE_ROUND_LEN;
+  // lora_pps = 1000.0 * lora_pkt_cnt / NODE_ROUND_LEN;
+  lora_pkt_cnt = 0;
+ 
   Serial.printf("-- t=%d.%03d ", now/1000, now%1000);
 #if defined(AXP_DEBUG)
-  Serial.printf("battery=%.04gV ", axp.getBattVoltage()/1000);
+  Serial.printf("%.04gV ", axp.getBattVoltage()/1000);
 #endif
-  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d\r\n",
-                dmx->dmxt_cnt, dmx->blbt_cnt, repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap());
+  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d pps=%1.2f\r\n",
+                dmx->dmxt_cnt, dmx->blbt_cnt, repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap(), lora_pps);
 
   // Serial.printf(".. node tick 1\r\n");
   if (theGOset->goset_len == 0)
@@ -206,20 +210,29 @@ void node_tick()
     while (g) {
       char *pos = strchr(g.name(), '!');
       if (pos != NULL) { // unfinished chain
-        int last_chunknr;
+        int chunk_cnt;
         unsigned char h[HASH_LEN];
         int seq = atoi(pos+1);
         unsigned char *pkt = repo->feed_read(fid, seq);
+        fishForNewLoRaPkt();
         if (pkt != NULL && pkt[DMX_LEN] == PKTTYPE_chain20) {
           // read length of content
           int len = 4; // max length of content length field
           int content_len = bipf_varint_decode(pkt, DMX_LEN+1, &len);
           content_len -= 48 - HASH_LEN - len; // content in the sidechain proper
-          last_chunknr = (content_len + TINYSSB_PKT_LEN - 1) / TINYSSB_SCC_LEN;
+          chunk_cnt = (content_len + TINYSSB_SCC_LEN - 1) / TINYSSB_SCC_LEN;
           int chainfile_len = g.size();
-          if (last_chunknr <= chainfile_len / TINYSSB_PKT_LEN)  // something is wrong
+          if (chunk_cnt <= chainfile_len / TINYSSB_PKT_LEN) { // mv file to a '-NNN' name
+            char *fold = repo->_feed_chnk(fid, seq, 1);
+            char *fnew = strdup(fold);
+            char *pos = strrchr(fnew, '!');
+            *pos = '-';
+            Serial.printf(" _ rename %s to %s\r\n", fold, fnew);
+            g.close();
+            MyFS.rename(fold, fnew);
+            free(fnew);
             seq = -1;
-          else {
+          } else {
             if (chainfile_len == 0) // fetch first ptr from log entry
               memcpy(h, pkt+DMX_LEN+1+28, HASH_LEN);
             else {
@@ -235,15 +248,14 @@ void node_tick()
           seq = -1;
         if (seq > 0) {
           int next_chunk = g.size() / TINYSSB_PKT_LEN;
-          // FIXME: check if sidechain is already full, then swap '.' for '!' (e.g. after a crash)
           struct bipf_s *slptr = bipf_mkList();
           bipf_list_append(slptr, bipf_mkInt(ndx));
           bipf_list_append(slptr, bipf_mkInt(seq));
           bipf_list_append(slptr, bipf_mkInt(next_chunk));
           bipf_list_append(lptr, slptr);
-          dmx->arm_blb(h, incoming_chunk, fid, seq, next_chunk, last_chunknr);
+          dmx->arm_blb(h, incoming_chunk, fid, seq, next_chunk, chunk_cnt-1);
           // Serial.printf("   armed %s for %d.%d.%d/%d\r\n", to_hex(h, HASH_LEN),
-          //               ndx, seq, next_chunk, last_chunknr);
+          //               ndx, seq, next_chunk, chunk_cnt-1);
           v += (v.length() == 0 ? "[ " : " ") + String(ndx) + "." + String(seq) + "." + String(next_chunk);
           encoding_len += bipf_encodingLength(slptr);
           if (requested_first == -1)

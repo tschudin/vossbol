@@ -653,7 +653,7 @@ void mgmt_setup()
   crypto_hash_sha256(h, (unsigned char*) MGMT_DMX_STR, strlen(MGMT_DMX_STR));
   memcpy(dmx->mgmt_dmx, h, DMX_LEN);
   dmx->arm_dmx(dmx->mgmt_dmx, mgmt_rx, NULL);
-  Serial.printf("CMD for MGMT is %s\r\n", to_hex(dmx->mgmt_dmx, DMX_LEN, 0));
+  Serial.printf("   DMX for MGMT is %s\r\n", to_hex(dmx->mgmt_dmx, DMX_LEN, 0));
   // get id
   for (int i = 0; i < MGMT_ID_LEN; i++) {
     mgmt_id[i] = my_mac[6 - MGMT_ID_LEN + i];

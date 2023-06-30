@@ -96,7 +96,7 @@ void setup()
   crypto_hash_sha256(h, (unsigned char*) GOSET_DMX_STR, strlen(GOSET_DMX_STR));
   memcpy(dmx->goset_dmx, h, DMX_LEN);
   dmx->arm_dmx(dmx->goset_dmx, theGOset_rx, NULL);
-  Serial.printf("DMX for GOST is %s\r\n", to_hex(dmx->goset_dmx, 7, 0));
+  Serial.printf("   DMX for GOST is %s\r\n", to_hex(dmx->goset_dmx, 7, 0));
 
   mgmt_setup();
 

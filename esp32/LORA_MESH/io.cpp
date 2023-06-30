@@ -33,6 +33,9 @@ struct face_s *faces[] = {
 #endif
 };
 
+int lora_pkt_cnt; // for counting in/outcoming packets per NODE round
+float lora_pps;
+
 // --------------------------------------------------------------------------------
 
 uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
@@ -165,6 +168,7 @@ void lora_send(unsigned char *buf, short len)
 {
 #if !defined(NO_LORA)
   if (LoRa.beginPacket()) {
+    lora_pkt_cnt++;
     uint32_t crc = crc32_ieee(buf, len);
     LoRa.write(buf, len);
     LoRa.write((unsigned char*) &crc, sizeof(crc));
@@ -373,6 +377,7 @@ int fishForNewLoRaPkt()
     int sz = LoRa.parsePacket();
     if (sz <= 0)
       return lora_buf_cnt;
+    lora_pkt_cnt++;
     if (lora_buf_cnt >= LORA_BUF_CNT) {
       Serial.printf("  ohh %d, rcvd too many LoRa pkts, cnt=%d\r\n",
                     sz, lora_buf_cnt);

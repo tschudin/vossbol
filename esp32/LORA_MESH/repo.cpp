@@ -20,6 +20,15 @@ extern void incoming_chnk_request(unsigned char* buf, int len, unsigned char* au
 
 #define MyFS LittleFS
 
+/*
+  files for log and side chains use the following conventions, where N is a digit:
+
+  ./-NNN  complete side chain for log entry with sequence number NNN
+  ./!NNN  incomplete side chain for log entry with sequence number NNN
+  ./+NN   message id (mID) for log entry NN, which typically is the last in ./log
+  ./log   the append-only log
+ */
+
 char* RepoClass::_feed_path(unsigned char *fid)
 {
   static char path[FEED_PATH_SIZE];
@@ -136,6 +145,8 @@ void RepoClass::load()
           }
         } else if (pos[0] == '-' || pos[0] == '!') {
           this->chunk_cnt += g.size() / TINYSSB_PKT_LEN;
+          // we could catch "open" ('!NNN') but finished side chains here, and rename
+          // them to the '-NNN' format, but currently we do it in the node_tick() method
         }
         g.close();
         g = ldir.openNextFile("r");

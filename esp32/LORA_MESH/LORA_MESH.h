@@ -20,7 +20,7 @@
 
 #define LORA_BAND    902.5E6 // USA
 // #define LORA_BAND  865.5E6 // Europe
-#define LORA_BW     250000
+#define LORA_BW     500000
 #define LORA_SF          7
 #define LORA_CR          5
 #define LORA_TXPOWER    20 // highpowermode, otherwise choose 17 or lower

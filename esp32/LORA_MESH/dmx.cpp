@@ -67,12 +67,23 @@ void DmxClass::arm_blb(unsigned char *h,
                        unsigned char *fid, int seq, int bnr, int last)
 {
   int ndx = this->_blbt_index(h);
-  if (ndx >= 0) // this entry will be either erased or newly written to
-      free(this->blbt[ndx].fid);
+  // Serial.printf(" _ arm_blb ndx=%d %s\r\n", ndx, to_hex(h, HASH_LEN));
+  if (ndx >= 0) { // this entry will be either erased or newly written to
+    // Serial.printf("   %p\r\n", this->blbt[ndx].fid);
+    free(this->blbt[ndx].fid);
+    // int fNDX = theGOset->_key_index(this->blbt[ndx].fid);
+    // Serial.printf(" _ squashing old CHKTAB entry %d %s %d.%d.%d\r\n",
+    //               ndx, to_hex(h, HASH_LEN), fNDX,
+    //               this->blbt[ndx].seq, this->blbt[ndx].bnr);
+  }
   if (fct == NULL) { // del
-    if (ndx != -1) {
+    if (ndx >= 0) {
+      // Serial.printf("   ->%p\r\n", this->blbt[ndx].fid);
       memmove(this->blbt+ndx, this->blbt+ndx+1,
               (this->blbt_cnt - ndx - 1) * sizeof(struct blb_s));
+      // int fNDX = theGOset->_key_index(this->blbt[ndx].fid);
+      // Serial.printf(" _ del CHKTAB entry %d %s %d.%d.%d\r\n", ndx, to_hex(h, HASH_LEN), fNDX,
+      //               this->blbt[ndx].seq, this->blbt[ndx].bnr);
       this->blbt_cnt--;
     }
     return;
@@ -84,6 +95,9 @@ void DmxClass::arm_blb(unsigned char *h,
     }
     ndx = this->blbt_cnt++;
   }
+  // int fNDX = theGOset->_key_index(fid);
+  // Serial.printf(" _ new CHKTAB entry @%d %s %d.%d.%d/%d\r\n", ndx, to_hex(h, HASH_LEN), fNDX,
+  //               seq, bnr, last);
   memcpy(this->blbt[ndx].h, h, HASH_LEN);
   this->blbt[ndx].fct = fct;
   this->blbt[ndx].fid = (unsigned char*) malloc(FID_LEN);
@@ -140,13 +154,13 @@ void DmxClass::set_want_dmx()
   memcpy(buf+4, theGOset->goset_state, GOSET_KEY_LEN);
   compute_dmx(this->want_dmx, buf, sizeof(buf));
   arm_dmx(this->want_dmx, incoming_want_request, NULL);
-  Serial.println(String("DMX for WANT is ") + to_hex(this->want_dmx, DMX_LEN, 0));
+  Serial.println(String("   DMX for WANT is ") + to_hex(this->want_dmx, DMX_LEN, 0));
 
   memcpy(buf, "blob", 4); // FIXME: value is historic -- should be the string "chunk" for a next tinySSB protocol version 
   memcpy(buf+4, theGOset->goset_state, GOSET_KEY_LEN);
   compute_dmx(this->chnk_dmx, buf, sizeof(buf));
   arm_dmx(this->chnk_dmx, incoming_chnk_request, NULL);
-  Serial.println(String("DMX for CHNK is ") + to_hex(this->chnk_dmx, DMX_LEN, 0));
+  Serial.println(String("   DMX for CHNK is ") + to_hex(this->chnk_dmx, DMX_LEN, 0));
 }
 
 // eof

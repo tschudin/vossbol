@@ -28,6 +28,9 @@ extern struct face_s bt_face;
 // #endif
 
 extern int bleDeviceConnected;
+extern int lora_pkt_cnt; // for counting in/outcoming packets per NODE round
+extern float lora_pps;
+
 
 uint32_t crc32_ieee(unsigned char *pkt, int len); // Ethernet/ZIP polynomial
 unsigned char* ble_fetch_received(); // first byte has length, up to 127B

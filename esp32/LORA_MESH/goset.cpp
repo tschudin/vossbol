@@ -161,12 +161,12 @@ void GOsetClass::rx(unsigned char *pkt, int len, unsigned char *aux, struct face
   len -= DMX_LEN;
 
   if (pkt[0] == 'n' && len == NOVELTY_LEN) {
-    Serial.printf("   goset NOV %s\r\n", to_hex(pkt+1, GOSET_KEY_LEN, 0));
+    Serial.printf("   =G.NOV %s\r\n", to_hex(pkt+1, GOSET_KEY_LEN, 0));
     this->add(pkt+1);
     return;
   }
   if (pkt[0] == 'z' && len == ZAP_LEN) {
-    Serial.println("   goset ZAP");
+    Serial.println("   =G.ZAP");
     unsigned long now = millis();
     if (this->zap_state == 0) {
       Serial.println("  ZAP phase I starts");
@@ -177,11 +177,11 @@ void GOsetClass::rx(unsigned char *pkt, int len, unsigned char *aux, struct face
     return;
   }
   if (pkt[0] != 'c' || len != CLAIM_LEN) {
-    Serial.printf("   goset t=%c ??\r\n", pkt[0]);
+    Serial.printf("   =G.?? t=%c\r\n", pkt[0]);
     return;
   }
   struct claim_s *cp = (struct claim_s *) pkt;
-  Serial.printf("   goset CLM xo=%s, |span|=%d\r\n", to_hex(cp->xo, GOSET_KEY_LEN, 0), cp->cnt);
+  Serial.printf("   =G.CLM xo=%s, |span|=%d\r\n", to_hex(cp->xo, GOSET_KEY_LEN, 0), cp->cnt);
   if (isZero(cp->lo, GOSET_KEY_LEN)) // remove this clause
     return;
   if (cp->cnt > this->largest_claim_span)
@@ -235,6 +235,8 @@ void GOsetClass::tick()
     memcpy(this->goset_state, claim+65, GOSET_KEY_LEN);
     dmx->set_want_dmx();
   }
+  Serial.printf(">> G [xo=%s, ||=%d] %d\r\n", to_hex(claim+65, GOSET_KEY_LEN),
+                this->goset_len, CLAIM_LEN);
   io_enqueue(claim, CLAIM_LEN, dmx->goset_dmx, NULL);
   
   // sort pending entries, smallest first
