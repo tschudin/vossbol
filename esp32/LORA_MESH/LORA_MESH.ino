@@ -1,74 +1,32 @@
-// vossbol_tbeam.ino
+// LORA_MESH.ino
 
 // tinySSB for ESP32
-// 2022-08-09 <christian.tschudin@unibas.ch>
-
-
-// #define NO_BLE   // disable Bluetooth Low Energy
-// #define NO_BT    // disable Bluetooth
-// #define NO_GPS   // disable GPS
-// #define NO_LORA  // disable LoRa
-// #define NO_OLED  // disable OLED
-#define NO_WIFI  // disable WiFi
-
-#define SLOW_CPU
-#define SLOW_CPU_MHZ 80  // 40MHz is too low for handling the BLE protocol
-
-#define LOG_FLUSH_INTERVAL         10000 // millis
-#define LOG_BATTERY_INTERVAL  15*60*1000 // millis (15 minutes)
-
-// ----------------------------------------------------------------------
-
-// #define LORA_BAND    902E6 // USA
-#define LORA_BAND  865.5E6 // Europe
-#define LORA_BW     125000
-#define LORA_SF          7
-#define LORA_CR          5
-#define LORA_TXPOWER    20 // highpowermode, otherwise choose 17 or lower
-#define LORA_SYNC_WORD  0x58 // for "SB, Scuttlebutt". Discussion at https://blog.classycode.com/lora-sync-word-compatibility-between-sx127x-and-sx126x-460324d1787a
-
-#define LORA_LOG // enable macro for logging received pkts
-#define LORA_LOG_FILENAME  "/lora_log.txt"
-
-#define FID_LEN         32
-#define HASH_LEN        20
-#define FID_HEX_LEN     (2*FID_LEN)
-#define FID_B64_LEN     ((FID_LEN + 2) / 3 * 4)
-#define FEED_DIR        "/feeds"
-#define MAX_FEEDS       100
-#define FEED_PATH_SIZE  sizeof(FEED_DIR) + 1 + 2 * FID_LEN
-
-#define DMX_LEN          7
-#define GOSET_DMX_STR    "tinySSB-0.1 GOset 1"
-
-#define TINYSSB_PKT_LEN   120
-
-#define tSSB_WIFI_SSID   "tinySSB"
-#define tSSB_WIFI_PW     "dWeb2022"
-#define tSSB_UDP_ADDR    "239.5.5.8"
-#define tSSB_UDP_PORT    1558
-
-#define PKTTYPE_plain48  '\x00' // single packet with 48B payload
-#define PKTTYPE_chain20  '\x01' // start of hash sidechain (pkt contains BIPF-encoded content length)
-
-/* Nordic UART
-#define BLE_SERVICE_UUID           "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
-#define BLE_CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
-#define BLE_CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
-*/
-
-#define BLE_SERVICE_UUID           "6e400001-7646-4b5b-9a50-71becce51558"
-#define BLE_CHARACTERISTIC_UUID_RX "6e400002-7646-4b5b-9a50-71becce51558"
-#define BLE_CHARACTERISTIC_UUID_TX "6e400003-7646-4b5b-9a50-71becce51558"
-#define BLE_CHARACTERISTIC_UUID_ST "6e400004-7646-4b5b-9a50-71becce51558"
-
-#define BLE_RING_BUF_SIZE 3
+// (c) 2022-2023 <christian.tschudin@unibas.ch>
 
 // -----------------------------------------------------------------------------
 
-char ssid[sizeof(tSSB_WIFI_SSID) + 6];
-int wifi_clients = 0;
+#include "LORA_MESH.h"  // all header files
+#include "hw_setup.h"
+
+// have Serial be initialized early i.e., before other global objects
+class Dummy { public: Dummy(); };
+Dummy::Dummy() { Serial.begin(BAUD_RATE); }
+Dummy *d = new Dummy();
+
+DmxClass   *dmx      = new DmxClass();
+RepoClass  *repo     = new RepoClass();
+GOsetClass *theGOset = new GOsetClass();
+
+// our own local code:
+#include "bipf.h"
+#include "kiss.h"
+#include "node.h"
+#include "ed25519.h"
+#include "mgmt.h"
+
+
 int ble_clients = 0;
+
 
 /* FTP server would be neat:
 // #define DEFAULT_STORAGE_TYPE_ESP32 STORAGE_LITTLEFS
@@ -77,51 +35,6 @@ int ble_clients = 0;
 #include <FtpServer.h>
 FtpServer ftpSrv;
 */
-
-struct feed_s {
-  unsigned char fid[FID_LEN];
-  int next_seq;
-  unsigned char prev[HASH_LEN]; // hash of previous log entry
-  int max_prev_seq;
-};
-struct feed_s feeds[MAX_FEEDS];
-int feed_cnt;
-
-int feed_index(unsigned char* fid) {
-  for (int i = 0; i < feed_cnt; i++)
-    if (!memcmp(fid, feeds[i].fid, FID_LEN))
-      return i;
-  return -1;  
-}
-
-struct feed_s* fid2feed(unsigned char* fid) {
-  int ndx = feed_index(fid);
-  if (ndx < 0) return NULL;
-  return feeds + ndx;
-}
-
-// forward definitions
-char* to_hex(unsigned char* buf, int len, int add_colon=0);
-void repo_new_feed(unsigned char* fid);
-void repo_reset(char *path = (char*)FEED_DIR);
-void incoming_pkt(unsigned char* buf, int len, unsigned char *fid, struct face_s *);
-void incoming_chunk(unsigned char* buf, int len, int blbt_ndx, struct face_s *);
-void incoming_want_request(unsigned char* buf, int len, unsigned char* aux, struct face_s *);
-void incoming_chnk_request(unsigned char* buf, int len, unsigned char* aux, struct face_s *);
-void ble_init();
-
-
-// our own local code:
-#include "bipf.h"
-#include "kiss.h"
-#include "hw_setup.h"
-#include "io.h"
-#include "goset.h"
-#include "dmx.h"
-#include "repo.h"
-#include "node.h"
-#include "ed25519.h"
-#include "mgmt.h"
 
 // char lora_line[80];
 char time_line[80];
@@ -137,9 +50,17 @@ int lora_bad_crc = 0;
 File lora_log;
 unsigned long int next_log_flush;
 
+
 #include "cmd.h"
 
+void theGOset_rx(unsigned char *pkt, int len, unsigned char *aux,
+                 struct face_s *f)
+{
+  theGOset->rx(pkt, len, aux, f);
+}
+
 // ----------------------------------------------------------------------------
+
 void setup()
 {
   hw_setup();
@@ -167,16 +88,16 @@ void setup()
   // ftpSrv.begin(".",".");
 
   Serial.println();
-  theGOset = goset_new();
+  // theGOset = GOsetClass();
   unsigned char h[32];
   crypto_hash_sha256(h, (unsigned char*) GOSET_DMX_STR, strlen(GOSET_DMX_STR));
-  memcpy(goset_dmx, h, DMX_LEN);
-  arm_dmx(goset_dmx, goset_rx, NULL);
-  Serial.printf("listening for GOset protocol on %s\r\n", to_hex(goset_dmx, 7));
+  memcpy(dmx->goset_dmx, h, DMX_LEN);
+  dmx->arm_dmx(dmx->goset_dmx, theGOset_rx, NULL);
+  Serial.printf("DMX for GOST is %s\r\n", to_hex(dmx->goset_dmx, 7, 0));
 
   mgmt_setup();
 
-  repo_load();
+  repo->load();
 
   // strcpy(lora_line, "?");
   strcpy(time_line, "?");
@@ -204,9 +125,9 @@ void setup()
   Serial.println("\r\ninit done, starting loop now. Type '?' for list of commands\r\n");
 
   delay(1500); // keep the screen for some time so the display headline can be read ..
-  OLED_toggle(); // default is OLED off, use button to switch on
+  // OLED_toggle(); // default is OLED off, use button to switch on
 
-  cpu_set_slow();
+  // cpu_set_slow();
 
 /*
   Serial.println("LIGHT SLEEP ENABLED FOR 5secs");
@@ -225,7 +146,7 @@ void setup()
 int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
 {
   if (len <= (DMX_LEN + sizeof(uint32_t)) || (has_crc && crc_check(pkt, len) != 0)) {
-    Serial.println(String("Bad CRC for face ") + f->name + String(" pkt=") + to_hex(pkt, len));
+    Serial.println(String("Bad CRC for face ") + f->name + String(" pkt=") + to_hex(pkt, len, 0));
     lora_bad_crc++;
     return -1;
   }
@@ -233,9 +154,9 @@ int incoming(struct face_s *f, unsigned char *pkt, int len, int has_crc)
     // Serial.println("CRC OK");
     len -= sizeof(uint32_t);
   }
-  if (!on_rx(pkt, len, f))
+  if (!dmx->on_rx(pkt, len, f))
     return 0;
-  Serial.println(String("DMX: unknown ") + to_hex(pkt, DMX_LEN));
+  Serial.println(String("   unknown DMX ") + to_hex(pkt, DMX_LEN, 0));
   return -1;
 }
 
@@ -251,6 +172,8 @@ void right_aligned(int cnt, char c, int y)
 
 const char *wheel[] = {"\\", "|", "/", "-"};
 int spin;
+
+// ----------------------------------------------------------------------
 
 void loop()
 {
@@ -273,14 +196,25 @@ void loop()
 
   userButton.loop();
   io_dequeue();
-  goset_tick(theGOset);
+  theGOset->tick();
   node_tick();
-  mgmt_tick();
+  // mgmt_tick();
 
   if (Serial.available())
     cmd_rx(Serial.readString());
 
 #if !defined(NO_LORA)
+  fishForNewLoRaPkt();
+  pkt_len = lora_get_pkt(pkt_buf);
+  if (pkt_len > 0) {
+    lora_cnt++;
+    // Serial.printf("Rcv LoRa %dB\r\n", pkt_len);
+    incoming(&lora_face, pkt_buf, pkt_len, 1);
+    // sprintf(lora_line, "LoRa %d/%d: %dB, rssi=%d", lora_cnt, lora_bad_crc, pkt_len, LoRa.packetRssi());
+    refresh = 1;
+  }
+
+#ifdef OLD_LORA
   packetSize = LoRa.parsePacket();
   if (packetSize > 0) {
     pkt_len = 0;
@@ -328,11 +262,13 @@ void loop()
     }
 #endif
     lora_cnt++;
+    Serial.printf("<< rcv LoRa %dB\r\n", pkt_len);
     incoming(&lora_face, pkt_buf, pkt_len, 1);
     // sprintf(lora_line, "LoRa %d/%d: %dB, rssi=%d", lora_cnt, lora_bad_crc, pkt_len, LoRa.packetRssi());
     refresh = 1;
   }
-#endif // NO_LORA
+#endif // OLD_LORA
+#endif // !NO_LORA
 
 #if !defined(NO_WIFI)
   packetSize = udp.parsePacket();
@@ -368,7 +304,7 @@ void loop()
     lora_log.printf("battery=%.04gV ", axp.getBattVoltage()/1000);
 # endif
     lora_log.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%dXX\r\n",
-                dmxt_cnt, blbt_cnt, feed_cnt, entry_cnt, chunk_cnt, ESP.getFreeHeap());
+                dmx->dmxt_cnt, dmx->blbt_cnt, repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap());
     next_log_battery = millis() + LOG_BATTERY_INTERVAL;
   }
 
@@ -400,7 +336,7 @@ void loop()
   }
 #endif // LORA_LOG
 
-  int sum = feed_cnt + entry_cnt + chunk_cnt;
+  int sum = repo->feed_cnt + repo->entry_cnt + repo->chunk_cnt;
   if (sum != old_repo_sum) {
     old_repo_sum = sum;
     refresh = 1;
@@ -438,9 +374,9 @@ void loop()
 #endif
 
     theDisplay.setFont(ArialMT_Plain_16);
-    right_aligned(feed_cnt,  'F', 0); 
-    right_aligned(entry_cnt, 'E', 22); 
-    right_aligned(chunk_cnt, 'C', 44); 
+    right_aligned(repo->feed_cnt,  'F', 0); 
+    right_aligned(repo->entry_cnt, 'E', 22); 
+    right_aligned(repo->chunk_cnt, 'C', 44); 
 
     int total = MyFS.totalBytes();
     int avail = total - MyFS.usedBytes();

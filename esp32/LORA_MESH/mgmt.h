@@ -13,6 +13,7 @@
 //     4B CRC       cyclic redundancy check (LoRa layer)
 //
 
+#include <sodium/crypto_hash_sha256.h>
 #include <sodium/crypto_auth.h>
 
 #if defined __has_include
@@ -23,8 +24,9 @@ unsigned char MGMT_KEY[crypto_auth_hmacsha512_KEYBYTES] = { 0 };
 #endif
 #endif
 
-
-unsigned char mgmt_dmx[DMX_LEN];
+extern GOsetClass *theGOset;
+extern DmxClass   *dmx;
+extern RepoClass  *repo;
 
 #define MGMT_DMX_STR         "tinySSB-0.1 mgmt 1"
 #define MGMT_ID_LEN          2
@@ -158,9 +160,9 @@ unsigned char* _mkStatus()
 #if defined(AXP_DEBUG)
   status.state.voltage = axp.getBattVoltage()/1000;
 #endif
-  status.state.feeds = feed_cnt;
-  status.state.entries = entry_cnt;
-  status.state.chunks = chunk_cnt;
+  status.state.feeds = repo->feed_cnt;
+  status.state.entries = repo->entry_cnt;
+  status.state.chunks = repo->chunk_cnt;
   int total = MyFS.totalBytes();
   int avail = total - MyFS.usedBytes();
   status.state.free = avail / (total/100);
@@ -208,7 +210,7 @@ unsigned char* _mkKey(bool op, unsigned char* key)
 void mgmt_rx_key(struct msg_key_s *key_update)
 {
   static char p[sizeof(KEYS_DIR) + 1 + 2*GOSET_KEY_LEN];
-  char *h = to_hex(key_update->key, GOSET_KEY_LEN);
+  char *h = to_hex(key_update->key, GOSET_KEY_LEN, 0);
   strcpy(p, KEYS_DIR);
   strcat(p, "/");
   strcat(p, h);
@@ -248,7 +250,7 @@ void mgmt_rx_request(struct msg_request_s *request, int len)
 
   // reset
   if (request->cmd == 'r') {
-    repo_reset();
+    repo->reset(NULL);
     return;
   }
 
@@ -328,7 +330,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   // check if face == lora   => only allow mgmt over LoRa
   if (memcmp(f->name, (char *) "lora", 4)) { return; }
 
-  Serial.printf("mgmt_rx: message = %s\r\n", to_hex(pkt, len));
+  Serial.printf("mgmt_rx: message = %s\r\n", to_hex(pkt, len, 0));
 
   // remove DMX
   pkt += DMX_LEN;
@@ -401,7 +403,7 @@ void mgmt_rx(unsigned char *pkt, int len, unsigned char *aux, struct face_s *f)
   if (typ == 'k' && len == MGMT_MSG_KEY_LEN) {
     struct msg_key_s *key_update = (struct msg_key_s*) calloc(1, MGMT_MSG_KEY_LEN);
     memcpy(key_update, pkt, MGMT_MSG_KEY_LEN);
-    Serial.printf("mgmt_rx: %s key %s\r\n", key_update->op ? "allow" : "deny", to_hex(key_update->key, GOSET_KEY_LEN));
+    Serial.printf("mgmt_rx: %s key %s\r\n", key_update->op ? "allow" : "deny", to_hex(key_update->key, GOSET_KEY_LEN, 0));
     mgmt_rx_key(key_update);
     free(key_update);
     io_send(pkt - MGMT_ID_LEN - 1 - DMX_LEN, len + DMX_LEN + 1 + MGMT_ID_LEN + MGMT_MAC_FIELD_LEN + MGMT_FCNT_FIELD_LEN, NULL);
@@ -577,7 +579,7 @@ void mgmt_tx(unsigned char typ, unsigned char* payload, int payload_len)
   unsigned char message[len] = { 0 };
   int offset = 0;
   // add DMX
-  memcpy(message + offset, mgmt_dmx, DMX_LEN);
+  memcpy(message + offset, dmx->mgmt_dmx, DMX_LEN);
   offset += DMX_LEN;
   // add typ
   int typ_len = 1;
@@ -605,7 +607,7 @@ void mgmt_tx(unsigned char typ, unsigned char* payload, int payload_len)
   offset += MGMT_MAC_FIELD_LEN;
   // send
   if (offset != len) { Serial.printf("mgmt_tx: final offset and length differ\r\n"); return; }
-  Serial.printf("mgmt_tx: message = %s\r\n", to_hex(message, len));
+  Serial.printf("mgmt_tx: message = %s\r\n", to_hex(message, len, 0));
   io_send(message, len, NULL);
 }
 
@@ -649,9 +651,9 @@ void mgmt_setup()
   // initialize mgmt_dmx
   unsigned char h[32];
   crypto_hash_sha256(h, (unsigned char*) MGMT_DMX_STR, strlen(MGMT_DMX_STR));
-  memcpy(mgmt_dmx, h, DMX_LEN);
-  arm_dmx(mgmt_dmx, mgmt_rx, NULL);
-  Serial.printf("listening for mgmt protocol on %s\r\n", to_hex(mgmt_dmx, DMX_LEN));
+  memcpy(dmx->mgmt_dmx, h, DMX_LEN);
+  dmx->arm_dmx(dmx->mgmt_dmx, mgmt_rx, NULL);
+  Serial.printf("CMD for MGMT is %s\r\n", to_hex(dmx->mgmt_dmx, DMX_LEN, 0));
   // get id
   for (int i = 0; i < MGMT_ID_LEN; i++) {
     mgmt_id[i] = my_mac[6 - MGMT_ID_LEN + i];
@@ -670,16 +672,19 @@ void mgmt_setup()
   // dump directory contents (DEBUG)
   File kdir = MyFS.open(KEYS_DIR);
   if (kdir) {
-    Serial.printf("mgmt_setup: listing goset keys\r\n");
+    // Serial.printf("mgmt_setup: listing goset keys\r\n");
     File k = kdir.openNextFile();
     while (k) {
       int cnt;
       k.read((unsigned char*) &cnt, sizeof(cnt));
-      Serial.printf("    %d %s\r\n", cnt, k.name());
+      // Serial.printf("    %d %s\r\n", cnt, k.name());
+      k.close();
       k = kdir.openNextFile();
     }
   }
   kdir.close();
+
+  // Serial.println("mgmt setup done");
 }
 
 // called in main loop

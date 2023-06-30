@@ -6,8 +6,8 @@
 #   make monitor SERIAL=/dev/tty.....
 
 
-#BINDIR=/opt/homebrew/bin
-BINDIR=/usr/local/bin
+BINDIR=/opt/homebrew/bin
+#BINDIR=/usr/local/bin
 MAIN=LORA_MESH
 
 
@@ -18,12 +18,13 @@ endif
 
 ifndef SERIAL
   ifeq ($(BOARD),heltec)
-    SERIAL=/dev/tty.usbserial-0001           # heltec LORA32
+    SERIAL=/dev/tty.usbserial-47           # heltec LORA32
+    SERIAL = $(shell ls /dev/tty.usbserial-*)
   else
-    #SERIAL=/dev/tty.wchusbserial54750108741  # fc84
+    # SERIAL=/dev/tty.wchusbserial54750108741  # fc84
     #SERIAL=/dev/tty.wchusbserial54750108751  # fcd4
-    SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
-    #SERIAL=/dev/tty.wchusbserial54750389471  # f948
+    # SERIAL=/dev/tty.wchusbserial54750388221  # f9d0
+    SERIAL=/dev/tty.wchusbserial54750389471  # f948
   endif
 endif
 
@@ -49,6 +50,9 @@ upload:
 monitor:
 	$(info use CTRL-A CTRL-\ to quit the screen program)
 	screen $(SERIAL) 115200
+
+upload2:
+	$(foreach var,$(SERIAL), $(BINDIR)/arduino-cli upload -v --fqbn $(FQBN) -p $(var) .;)
 
 clean:
 	rm -rf *~
