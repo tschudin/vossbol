@@ -115,7 +115,7 @@ void GOsetClass::add(unsigned char *key)
       return;
     }
   if (this->goset_len >= GOSET_MAX_KEYS) {
-    Serial.printf("  too many keys: %d\n", this->goset_len);
+    Serial.printf("   too many keys: %d\n", this->goset_len);
     return;
   }
   repo->new_feed(key);
@@ -133,7 +133,7 @@ void GOsetClass::add(unsigned char *key)
     }
   }
 
-  Serial.printf("added key %s, len=%d\r\n", to_hex(key, GOSET_KEY_LEN, 0), this->goset_len);
+  Serial.printf("   G: added key %s, len=%d\r\n", to_hex(key, GOSET_KEY_LEN, 0), this->goset_len);
 }
 
 void GOsetClass::populate(unsigned char *key)
@@ -146,7 +146,7 @@ void GOsetClass::populate(unsigned char *key)
     return;
   }
   if (this->goset_len >= GOSET_MAX_KEYS) {
-    Serial.printf("  too many keys: %d\n", this->goset_len);
+    Serial.printf("   G: too many keys: %d\n", this->goset_len);
     return;
   }
   memcpy(this->goset_keys + this->goset_len * GOSET_KEY_LEN, key, GOSET_KEY_LEN);
@@ -169,7 +169,7 @@ void GOsetClass::rx(unsigned char *pkt, int len, unsigned char *aux, struct face
     Serial.println("   =G.ZAP");
     unsigned long now = millis();
     if (this->zap_state == 0) {
-      Serial.println("  ZAP phase I starts");
+      Serial.println("   ZAP phase I starts");
       memcpy(&this->zap, pkt, ZAP_LEN);
       this->zap_state = now + ZAP_ROUND_LEN;
       this->zap_next = now;
@@ -261,7 +261,7 @@ void GOsetClass::tick()
     // Serial.println("  not eliminated " + String(lo,DEC) + " " + String(hi,DEC) + " " + String(cp->cnt));
     if (partial->cnt <= cp->cnt) { // ask for help, but only for smallest entry, and only once in this round
       if (max_ask-- > 0) {
-        Serial.printf("  asking for help %killd [%d..%d]\r\n",
+        Serial.printf("   asking for help cnt=%d [%d..%d]\r\n",
                       partial->cnt,
                       this->_key_index(partial->lo),
                       this->_key_index(partial->hi));
@@ -279,7 +279,7 @@ void GOsetClass::tick()
     }
     if (max_help-- > 0) { // we have larger claim span, offer help (but limit # of claims)
       hi--, lo++;
-      Serial.print("  offer help span=" + String(partial->cnt - 2));
+      Serial.print("   offer help span=" + String(partial->cnt - 2));
       Serial.print(String(" ") + to_hex(this->goset_keys+lo*GOSET_KEY_LEN,4,0) + String(".."));
       Serial.println(String(" ") + to_hex(this->goset_keys+hi*GOSET_KEY_LEN,4,0) + String(".."));
       if (hi <= lo)
@@ -309,11 +309,11 @@ void GOsetClass::tick()
   // if (this->pending_c_cnt > 2)
   //   this->pending_c_cnt = 2; // better: log2(largest_claim_span) ?
   if (this->pending_c_cnt > 0)
-    Serial.printf("  |GOset|=%d, %d pending claims", this->goset_len, this->pending_c_cnt);
+    Serial.printf("   |GOset|=%d, %d pending claims", this->goset_len, this->pending_c_cnt);
   // unsigned char *heap = reinterpret_cast<unsigned char*>(sbrk(0));
   // Serial.println(String(", heap sbrk=") + to_hex((unsigned char *)&heap, sizeof(heap)));
   for (int i = 0; i < this->pending_c_cnt; i++)
-    Serial.printf("  xor=%s, |span|=%d\r\n", to_hex(this->pending_claims[i].xo,32,0), this->pending_claims[i].cnt);
+    Serial.printf("     xor=%s, |span|=%d\r\n", to_hex(this->pending_claims[i].xo,32,0), this->pending_claims[i].cnt);
 }
 
 void GOsetClass::do_zap(int ndx)

@@ -8,8 +8,9 @@
 #if !defined(_INCLUDE_DMX_H)
 #define _INCLUDE_DMX_H
 
-#define DMXT_SIZE   (1+GOSET_MAX_KEYS) // we need place for want (1 per feed), plus Goset protoc
-#define BLBT_SIZE   100              // this size is a guess
+#define DMXT_SIZE   (4+GOSET_MAX_KEYS) // we need place for want (1 per feed),
+                                       // plus misc protocols (GOset, mgmt, WANT, CHNK)
+#define BLBT_SIZE   100                // this size is a guess
 #define DMX_PFX     "tinyssb-v0"
 
 struct dmx_s {
@@ -51,6 +52,7 @@ class DmxClass {
   void compute_dmx(unsigned char *dst, unsigned char *buf, int len);
   int on_rx(unsigned char *buf, int len, struct face_s *f);
   void set_want_dmx();
+  // void invalidate(); // clears all entries with aux!=NULL
 };
 
 #endif

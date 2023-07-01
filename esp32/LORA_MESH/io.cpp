@@ -33,8 +33,12 @@ struct face_s *faces[] = {
 #endif
 };
 
-int lora_pkt_cnt; // for counting in/outcoming packets per NODE round
-float lora_pps;
+int lora_pkt_cnt; // for counting in/outcoming packets, per NODE round
+float lora_pps;   // packet-per-seconds, gliding average
+
+int lora_sent_pkts = 0; // absolute counter
+int lora_rcvd_pkts = 0; // absolute counter
+
 
 // --------------------------------------------------------------------------------
 
@@ -169,6 +173,7 @@ void lora_send(unsigned char *buf, short len)
 #if !defined(NO_LORA)
   if (LoRa.beginPacket()) {
     lora_pkt_cnt++;
+    lora_sent_pkts++;
     uint32_t crc = crc32_ieee(buf, len);
     LoRa.write(buf, len);
     LoRa.write((unsigned char*) &crc, sizeof(crc));
@@ -378,6 +383,7 @@ int fishForNewLoRaPkt()
     if (sz <= 0)
       return lora_buf_cnt;
     lora_pkt_cnt++;
+    lora_rcvd_pkts++;
     if (lora_buf_cnt >= LORA_BUF_CNT) {
       Serial.printf("  ohh %d, rcvd too many LoRa pkts, cnt=%d\r\n",
                     sz, lora_buf_cnt);

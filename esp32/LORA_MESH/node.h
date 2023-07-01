@@ -127,10 +127,13 @@ void node_tick()
  
   Serial.printf("-- t=%d.%03d ", now/1000, now%1000);
 #if defined(AXP_DEBUG)
-  Serial.printf("%.04gV ", axp.getBattVoltage()/1000);
+  Serial.printf("%1.04gV ", axp.getBattVoltage()/1000);
 #endif
-  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d pps=%1.2f\r\n",
-                dmx->dmxt_cnt, dmx->blbt_cnt, repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap(), lora_pps);
+  //  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d pps=%1.2f\r\n",
+  //                dmx->dmxt_cnt, dmx->blbt_cnt, repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap(), lora_pps);
+  Serial.printf("|dmxt|=%d |blbt|=%d |freeHeap|=%d lora_sent=%d lora_rcvd=%d pps=%1.2f\r\n",
+                dmx->dmxt_cnt, dmx->blbt_cnt, ESP.getFreeHeap(),
+                lora_sent_pkts, lora_rcvd_pkts, lora_pps);
 
   // Serial.printf(".. node tick 1\r\n");
   if (theGOset->goset_len == 0)
