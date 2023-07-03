@@ -6,11 +6,11 @@ import kotlin.experimental.and
 import kotlin.experimental.or
 
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_BYTES
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_DICT
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_INT
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_STRING
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
-import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -25,6 +25,8 @@ class Bipf_e(t: Int) {
     fun getInt(): Int         { if (typ == BIPF_INT) return v as Int
                                 else throw Exception("BIPF type is ${typ} instead of INT")}
     fun getList(): ArrayList<Bipf_e> { if (typ == BIPF_LIST) return v as ArrayList<Bipf_e>
+                                else throw Exception("BIPF type is ${typ} instead of LIST")}
+    fun getDict(): MutableMap<Bipf_e, Bipf_e> { if (typ == BIPF_DICT) return v as MutableMap<Bipf_e, Bipf_e>
                                 else throw Exception("BIPF type is ${typ} instead of LIST")}
     fun getBoolean(): Boolean { if (typ == BIPF_BOOLNONE && v as Int >= 0) return (v as Int) > 0
                                 else throw Exception("BIPF type is ${typ} instead of BOOL")}
@@ -84,6 +86,13 @@ class Bipf {
         }
 
         @JvmStatic
+        fun mkDict(): Bipf_e {
+            val e = Bipf_e(BIPF_DICT)
+            e.v = mutableMapOf<Bipf_e, Bipf_e>()
+            return e
+        }
+
+        @JvmStatic
         fun mkString(s: String): Bipf_e {
             val e = Bipf_e(BIPF_STRING)
             e.v = s.encodeToByteArray()
@@ -95,6 +104,13 @@ class Bipf {
             val alst = lst.v as ArrayList<Bipf_e>
             alst.add(e)
             lst.cnt++
+        }
+
+        @JvmStatic
+        fun dict_append(dict: Bipf_e, k: Bipf_e, v: Bipf_e) {
+            val adict = dict.v as MutableMap<Bipf_e, Bipf_e>
+            adict[k] = v
+            dict.cnt++
         }
 
         @JvmStatic
@@ -188,6 +204,23 @@ class Bipf {
                     }
                     return lst to (p - pos)
                 }
+                BIPF_DICT -> {
+                    // Log.d("bipf", "list")
+                    var p = pos
+                    val dict = mkDict()
+                    while (p < lim) {
+                        val (k, szK) = decode(buf, p, lim)
+                        if (k == null)
+                            return null to -1
+                        p += szK
+                        val (v, szV) = decode(buf, p, lim)
+                        if (v == null)
+                            return null to -1
+                        dict_append(dict, k, v)
+                        p += szV
+                    }
+                    return dict to (p - pos)
+                }
                 BIPF_STRING -> {
                     val e = Bipf_e(BIPF_STRING)
                     // e.cnt = sz
@@ -265,6 +298,25 @@ class Bipf {
                     }
                     return buf
                 }
+                BIPF_DICT -> {
+                    Log.d("bipf", "DICT")
+                    val ad = e.v!! as MutableMap<Bipf_e, Bipf_e>
+                    var buf: ByteArray = ByteArray(0)
+                    for ((k, v) in ad) {
+                        if ((k as Bipf_e).typ == BIPF_DICT ||k.typ == BIPF_LIST) {
+                            Log.e("bipf", "key $k cannot be list or dictionary")
+                            return null // key cannot be list or dictionary
+                        }
+                        val ek = encode(k)
+                        val ev = encode(v as Bipf_e)
+                        if (ek == null || ev == null) {
+                            Log.e("bipf", "key $k or value $v is null")
+                            return null
+                        }
+                        buf = buf + ek + ev
+                    }
+                    return buf
+                }
                 BIPF_STRING -> {
                     return e.v as ByteArray
                 }
@@ -300,6 +352,7 @@ class Bipf {
                     BIPF_STRING   -> { obj.put(i, le.getString()) }
                     BIPF_INT      -> { obj.put(i, le.getInt()) }
                     BIPF_LIST     -> { obj.put(i, bipf_list2JSON(le)) }
+                    BIPF_DICT     -> { obj.put(i, bipf_dict2JSON(le)) }
                     BIPF_BOOLNONE -> {
                         if ((lst[i].v as Int) < 0)
                             obj.put(i, null)
@@ -314,6 +367,53 @@ class Bipf {
             return obj
         }
 
+        @JvmStatic
+        fun bipf_dict2JSON(e: Bipf_e): JSONObject? {
+//            Log.d("bipf", "dict2J typ=${e.typ}")
+            if (e.typ != BIPF_DICT) {
+                 Log.d("bipf", "dict2J typ=${e.typ}")
+                return null
+            }
+            val dict = e.getDict()
+            // Log.d("bipf", "list2J ${lst.size}")
+            val obj = JSONObject()
+            for (i in dict.keys) {
+//                Log.d("bipf", "dict2J key=${i}")
+                var k = ""
+                when (i.typ) {
+                    BIPF_BYTES    -> { k = i.getBytes().toBase64() }
+                    BIPF_STRING   -> { k = i.getString() }
+                    BIPF_INT      -> { k = i.getInt().toString() }
+                    BIPF_BOOLNONE -> {
+                        if ((i.v as Int) < 0)
+                            k = ""
+                        else
+                            k = i.getBoolean().toString()
+                    }
+                    else -> {
+                        Log.d("bipf", "dict2JSON -- not implemented for typ=${i.typ}")
+                    }
+                }
+//                Log.d("bipf", "value typ=${dict[i]!!.typ}")
+                when (dict[i]!!.typ) {
+                    BIPF_BYTES    -> { obj.put(k, dict[i]!!.getBytes().toBase64()) }
+                    BIPF_STRING   -> { obj.put(k, dict[i]!!.getString()) }
+                    BIPF_INT      -> { obj.put(k, dict[i]!!.getInt()) }
+                    BIPF_LIST     -> { obj.put(k, bipf_list2JSON(i)) }
+                    BIPF_DICT     -> { obj.put(k, bipf_dict2JSON(i)) }
+                    BIPF_BOOLNONE -> {
+                        if ((dict[i]!!.v as Int) < 0)
+                            obj.put(k, null)
+                        else
+                            obj.put(k, dict[i]!!.getBoolean())
+                    }
+                    else -> {
+                        Log.d("bipf", "list2JSON -- not implemented for typ=${i.typ}")
+                    }
+                }
+            }
+            return obj
+        }
     }
 }
 
