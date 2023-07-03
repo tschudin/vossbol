@@ -32,19 +32,6 @@ const tile_state = {
     TOUCHED           : { number: "C", letter: 'X', size: 0, color: "red" }
 };
 
-function terminate() {
-    small_grid_buttons = [];
-    big_grid_buttons = [];
-    my_grid = [];
-    other_grid = [];
-
-    tremola.games[curr_game]['terminated'] = true;
-    persist();
-    load_game_list();
-    closeOverlay();
-    setScenario("game-init");
-}
-
 //--- New game and game-init scenario
 
 function new_game() {
@@ -79,9 +66,11 @@ function new_game() {
 //        console.log("game: receive_shot TURN ON");
         persist();
         console.log("game : stringified new" + JSON.stringify(tremola.games[nm]));
-        npc_load();  // TODO only for testing
+//        npc_load();  // TODO only for testing
+        backend("bts I " + nm);
     } else
         tremola.game[nm]["touched"] = Date.now();
+
 
     load_game_list();
     console.log("game: curr_game " + JSON.stringify(curr_game));
@@ -333,6 +322,19 @@ function handle_receive_shot(i) {
 }
 
 //--- public game logic
+
+function terminate() {
+    small_grid_buttons = [];
+    big_grid_buttons = [];
+    my_grid = [];
+    other_grid = [];
+
+    tremola.games[curr_game]['terminated'] = true;
+    persist();
+    load_game_list();
+    closeOverlay();
+    setScenario("game-init");
+}
 
 function send_shot(i, button) {
     console.log("1 game: send_shot");

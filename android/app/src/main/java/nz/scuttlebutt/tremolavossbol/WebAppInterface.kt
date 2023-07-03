@@ -211,10 +211,60 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 }
             }
 
+            "bts" -> {
+                when(args[1]) {
+                    "I" -> {sendBTSInvite(args[2])}
+                    "A" -> {sendBTSAccept(args[2], args[3])}
+                    "D" -> {sendBTSDecline(args[2], args[3])}
+                    "T" -> {sendBTSTerminate(args[2], args[3])}
+                    "M" -> {sendBTSMove(args[2], args[3], args[4])}
+                    "R" -> {sendBTSRefuse(args[2], args[3], args[4])}
+                    "L" -> {sendBTSLoose(args[2], args[3], args[4])}
+                    "W" -> {sendBTSWin(args[2], args[3], args[4])}
+                    "S" -> {sendBTSSurrender(args[2], args[3])}
+                }
+            }
+
             else -> {
                 Log.d("onFrontendRequest", "unknown")
             }
         }
+    }
+
+    private fun sendBTSInvite(rcp: String) {
+
+    }
+
+    private fun sendBTSAccept(rcp: String, game_id: String) {
+        TODO("Not yet implemented")
+    }
+
+    private fun sendBTSDecline(rcp: String, game_id: String) {
+        TODO("Not yet implemented")
+    }
+
+    private fun sendBTSTerminate(rcp: String, game_id: String) {
+        TODO("Not yet implemented")
+    }
+
+    private fun sendBTSMove(rcp: String, game_id: String, move: String) {
+        TODO("Not yet implemented")
+    }
+
+    private fun sendBTSRefuse(rcp: String, game_id: String, msg: String) {
+        TODO("Not yet implemented")
+    }
+
+    private fun sendBTSLoose(rcp: String, game_id: String, boats: String) {
+        TODO("Not yet implemented")
+    }
+
+    private fun sendBTSWin(rcp: String, game_id: String, boats: String) {
+        TODO("Not yet implemented")
+    }
+
+    private fun sendBTSSurrender(rcp: String, game_id: String) {
+        TODO("Not yet implemented")
     }
 
     fun eval(js: String) { // send JS string to webkit frontend for execution
