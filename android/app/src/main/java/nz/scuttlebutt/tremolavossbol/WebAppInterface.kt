@@ -19,6 +19,7 @@ import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_STRING
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_dict2JSON
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_list2JSON
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.decode
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkDict
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkList
 import nz.scuttlebutt.tremolavossbol.utils.Bipf_e
@@ -289,7 +290,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         Log.d("wai", "send time is ${tst.getInt()}")
 
         // Prepare message
-        val packet = mkDict()
+        val packet = mkList()
         if (rcps!!.isNotEmpty()) {  // private message: add recipients list and encrypt
             // Prepare the list of recipients ("recps" as a field in the post and "keys" for the encryption)
             val recps = Bipf.mkList()
@@ -309,12 +310,14 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             Bipf.dict_append(msg, TINYSSB_APP_TEXTANDMEDIA, post)
 
             val encrypted = act.idStore.identity.encryptPrivateMessage(Bipf.encode(msg)!!, keys)
-            Bipf.dict_append(packet, TINYSSB_APP_BOX, Bipf.mkBytes(encrypted))
+            Bipf.list_append(packet, TINYSSB_APP_BOX)
+            Bipf.list_append(packet, Bipf.mkBytes(encrypted))
         } else { // public message
-            Bipf.dict_append(packet, TINYSSB_APP_TEXTANDMEDIA, post)
+            Bipf.list_append(packet, TINYSSB_APP_TEXTANDMEDIA)
+            Bipf.list_append(packet, post)
         }
 
-        Log.d("wai", "Sending bipf: ${bipf_dict2JSON(packet)}")
+        Log.d("wai", "Sending bipf: ${bipf_list2JSON(packet)}")
         act.tinyNode.publish_content(Bipf.encode(packet)!!)
     }
 
@@ -369,30 +372,29 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     }
 
     fun sendToFrontend(fid: ByteArray, seq: Int, mid: ByteArray, payload: ByteArray) {
-        Log.d("wai", "sendToFrontend seq=${seq} ${payload.toHex()}")
+        Log.d("send", "sendToFrontend seq=${seq} ${payload.toHex()}")
         var confid = false
         var bodyList = Bipf.decode(payload)
-        if (bodyList == null || bodyList.typ != BIPF_DICT) {
-            Log.d("sendToFrontend", "decoded payload == null")
+        if (bodyList == null || bodyList.typ != BIPF_LIST) {
+            Log.d("send", "decoded payload == null")
             return
         }
-        val box = bipf_dict2JSON(bodyList)!![TINYSSB_APP_BOX.getString()]
-        // FIXME "box" seems to always be null
-        Log.d("send", "box = $box")
-        if (box != null) { //private, decrypt
-            Log.d("sendToFrontend", box.toString())
-            val x = act.idStore.identity.decryptPrivateMessageString(box as String)
-            Log.e("sendToFrontend", x!!.toString())
+        val body = bipf_list2JSON(bodyList)
+        Log.d("send", "box = $body")
+        if (body!![0] == TINYSSB_APP_BOX.getString()) { //private, decrypt
+            Log.d("sendToFrontend", body.toString())
+            val x = act.idStore.identity.decryptPrivateMessageString(body[1] as String)
+            Log.e("sendToFrontend", bipf_dict2JSON(decode(x!!)!!).toString())
             bodyList = Bipf.decode(x!!)
+            if (bodyList == null || bodyList.typ != BIPF_LIST) {
+                Log.d("send", "decrypted payload == null")
+                return
+            }
             confid = true
         }
 
-        if (bodyList == null || bodyList.typ != BIPF_DICT) {
-            Log.d("sendToFrontend", "decoded payload == null")
-            return
-        }
         val param = bipf_dict2JSON(bodyList)
-        Log.e("sendToFrontend", param.toString())
+        Log.e("send", param.toString())
         val hdr = JSONObject()
         hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
         hdr.put("ref", mid.toBase64())
@@ -406,7 +408,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             cmd += "\"confid\":${null}"
         }
         cmd += "});"
-        Log.d("CMD", cmd)
+        Log.d("CMD", "send : $cmd")
         eval(cmd)
     }
 }
@@ -415,5 +417,5 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
 /**
  * Ideal message layout:
  *
- * {'TAM', {'RCP': RCPS*, 'XRF', XREF*, 'TIM', time, 'BDY': {'TXU8': time, 'IMPG', png_image, 'LOGP', gps_coordinates}}}
+ * ['TAM', {'RCP': RCPS*, 'XRF', XREF*, 'TIM', time, 'BDY': {'TXU8': time, 'IMPG', png_image, 'LOGP', gps_coordinates}}]
  */
