@@ -39,7 +39,13 @@ class HelperFunctions {
         @JvmStatic
         fun String.deRef(): ByteArray { // only works for IDs, but not msg keys or blob hashes
             // Log.d("deRef", "<" + this + ">")
-            val s = this.slice(1..this.lastIndex).removeSuffix(".ed25519")
+            var s: String
+            if (this.startsWith('@'))
+                s = this.slice(1..this.lastIndex).removeSuffix(".ed25519")
+            else
+                s = this.slice(0..this.lastIndex).removeSuffix(".ed25519")
+
+
             return Base64.decode(s, Base64.NO_WRAP)
         }
 
