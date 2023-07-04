@@ -14,12 +14,25 @@ import androidx.core.content.ContextCompat.checkSelfPermission
 import com.google.zxing.integration.android.IntentIntegrator
 import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_DICT
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_STRING
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_dict2JSON
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_list2JSON
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkDict
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkList
 import nz.scuttlebutt.tremolavossbol.utils.Bipf_e
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_BODY
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_BOX
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_KANBAN
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_RECP
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDMEDIA
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TIME
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_XREF
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_AUDIO_CODEC2
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_TIME
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_UTF8_TEXT
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.deRef
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
@@ -105,7 +118,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 act.idStore.setNewIdentity(null) // creates new identity
                 act.tinyRepo.repo_reset()
                 // eval("b2f_initialize(\"${tremolaState.idStore.identity.toRef()}\")")
-                // FIXME: should kill all active connections, or better then the app
+                // FIX ME: should kill all active connections, or better then the app
                 act.finishAffinity()
             }
 
@@ -230,7 +243,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     private fun importIdentity(secret: String): Boolean {
         Log.d("D/importIdentity", secret)
         if (act.idStore.setNewIdentity(Base64.decode(secret, Base64.DEFAULT))) {
-            // FIXME: remove all decrypted content in the database, try to decode new one
+            // FIX ME: remove all decrypted content in the database, try to decode new one
             Toast.makeText(act, "Imported of ID worked. You must restart the app.",
                 Toast.LENGTH_SHORT).show()
             return true
@@ -240,49 +253,69 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     }
 
     fun post_with_voice(tips: ArrayList<String>, text: String?, voice: ByteArray?, rcps: List<String>?) {
+        // FIXME
+        // independent piece of code that calls the library
+        // My understanding is that it works but keeps only one item
+        val e = Bipf.mkDict()
+        Bipf.dict_append(e, Bipf.mkString("key"), Bipf.mkInt(2351235))
+        Bipf.dict_append(e, Bipf.mkString("key2"), Bipf.mkString("My message"))
+        Log.e("dict", "Dict: $e")
+        Log.e("dict", "Dict: ${Bipf.encode(e)}")
+        val d = Bipf.decode(Bipf.encode(e)!!)
+        Log.e("dict", "Dict: $d")
+        Log.e("dict", "Dict: ${Bipf.bipf_dict2JSON(d!!)}")
+
         if (text != null)
             Log.d("wai", "post_text t- ${text}/${text.length}")
         if (voice != null)
             Log.d("wai", "post_voice v- ${voice}/${voice.size}")
-        val lst = Bipf.mkList()
-        Bipf.list_append(lst, TINYSSB_APP_TEXTANDVOICE)
-        // add tips
-        Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
-        Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
+
+
+        //  Prepare attachments
+        val body = mkDict()
+        if (text != null) {
+            Bipf.dict_append(body, TINYSSB_ATTACH_UTF8_TEXT, Bipf.mkString(text))
+        }
+        if (voice != null) {
+            Bipf.dict_append(body, TINYSSB_ATTACH_AUDIO_CODEC2, Bipf.mkBytes(voice))
+        }
+
+        // Prepare post
+        val post = mkDict()
+        Bipf.dict_append(post, TINYSSB_APP_BODY, body)
 
         val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
+        Bipf.dict_append(post, TINYSSB_ATTACH_TIME, tst)
         Log.d("wai", "send time is ${tst.getInt()}")
-        Bipf.list_append(lst, tst)
 
-        val body: ByteArray?
-        if (rcps!![0] == "null") {
-            Bipf.list_append(lst, Bipf.mkNone())
-            body = Bipf.encode(lst) // public post
-        } else {
-            body = Bipf.encode(encrypt_post(lst, rcps)!!) // private post
-        }
-        Log.d("wai", "Sending: ${Bipf.bipf_list2JSON(Bipf.decode(body!!)!!)}")
-        act.tinyNode.publish_content(body)
-    }
-
-    fun encrypt_post(lst: Bipf_e, rcps: List<String>): Bipf_e? {
-        Log.d("priv:post", "sending ${bipf_list2JSON(lst).toString()}")
-        val recps = Bipf.mkList()
-        val keys: MutableList<ByteArray> = mutableListOf()
-        val me = act.idStore.identity.toRef()
-        for (r in rcps) {
-            if (r != me) {
-                Bipf.list_append(recps, Bipf.mkString(r))
-                keys.add(r.deRef())
+        // Prepare message
+        val packet = mkDict()
+        if (rcps!!.isNotEmpty()) {  // private message: add recipients list and encrypt
+            // Prepare the list of recipients ("recps" as a field in the post and "keys" for the encryption)
+            val recps = Bipf.mkList()
+            val keys: MutableList<ByteArray> = mutableListOf()
+            val me = act.idStore.identity.toRef()
+            for (r in rcps) {
+                if (r != me) {
+                    Bipf.list_append(recps, Bipf.mkBytes(r.deRef()))
+                    keys.add(r.deRef())
+                }
             }
-        }
-        Bipf.list_append(recps, Bipf.mkString(me))
-        keys.add(me.deRef())
-        Bipf.list_append(lst, recps)
-        val body = Bipf.encode(lst)
+            Bipf.list_append(recps, Bipf.mkBytes(me.deRef()))
+            keys.add(me.deRef())
+            Bipf.dict_append(post, TINYSSB_APP_RECP, recps)
 
-        val encrypted = body?.let { act.idStore.identity.encryptPrivateMessage(it, keys) }
-        return encrypted?.let { Bipf.mkString(it) }
+            val msg = mkDict()
+            Bipf.dict_append(msg, TINYSSB_APP_TEXTANDMEDIA, post)
+
+            val encrypted = act.idStore.identity.encryptPrivateMessage(Bipf.encode(msg)!!, keys)
+            Bipf.dict_append(packet, TINYSSB_APP_BOX, Bipf.mkBytes(encrypted))
+        } else { // public message
+            Bipf.dict_append(packet, TINYSSB_APP_TEXTANDMEDIA, post)
+        }
+
+        Log.d("wai", "Sending bipf: ${bipf_dict2JSON(packet)}")
+        act.tinyNode.publish_content(Bipf.encode(packet)!!)
     }
 
     fun kanban(bid: String?, prev: List<String>?, operation: String, args: List<String>?) {
@@ -339,18 +372,27 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         Log.d("wai", "sendToFrontend seq=${seq} ${payload.toHex()}")
         var confid = false
         var bodyList = Bipf.decode(payload)
-        if (bodyList!!.typ == BIPF_STRING) { //private, decrypt
-            Log.d("send", bodyList.getString())
-            val x = act.idStore.identity.decryptPrivateMessage(bodyList.getString())
+        if (bodyList == null || bodyList.typ != BIPF_DICT) {
+            Log.d("sendToFrontend", "decoded payload == null")
+            return
+        }
+        val box = bipf_dict2JSON(bodyList)!![TINYSSB_APP_BOX.getString()]
+        // FIXME "box" seems to always be null
+        Log.d("send", "box = $box")
+        if (box != null) { //private, decrypt
+            Log.d("sendToFrontend", box.toString())
+            val x = act.idStore.identity.decryptPrivateMessageString(box as String)
+            Log.e("sendToFrontend", x!!.toString())
             bodyList = Bipf.decode(x!!)
             confid = true
         }
 
-        if (bodyList == null || bodyList.typ != BIPF_LIST) {
+        if (bodyList == null || bodyList.typ != BIPF_DICT) {
             Log.d("sendToFrontend", "decoded payload == null")
             return
         }
-        val param = bipf_list2JSON(bodyList)
+        val param = bipf_dict2JSON(bodyList)
+        Log.e("sendToFrontend", param.toString())
         val hdr = JSONObject()
         hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
         hdr.put("ref", mid.toBase64())
@@ -368,3 +410,10 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         eval(cmd)
     }
 }
+
+
+/**
+ * Ideal message layout:
+ *
+ * {'TAM', {'RCP': RCPS*, 'XRF', XREF*, 'TIM', time, 'BDY': {'TXU8': time, 'IMPG', png_image, 'LOGP', gps_coordinates}}}
+ */

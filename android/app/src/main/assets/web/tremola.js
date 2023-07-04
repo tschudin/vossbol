@@ -274,7 +274,7 @@ function new_text_post(s) {
     var recps;
     if (curr_chat == "ALL") {
         recps = "ALL";
-        backend("post [] " + btoa(draft) + " null null")
+        backend("post [] " + btoa(draft) + " null")
     } else {
         recps = tremola.chats[curr_chat].members.join(' ');
         backend("post [] " + btoa(draft) + " null " + recps);
@@ -933,7 +933,7 @@ function b2f_update_progress(min_entries, old_min_entries, old_want_entries, cur
 }
 
 function b2f_local_peer(type, identifier, displayname, status) {
-    console.log("incoming displayname:", displayname)
+//    console.log("incoming displayname:", displayname)
     if (displayname == "null") {
         displayname = identifier
     }
@@ -957,7 +957,7 @@ function b2f_local_peer(type, identifier, displayname, status) {
         }
 
 
-    console.log("local_peer:", type, identifier, displayname, status)
+//    console.log("local_peer:", type, identifier, displayname, status)
 
     if (status == "offline") {
       delete localPeers[identifier]
@@ -971,7 +971,8 @@ function b2f_local_peer(type, identifier, displayname, status) {
 
 function b2f_new_event(e) { // incoming SSB log event: we get map with three entries
                             // console.log('hdr', JSON.stringify(e.header))
-    console.log('pub', "New Frontend Event: " + JSON.stringify(e))
+    console.log('pub', "New Frontend Event: " + e)
+//    console.log('pub', "New Frontend Event: " + JSON.stringify(e))
 
     // add new contact
     if (!(e.header.fid in tremola.contacts)) {
@@ -983,7 +984,7 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
         }
         load_contact_list()
     }
-    if (e.confid !== null && e.confid[0] === 'TAV') {
+    if (e.confid !== null && e.confid[0] === 'TAM') {
         var conv_name = recps2nm(e.confid[4]);
         console.log('cfd', "Which means it WORKS!!!   2: i = " + "i" + ", conv_name = " + conv_name)
         if (!(conv_name in tremola.chats)) { // create new conversation if needed
@@ -1135,7 +1136,9 @@ function b2f_initialize(id) {
 
     closeOverlay();
     setScenario('chats');
-    // load_chat("ALL");
+    load_chat("ALL");
+//    load_chat(recps2nm([myId]));
+    showPreview();
 }
 
 // --- eof
