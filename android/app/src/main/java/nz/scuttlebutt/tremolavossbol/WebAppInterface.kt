@@ -306,12 +306,14 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             keys.add(me.deRef())
             Bipf.dict_append(post, TINYSSB_APP_RECP, recps)
 
-            val msg = mkDict()
-            Bipf.dict_append(msg, TINYSSB_APP_TEXTANDMEDIA, post)
+            val msg = mkList()
+            Bipf.list_append(msg, TINYSSB_APP_TEXTANDMEDIA)
+            Bipf.list_append(msg, post)
 
             val encrypted = act.idStore.identity.encryptPrivateMessage(Bipf.encode(msg)!!, keys)
             Bipf.list_append(packet, TINYSSB_APP_BOX)
             Bipf.list_append(packet, Bipf.mkBytes(encrypted))
+            Log.d("wai", "Sending encrypted bipf: ${bipf_list2JSON(msg)}")
         } else { // public message
             Bipf.list_append(packet, TINYSSB_APP_TEXTANDMEDIA)
             Bipf.list_append(packet, post)
@@ -367,25 +369,23 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     }
 
     fun sendTinyEventToFrontend(entry: LogTinyEntry) {
-        Log.d("wai", "sendTinyEvent ${entry.body.toHex()}")
         sendToFrontend(entry.fid, entry.seq, entry.mid, entry.body)
     }
 
     fun sendToFrontend(fid: ByteArray, seq: Int, mid: ByteArray, payload: ByteArray) {
         Log.d("send", "sendToFrontend seq=${seq} ${payload.toHex()}")
         var confid = false
-        var bodyList = Bipf.decode(payload)
+        var bodyList = decode(payload)
         if (bodyList == null || bodyList.typ != BIPF_LIST) {
             Log.d("send", "decoded payload == null")
             return
         }
         val body = bipf_list2JSON(bodyList)
-        Log.d("send", "box = $body")
+//        Log.d("send", "box = $body")
         if (body!![0] == TINYSSB_APP_BOX.getString()) { //private, decrypt
-            Log.d("sendToFrontend", body.toString())
+//            Log.d("sendToFrontend", body.toString())
             val x = act.idStore.identity.decryptPrivateMessageString(body[1] as String)
-            Log.e("sendToFrontend", bipf_dict2JSON(decode(x!!)!!).toString())
-            bodyList = Bipf.decode(x!!)
+            bodyList = decode(x!!)
             if (bodyList == null || bodyList.typ != BIPF_LIST) {
                 Log.d("send", "decrypted payload == null")
                 return
@@ -393,8 +393,8 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             confid = true
         }
 
-        val param = bipf_dict2JSON(bodyList)
-        Log.e("send", param.toString())
+        val param = bipf_list2JSON(bodyList)!![1]
+        Log.d("send", "param = $param")
         val hdr = JSONObject()
         hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
         hdr.put("ref", mid.toBase64())
@@ -402,9 +402,9 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         var cmd = "b2f_new_event({\"header\":${hdr},"
         if (confid) {
             cmd += "\"public\":${null},"
-            cmd += "\"confid\":${param.toString()}"
+            cmd += "\"confid\":${param}"
         } else {
-            cmd += "\"public\":${param.toString()},"
+            cmd += "\"public\":${param},"
             cmd += "\"confid\":${null}"
         }
         cmd += "});"

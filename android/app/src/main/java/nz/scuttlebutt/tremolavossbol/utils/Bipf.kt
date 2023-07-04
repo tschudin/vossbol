@@ -369,16 +369,16 @@ class Bipf {
 
         @JvmStatic
         fun bipf_dict2JSON(e: Bipf_e): JSONObject? {
-//            Log.d("bipf", "dict2J typ=${e.typ}")
+            // Log.d("bipf", "dict2J typ=${e.typ}")
             if (e.typ != BIPF_DICT) {
-                 Log.d("bipf", "dict2J typ=${e.typ}")
+                 Log.e("bipf", "dict2J typ=${e.typ}")
                 return null
             }
             val dict = e.getDict()
             // Log.d("bipf", "list2J ${lst.size}")
             val obj = JSONObject()
             for (i in dict.keys) {
-//                Log.d("bipf", "dict2J key=${i}")
+                // Log.d("bipf", "dict2J key=${i}")
                 var k = ""
                 when (i.typ) {
                     BIPF_BYTES    -> { k = i.getBytes().toBase64() }
@@ -394,13 +394,13 @@ class Bipf {
                         Log.d("bipf", "dict2JSON -- not implemented for typ=${i.typ}")
                     }
                 }
-//                Log.d("bipf", "value typ=${dict[i]!!.typ}")
+                // Log.d("bipf", "value typ=${dict[i]!!.typ}")
                 when (dict[i]!!.typ) {
                     BIPF_BYTES    -> { obj.put(k, dict[i]!!.getBytes().toBase64()) }
                     BIPF_STRING   -> { obj.put(k, dict[i]!!.getString()) }
                     BIPF_INT      -> { obj.put(k, dict[i]!!.getInt()) }
-                    BIPF_LIST     -> { obj.put(k, bipf_list2JSON(i)) }
-                    BIPF_DICT     -> { obj.put(k, bipf_dict2JSON(i)) }
+                    BIPF_LIST     -> { obj.put(k, bipf_list2JSON(dict[i]!!)) }
+                    BIPF_DICT     -> { obj.put(k, bipf_dict2JSON(dict[i]!!)) }
                     BIPF_BOOLNONE -> {
                         if ((dict[i]!!.v as Int) < 0)
                             obj.put(k, null)
