@@ -15,11 +15,18 @@ import com.google.zxing.integration.android.IntentIntegrator
 import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
-import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_STRING
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_list2JSON
-import nz.scuttlebutt.tremolavossbol.utils.Bipf_e
-import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_KANBAN
-import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.decode
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkDict
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkList
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_BODY
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_BOX
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_KANBAN
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_RECP
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TIME
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_TEXTANDMEDIA
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_AUDIO_CODEC2
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_UTF8_TEXT
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.deRef
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
@@ -135,9 +142,9 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 val a = JSONArray(args[1])
                 val tips = ArrayList<String>(0)  // for voice
                 for (i in 0..a.length() - 1) {
-                    val s = (a[i] as JSONObject).toString()
-                    Log.d("post", s)
-                    tips.add(s)
+                    val post = (a[i] as JSONObject).toString()
+                    Log.d("post", post)
+                    tips.add(post)
                 }
                 var t: String? = null
                 if (args[2] != "null")
@@ -294,57 +301,68 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             Log.d("wai", "post_text t- ${text}/${text.length}")
         if (voice != null)
             Log.d("wai", "post_voice v- ${voice}/${voice.size}")
-        val lst = Bipf.mkList()
-        Bipf.list_append(lst, TINYSSB_APP_TEXTANDVOICE)
-        // add tips
-        Bipf.list_append(lst, if (text == null) Bipf.mkNone() else Bipf.mkString(text))
-        Bipf.list_append(lst, if (voice == null) Bipf.mkNone() else Bipf.mkBytes(voice))
+
+        //  Prepare attachments
+        val body = mkDict()
+        if (text != null) {
+            Bipf.dict_append(body, TINYSSB_ATTACH_UTF8_TEXT, Bipf.mkString(text))
+        }
+        if (voice != null) {
+            Bipf.dict_append(body, TINYSSB_ATTACH_AUDIO_CODEC2, Bipf.mkBytes(voice))
+        }
+
+        // Prepare post
+        val post = mkDict()
+        Bipf.dict_append(post, TINYSSB_APP_BODY, body)
 
         val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
+        Bipf.dict_append(post, TINYSSB_APP_TIME, tst)
         Log.d("wai", "send time is ${tst.getInt()}")
-        Bipf.list_append(lst, tst)
 
-        val body: ByteArray?
-        if (rcps!![0] == "null") {
-            Bipf.list_append(lst, Bipf.mkNone())
-            body = Bipf.encode(lst) // public post
-        } else {
-            body = Bipf.encode(encrypt_post(lst, rcps)!!) // private post
-        }
-        Log.d("wai", "Sending: ${Bipf.bipf_list2JSON(Bipf.decode(body!!)!!)}")
-        act.tinyNode.publish_content(body)
-    }
-
-    fun encrypt_post(lst: Bipf_e, rcps: List<String>): Bipf_e? {
-        Log.d("priv:post", "sending ${bipf_list2JSON(lst).toString()}")
-        val recps = Bipf.mkList()
-        val keys: MutableList<ByteArray> = mutableListOf()
-        val me = act.idStore.identity.toRef()
-        for (r in rcps) {
-            if (r != me) {
-                Bipf.list_append(recps, Bipf.mkString(r))
-                keys.add(r.deRef())
+        // Prepare message
+        val packet = mkList()
+        if (rcps!!.isNotEmpty()) {  // private message: add recipients list and encrypt
+            // Prepare the list of recipients ("recps" as a field in the post and "keys" for the encryption)
+            val recps = mkList()
+            val keys: MutableList<ByteArray> = mutableListOf()
+            val me = act.idStore.identity.toRef()
+            for (r in rcps) {
+                if (!r.deRef().contentEquals(me.deRef())) {
+                    Bipf.list_append(recps, Bipf.mkBytes(r.deRef()))
+                    keys.add(r.deRef())
+                }
             }
-        }
-        Bipf.list_append(recps, Bipf.mkString(me))
-        keys.add(me.deRef())
-        Bipf.list_append(lst, recps)
-        val body = Bipf.encode(lst)
+            Bipf.list_append(recps, Bipf.mkBytes(me.deRef()))
+            keys.add(me.deRef())
+            Bipf.dict_append(post, TINYSSB_APP_RECP, recps)
 
-        val encrypted = body?.let { act.idStore.identity.encryptPrivateMessage(it, keys) }
-        return encrypted?.let { Bipf.mkString(it) }
+            val msg = mkList()
+            Bipf.list_append(msg, TINYSSB_TOP_TEXTANDMEDIA)
+            Bipf.list_append(msg, post)
+
+            val encrypted = act.idStore.identity.encryptPrivateMessage(Bipf.encode(msg)!!, keys)
+            Bipf.list_append(packet, TINYSSB_TOP_BOX)
+            Bipf.list_append(packet, Bipf.mkBytes(encrypted))
+            Log.d("wai", "Sending encrypted bipf: ${bipf_list2JSON(msg)}")
+        } else { // public message
+            Bipf.list_append(packet, TINYSSB_TOP_TEXTANDMEDIA)
+            Bipf.list_append(packet, post)
+        }
+
+        Log.d("wai", "Sending bipf: ${bipf_list2JSON(packet)}")
+        act.tinyNode.publish_content(Bipf.encode(packet)!!)
     }
 
     fun kanban(bid: String?, prev: List<String>?, operation: String, args: List<String>?) {
-        val lst = Bipf.mkList()
-        Bipf.list_append(lst, TINYSSB_APP_KANBAN)
+        val lst = mkList()
+        Bipf.list_append(lst, TINYSSB_TOP_KANBAN)
         if (bid != null)
             Bipf.list_append(lst, Bipf.mkString(bid))
         else
             Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
 
         if (prev != null) {
-            val prevList = Bipf.mkList()
+            val prevList = mkList()
             for (p in prev) {
                 Bipf.list_append(prevList, Bipf.mkString(p))
             }
@@ -364,7 +382,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         val body = Bipf.encode(lst)
 
         if (body != null) {
-            Log.d("kanban", "published bytes: " + Bipf.decode(body))
+            Log.d("kanban", "published bytes: " + decode(body))
             act.tinyNode.publish_content(body)
         }
         //val body = Bipf.encode(lst)
@@ -381,40 +399,65 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
     }
 
     fun sendTinyEventToFrontend(entry: LogTinyEntry) {
-        Log.d("wai", "sendTinyEvent ${entry.body.toHex()}")
         sendToFrontend(entry.fid, entry.seq, entry.mid, entry.body)
     }
 
     fun sendToFrontend(fid: ByteArray, seq: Int, mid: ByteArray, payload: ByteArray) {
-        Log.d("wai", "sendToFrontend seq=${seq} ${payload.toHex()}")
+        Log.d("send", "sendToFrontend seq=${seq} ${payload.toHex()}")
         var confid = false
-        var bodyList = Bipf.decode(payload)
-        if (bodyList!!.typ == BIPF_STRING) { //private, decrypt
-            Log.d("send", bodyList.getString())
-            val x = act.idStore.identity.decryptPrivateMessage(bodyList.getString())
-            bodyList = Bipf.decode(x!!)
-            confid = true
-        }
-
+        var bodyList = decode(payload)
         if (bodyList == null || bodyList.typ != BIPF_LIST) {
-            Log.d("sendToFrontend", "decoded payload == null")
+            Log.d("send", "decoded payload == null")
             return
         }
-        val param = bipf_list2JSON(bodyList)
-        val hdr = JSONObject()
-        hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
-        hdr.put("ref", mid.toBase64())
-        hdr.put("seq", seq)
-        var cmd = "b2f_new_event({\"header\":${hdr},"
-        if (confid) {
-            cmd += "\"public\":${null},"
-            cmd += "\"confid\":${param.toString()}"
-        } else {
-            cmd += "\"public\":${param.toString()},"
-            cmd += "\"confid\":${null}"
+        var body = bipf_list2JSON(bodyList)
+//        Log.d("send", "box = $body")
+        if (body!![0] == TINYSSB_TOP_BOX.getString()) { //private, decrypt
+//            Log.d("sendToFrontend", body.toString())
+            val x = act.idStore.identity.decryptPrivateMessageString(body[1] as String)
+            bodyList = decode(x!!)
+            if (bodyList == null || bodyList.typ != BIPF_LIST) {
+                Log.d("send", "decrypted payload == null")
+                return
+            }
+            body = bipf_list2JSON(bodyList)
+            confid = true
         }
-        cmd += "});"
-        Log.d("CMD", cmd)
-        eval(cmd)
+        Log.d("send", "sending $body")
+
+        if (body!![0] == TINYSSB_TOP_TEXTANDMEDIA.getString()) { // Text and media, send message
+
+            val param = JSONObject()
+            param.put("TAM", body[1])
+            Log.d("send", "param = $param")
+            val hdr = JSONObject()
+            hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
+            hdr.put("ref", mid.toBase64())
+            hdr.put("seq", seq)
+            var cmd = "b2f_new_event({\"header\":${hdr},"
+            if (confid) {
+                cmd += "\"public\":${null},"
+                cmd += "\"confid\":${param}"
+            } else {
+                cmd += "\"public\":${param},"
+                cmd += "\"confid\":${null}"
+            }
+            cmd += "});"
+            Log.d("CMD", "send : $cmd")
+            eval(cmd)
+        } else if (body[0] == TINYSSB_TOP_KANBAN.getString()) { //private, decrypt
+            val param = bipf_list2JSON(bodyList)
+            val hdr = JSONObject()
+            hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
+            hdr.put("ref", mid.toBase64())
+            hdr.put("seq", seq)
+            var cmd = "b2f_new_event({\"header\":${hdr},"
+            cmd += "\"public\":${param.toString()}"
+            cmd += "});"
+            Log.d("CMD", cmd)
+            eval(cmd)
+        } else {
+            Log.d("sendToFrontend", "Packet format ${body[0]} not recognised")
+        }
     }
 }

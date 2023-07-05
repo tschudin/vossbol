@@ -89,12 +89,8 @@ class SSBid { // ed25519
         return shared
     }
 
-    fun encryptPrivateMessage(message: String, recps: List<ByteArray>): String {
+    fun encryptStringPrivateMessage(message: String, recps: List<ByteArray>): String {
         val txt = message.encodeToByteArray()
-        return encryptPrivateMessage(txt, recps)
-    }
-
-    fun encryptPrivateMessage(txt: ByteArray, recps: List<ByteArray>): String {
         val nonce = SecureRandom().generateSeed(24)
         val cdek = SecureRandom().generateSeed(33) // count plus data encryption key
         cdek[0] = recps.size.toByte()
@@ -116,7 +112,28 @@ class SSBid { // ed25519
         return Base64.encodeToString(total, Base64.NO_WRAP) + ".box"
     }
 
-    fun decryptPrivateMessage(message: String): ByteArray? {
+    fun encryptPrivateMessage(txt: ByteArray, recps: List<ByteArray>): ByteArray {
+        val nonce = SecureRandom().generateSeed(24)
+        val cdek = SecureRandom().generateSeed(33) // count plus data encryption key
+        cdek[0] = recps.size.toByte()
+        val dek = cdek.sliceArray(1..32)
+        val aKeyPair = lazySodiumInst.cryptoSignKeypair()
+        val secret = ed25519SktoCurve(aKeyPair.secretKey.asBytes)
+        val public = ed25519PktoCurve(aKeyPair.publicKey.asBytes)
+        var boxes = ByteArray(0)
+        val kek = ByteArray(32)
+        for (k in recps) {
+            val sbox = ByteArray(cdek.size + 16)
+            lazySodiumInst.cryptoScalarMult(kek, secret, ed25519PktoCurve(k))
+            lazySodiumInst.cryptoSecretBoxEasy(sbox, cdek, cdek.size.toLong(), nonce, kek)
+            boxes += sbox
+        }
+        val lastbox = ByteArray(txt.size + 16)
+        lazySodiumInst.cryptoSecretBoxEasy(lastbox, txt, txt.size.toLong(), nonce, dek)
+        return nonce + public + boxes + lastbox
+    }
+
+    fun decryptPrivateMessageString(message: String): ByteArray? {
         val raw = Base64.decode(message.removeSuffix(".box"), Base64.NO_WRAP)
         val nonce = raw.sliceArray(0..23)
         val pubkey = raw.sliceArray(24..55)
@@ -133,6 +150,27 @@ class SSBid { // ed25519
                 return SodiumAPI.secretUnbox(data, nonce, cdek.sliceArray(1..32))
             }
             recipients = raw.sliceArray(56 + (i+1)*49 .. raw.lastIndex)
+        }
+        return null
+    }
+
+    fun decryptPrivateMessage(message: ByteArray): ByteArray? {
+//        val raw = Base64.decode(message.removeSuffix(".box"), Base64.NO_WRAP)
+        val nonce = message.sliceArray(0..23)
+        val pubkey = message.sliceArray(24..55)
+        val kek = ByteArray(32)
+        lazySodiumInst.cryptoScalarMult(kek, ed25519SktoCurve(signingKey!!), pubkey)
+        var recipients = message.sliceArray(56 .. message.lastIndex)
+
+        for (i in 0..6) {
+            if (recipients.size < 49) return null
+            val cdek = SodiumAPI.secretUnbox(recipients.copyOfRange(0, 49), nonce, kek)
+            if (cdek != null) {
+                val numberRecipients = cdek[0].toInt()
+                val data = message.sliceArray(56 + numberRecipients*49 .. message.lastIndex)
+                return SodiumAPI.secretUnbox(data, nonce, cdek.sliceArray(1..32))
+            }
+            recipients = message.sliceArray(56 + (i+1)*49 .. message.lastIndex)
         }
         return null
     }

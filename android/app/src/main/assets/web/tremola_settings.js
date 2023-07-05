@@ -6,7 +6,7 @@ function get_default_settings() {
     return {
         'enable_preview': false,
         'background_map': true,
-        'websocket': true,
+        'websocket': false,  // TODO back to true
         'show_shortnames': true,
         'hide_forgotten_conv': true,
         'hide_forgotten_contacts': true,

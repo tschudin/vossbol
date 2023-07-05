@@ -28,11 +28,28 @@ class Constants{
 
         //  app name                                              schema
         val TINYSSB_APP_ALIAS        = Bipf.mkString("ALI") // fid str
-        val TINYSSB_APP_BOX          = Bipf.mkString("BOX") // bytes
-        val TINYSSB_APP_BOX2         = Bipf.mkString("BX2") // bytes
-        val TINYSSB_APP_KANBAN       = Bipf.mkString("KAN") // ...
-        val TINYSSB_APP_TEXTANDVOICE = Bipf.mkString("TAV") // str bytes int (xref)
-        val TINYSSB_APP_TEXT         = Bipf.mkString("TXT") // str int xref
+
+        // Top-level tags
+        val TINYSSB_TOP_BOX          = Bipf.mkString("BOX") // bytes: encrypted content
+        val TINYSSB_TOP_BOX2         = Bipf.mkString("BX2") // bytes
+        val TINYSSB_TOP_KANBAN       = Bipf.mkString("KAN") // Content for the Kanban app
+//         val TINYSSB_TOP_TEXTANDVOICE = Bipf.mkString("TAV") // str bytes int (xref)  FIXME deprecated
+        val TINYSSB_TOP_TEXTANDMEDIA = Bipf.mkString("TAM") // dictionary
+
+        // Tags inside of the "TAM" value
+        val TINYSSB_APP_TIME         = Bipf.mkString("TIM") // int : unix time in seconds since Jan 1, 1970
+        val TINYSSB_APP_BODY         = Bipf.mkString("BDY") // list: attachments
+        val TINYSSB_APP_XREF         = Bipf.mkString("XRF") // list of bin: cross reference to other posts
+        val TINYSSB_APP_RECP         = Bipf.mkString("RCP") // list of bin: list of recipients
+
+        // Attachment tags
+        val TINYSSB_ATTACH_UTF8_TEXT           = Bipf.mkString("TXU8") // string:      utf-8 encoded text
+        val TINYSSB_ATTACH_AUDIO_CODEC2        = Bipf.mkString("AUC2") // bin:         codec2 audio file
+        val TINYSSB_ATTACH_IMAGE_JPG           = Bipf.mkString("IMJP") // bin:         JPG image
+        val TINYSSB_ATTACH_IMAGE_PNG           = Bipf.mkString("IMPG") // bin:         PNG image
+        val TINYSSB_ATTACH_LOCATION_GPS        = Bipf.mkString("LOGP") // bin:         GPS location
+        val TINYSSB_ATTACH_LOCATION_MAIDENHEAD = Bipf.mkString("LOMD") // bin:         Maidenhead location
+
 
         val TINYSSB_BLE_REPL_SERVICE_2022 = UUID.fromString("6e400001-7646-4b5b-9a50-71becce51558")
         val TINYSSB_BLE_RX_CHARACTERISTIC = UUID.fromString("6e400002-7646-4b5b-9a50-71becce51558") // for writing to the remote device
