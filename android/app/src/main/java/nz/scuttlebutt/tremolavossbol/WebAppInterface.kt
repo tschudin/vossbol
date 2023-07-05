@@ -20,12 +20,12 @@ import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.decode
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkDict
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkList
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_BODY
-import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_BOX
-import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_KANBAN
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_BOX
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_KANBAN
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_RECP
-import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDMEDIA
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TIME
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_TEXTANDMEDIA
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_AUDIO_CODEC2
-import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_TIME
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_UTF8_TEXT
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.deRef
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
@@ -266,7 +266,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         Bipf.dict_append(post, TINYSSB_APP_BODY, body)
 
         val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
-        Bipf.dict_append(post, TINYSSB_ATTACH_TIME, tst)
+        Bipf.dict_append(post, TINYSSB_APP_TIME, tst)
         Log.d("wai", "send time is ${tst.getInt()}")
 
         // Prepare message
@@ -287,15 +287,15 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             Bipf.dict_append(post, TINYSSB_APP_RECP, recps)
 
             val msg = mkList()
-            Bipf.list_append(msg, TINYSSB_APP_TEXTANDMEDIA)
+            Bipf.list_append(msg, TINYSSB_TOP_TEXTANDMEDIA)
             Bipf.list_append(msg, post)
 
             val encrypted = act.idStore.identity.encryptPrivateMessage(Bipf.encode(msg)!!, keys)
-            Bipf.list_append(packet, TINYSSB_APP_BOX)
+            Bipf.list_append(packet, TINYSSB_TOP_BOX)
             Bipf.list_append(packet, Bipf.mkBytes(encrypted))
             Log.d("wai", "Sending encrypted bipf: ${bipf_list2JSON(msg)}")
         } else { // public message
-            Bipf.list_append(packet, TINYSSB_APP_TEXTANDMEDIA)
+            Bipf.list_append(packet, TINYSSB_TOP_TEXTANDMEDIA)
             Bipf.list_append(packet, post)
         }
 
@@ -305,7 +305,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
 
     fun kanban(bid: String?, prev: List<String>?, operation: String, args: List<String>?) {
         val lst = mkList()
-        Bipf.list_append(lst, TINYSSB_APP_KANBAN)
+        Bipf.list_append(lst, TINYSSB_TOP_KANBAN)
         if (bid != null)
             Bipf.list_append(lst, Bipf.mkString(bid))
         else
@@ -362,7 +362,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         }
         var body = bipf_list2JSON(bodyList)
 //        Log.d("send", "box = $body")
-        if (body!![0] == TINYSSB_APP_BOX.getString()) { //private, decrypt
+        if (body!![0] == TINYSSB_TOP_BOX.getString()) { //private, decrypt
 //            Log.d("sendToFrontend", body.toString())
             val x = act.idStore.identity.decryptPrivateMessageString(body[1] as String)
             bodyList = decode(x!!)
@@ -375,7 +375,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         }
         Log.d("send", "sending $body")
 
-        if (body!![0] == TINYSSB_APP_TEXTANDMEDIA.getString()) { // Text and media, send message
+        if (body!![0] == TINYSSB_TOP_TEXTANDMEDIA.getString()) { // Text and media, send message
 
             val param = JSONObject()
             param.put("TAM", body[1])
@@ -395,7 +395,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             cmd += "});"
             Log.d("CMD", "send : $cmd")
             eval(cmd)
-        } else if (body[0] == TINYSSB_APP_KANBAN.getString()) { //private, decrypt
+        } else if (body[0] == TINYSSB_TOP_KANBAN.getString()) { //private, decrypt
             val param = bipf_list2JSON(bodyList)
             val hdr = JSONObject()
             hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
