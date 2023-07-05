@@ -44,4 +44,11 @@ The body contains a dictionary of fields. Each field is optional.
 - "IMJP": Image in JPG format
 - "IMPG": Image in PNG format
 - "LOGP": GPS location coordinates
-- "LOMD": Maidenhead location coodinates
+- "LOMD": Maidenhead location coordinates
+
+### Examples
+
+- Text and Media: "['TAM', {'RCP': RCPS*, 'XRF', XREF*, 'TIM', time, 'BDY': {'TXU8': time, 'IMPG', png_image, 'LOGP', gps_coordinates}}]"
+
+- Encrypted content: "['BOX', {content}]" where content when decrypted is Text and Media
+  (including the tag)
