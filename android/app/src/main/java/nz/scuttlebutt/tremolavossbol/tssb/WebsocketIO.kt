@@ -15,7 +15,7 @@ class WebsocketIO(val context: MainActivity, val url: String) {
 
 
     fun start() {
-
+        return
         if (!context.settings!!.isWebsocketEnabled())
             return
 

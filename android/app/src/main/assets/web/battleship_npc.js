@@ -64,23 +64,23 @@ function npc_place_boats() {
     for (var i = 0; i < 2; i++) {
         grid = replace_at(grid, i+12, tile_state.PATROL.number);
     }
-    npc_ships += " 1H12";
+    npc_ships += " PH12";
     for (var i = 0; i < 3; i++) {
         grid = replace_at(grid, i+81, tile_state.SUBMARINE.number);
     }
-    npc_ships += " 2H81";
+    npc_ships += " SH81";
     for (var i = 0; i < 3 * width; i += width) {
         grid = replace_at(grid, i+7, tile_state.DESTROYER.number);
     }
-    npc_ships += " 3V7";
+    npc_ships += " DV7";
     for (var i = 0; i < 4 * width; i += width) {
         grid = replace_at(grid, i+51, tile_state.BATTLESHIP.number);
     }
-    npc_ships += " 4V51";
+    npc_ships += " BV51";
     for (var i = 0; i < 5; i++) {
         grid = replace_at(grid, i+40, tile_state.CARRIER.number);
     }
-    npc_ships += " 5H40";
+    npc_ships += " CH40";
 //    console.log("game: " + grid);
     return grid;
 }

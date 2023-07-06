@@ -12,13 +12,21 @@ import android.webkit.WebView
 import android.widget.Toast
 import androidx.core.content.ContextCompat.checkSelfPermission
 import com.google.zxing.integration.android.IntentIntegrator
+import nz.scuttlebutt.tremolavossbol.crypto.SodiumAPI
+import nz.scuttlebutt.tremolavossbol.crypto.SodiumAPI.Companion.sha256
 import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.bipf_list2JSON
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.decode
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.dict_append
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.encode
+import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.list_append
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkDict
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.mkList
+import nz.scuttlebutt.tremolavossbol.utils.Bipf_e
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.BATTLESHIP_ACCEPT
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.BATTLESHIP_INVITE
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_BODY
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_BOX
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_KANBAN
@@ -27,9 +35,11 @@ import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TIME
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_TEXTANDMEDIA
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_AUDIO_CODEC2
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_ATTACH_UTF8_TEXT
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_TOP_BATTLESHIP
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.deRef
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toHex
+import nz.scuttlebutt.tremolavossbol.utils.Json_PP
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -220,15 +230,52 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
 
             "bts" -> {
                 when(args[1]) {
-                    "I" -> {sendBTSInvite(args[2])}
-                    "A" -> {sendBTSAccept(args[2], args[3])}
-                    "D" -> {sendBTSDecline(args[2], args[3])}
-                    "T" -> {sendBTSTerminate(args[2], args[3])}
-                    "M" -> {sendBTSMove(args[2], args[3], args[4])}
-                    "R" -> {sendBTSRefuse(args[2], args[3], args[4])}
-                    "L" -> {sendBTSLoose(args[2], args[3], args[4])}
-                    "W" -> {sendBTSWin(args[2], args[3], args[4])}
-                    "S" -> {sendBTSSurrender(args[2], args[3])}
+                    "I" -> {
+                        Log.d( "bts", "ships = ships, to = ${args[2].deRef()}")
+                        try {
+                            val a = JSONArray(args[3])
+                            val ships = mkList()  // for voice
+                            list_append(ships, Bipf.mkInt(a[0] as Int))
+                            list_append(ships, Bipf.mkInt(a[1] as Int))
+                            for (i in 2 until a.length())
+                                list_append(ships, Bipf.mkString(a[i] as String))
+                            val nonce = Bipf.mkBytes(SodiumAPI.nonce(64))
+                            list_append(ships, nonce)
+
+                            val commitment = encode(ships)!!.sha256()
+                            val parameter = mkList()
+                            list_append(parameter, Bipf.mkBytes(commitment))
+                            sendBTSMessage(parameter, BATTLESHIP_INVITE, args[2])
+                        } catch (e: Exception) {
+                            Log.e("bts", e.toString())
+                        }
+//                        post_with_voice(ships, t, v, args.slice(4..args.lastIndex))
+                        return
+                    }
+                    "A" -> {
+                        val a = JSONArray(args[5])
+                        val ships = mkList()  // for voice
+                        list_append(ships, Bipf.mkInt(a[0] as Int))
+                        list_append(ships, Bipf.mkInt(a[1] as Int))
+                        for (i in 2 until a.length())
+                            list_append(ships, Bipf.mkString(a[i] as String))
+                        val nonce = Bipf.mkBytes(SodiumAPI.nonce(64))
+                        list_append(ships, nonce)
+
+                        val commitment = encode(ships)!!.sha256()
+                        val parameter = mkList()
+                        list_append(parameter, Bipf.mkString(args[2])) // game_id
+                        list_append(parameter, Bipf.mkString(args[3])) // xref to previous
+                        list_append(parameter, Bipf.mkBytes(commitment))
+                        list_append(parameter, Bipf.mkInt(args[6] as Int))
+                        sendBTSMessage(parameter, BATTLESHIP_ACCEPT, args[4])
+                    }
+                    "D" -> { /* TODO Not implemented yet */ }
+                    "T" -> { /* TODO Not implemented yet */ }
+                    "M" -> { /* TODO Not implemented yet */ }
+                    "L" -> { /* TODO Not implemented yet */ }
+                    "W" -> { /* TODO Not implemented yet */ }
+                    "S" -> { /* TODO Not implemented yet */ }
                 }
             }
 
@@ -238,40 +285,21 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         }
     }
 
-    private fun sendBTSInvite(rcp: String) {
+    private fun sendBTSMessage(parameter: Bipf_e, tag: Bipf_e, rcp: String) {
+        val message = mkDict()
+        dict_append(message, tag, parameter)
 
-    }
+        val packet = mkList()
+        list_append(packet, TINYSSB_TOP_BATTLESHIP)
+        list_append(packet, message)
 
-    private fun sendBTSAccept(rcp: String, game_id: String) {
-        TODO("Not yet implemented")
-    }
+        val box = mkList()
+        val encrypted = act.idStore.identity.encryptPrivateMessage(encode(packet)!!, mutableListOf(rcp.deRef()))
+        list_append(box, TINYSSB_TOP_BOX)
+        list_append(box, Bipf.mkBytes(encrypted))
 
-    private fun sendBTSDecline(rcp: String, game_id: String) {
-        TODO("Not yet implemented")
-    }
-
-    private fun sendBTSTerminate(rcp: String, game_id: String) {
-        TODO("Not yet implemented")
-    }
-
-    private fun sendBTSMove(rcp: String, game_id: String, move: String) {
-        TODO("Not yet implemented")
-    }
-
-    private fun sendBTSRefuse(rcp: String, game_id: String, msg: String) {
-        TODO("Not yet implemented")
-    }
-
-    private fun sendBTSLoose(rcp: String, game_id: String, boats: String) {
-        TODO("Not yet implemented")
-    }
-
-    private fun sendBTSWin(rcp: String, game_id: String, boats: String) {
-        TODO("Not yet implemented")
-    }
-
-    private fun sendBTSSurrender(rcp: String, game_id: String) {
-        TODO("Not yet implemented")
+        Log.d("bts", "Sending bts message: ${bipf_list2JSON(packet)}")
+        act.tinyNode.publish_content(encode(packet)!!)
     }
 
     fun eval(js: String) { // send JS string to webkit frontend for execution
@@ -305,18 +333,18 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         //  Prepare attachments
         val body = mkDict()
         if (text != null) {
-            Bipf.dict_append(body, TINYSSB_ATTACH_UTF8_TEXT, Bipf.mkString(text))
+            dict_append(body, TINYSSB_ATTACH_UTF8_TEXT, Bipf.mkString(text))
         }
         if (voice != null) {
-            Bipf.dict_append(body, TINYSSB_ATTACH_AUDIO_CODEC2, Bipf.mkBytes(voice))
+            dict_append(body, TINYSSB_ATTACH_AUDIO_CODEC2, Bipf.mkBytes(voice))
         }
 
         // Prepare post
         val post = mkDict()
-        Bipf.dict_append(post, TINYSSB_APP_BODY, body)
+        dict_append(post, TINYSSB_APP_BODY, body)
 
         val tst = Bipf.mkInt((System.currentTimeMillis() / 1000).toInt())
-        Bipf.dict_append(post, TINYSSB_APP_TIME, tst)
+        dict_append(post, TINYSSB_APP_TIME, tst)
         Log.d("wai", "send time is ${tst.getInt()}")
 
         // Prepare message
@@ -328,29 +356,29 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             val me = act.idStore.identity.toRef()
             for (r in rcps) {
                 if (!r.deRef().contentEquals(me.deRef())) {
-                    Bipf.list_append(recps, Bipf.mkBytes(r.deRef()))
+                    list_append(recps, Bipf.mkBytes(r.deRef()))
                     keys.add(r.deRef())
                 }
             }
-            Bipf.list_append(recps, Bipf.mkBytes(me.deRef()))
+            list_append(recps, Bipf.mkBytes(me.deRef()))
             keys.add(me.deRef())
-            Bipf.dict_append(post, TINYSSB_APP_RECP, recps)
+            dict_append(post, TINYSSB_APP_RECP, recps)
 
             val msg = mkList()
-            Bipf.list_append(msg, TINYSSB_TOP_TEXTANDMEDIA)
-            Bipf.list_append(msg, post)
+            list_append(msg, TINYSSB_TOP_TEXTANDMEDIA)
+            list_append(msg, post)
 
-            val encrypted = act.idStore.identity.encryptPrivateMessage(Bipf.encode(msg)!!, keys)
-            Bipf.list_append(packet, TINYSSB_TOP_BOX)
-            Bipf.list_append(packet, Bipf.mkBytes(encrypted))
+            val encrypted = act.idStore.identity.encryptPrivateMessage(encode(msg)!!, keys)
+            list_append(packet, TINYSSB_TOP_BOX)
+            list_append(packet, Bipf.mkBytes(encrypted))
             Log.d("wai", "Sending encrypted bipf: ${bipf_list2JSON(msg)}")
         } else { // public message
-            Bipf.list_append(packet, TINYSSB_TOP_TEXTANDMEDIA)
-            Bipf.list_append(packet, post)
+            list_append(packet, TINYSSB_TOP_TEXTANDMEDIA)
+            list_append(packet, post)
         }
 
         Log.d("wai", "Sending bipf: ${bipf_list2JSON(packet)}")
-        act.tinyNode.publish_content(Bipf.encode(packet)!!)
+        act.tinyNode.publish_content(encode(packet)!!)
     }
 
     fun kanban(bid: String?, prev: List<String>?, operation: String, args: List<String>?) {
@@ -455,6 +483,20 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             cmd += "\"public\":${param.toString()}"
             cmd += "});"
             Log.d("CMD", cmd)
+            eval(cmd)
+        } else if (body[0] == TINYSSB_TOP_BATTLESHIP.getString()) {
+            val hdr = JSONObject()
+            hdr.put("fid", "@" + fid.toBase64() + ".ed25519")
+            hdr.put("ref", mid.toBase64())
+            hdr.put("seq", seq)
+            val param = JSONObject()
+            val key = (body[1] as JSONObject).keys().next()
+            param.put(key,(body[1] as JSONObject)[key])
+            param.put("xref", "xref")
+            Log.d("send", "param = $param")
+            param.put("header", hdr)
+            var cmd = "bts_b2f(${param});"
+            Log.d("CMD", "send bts : $cmd")
             eval(cmd)
         } else {
             Log.d("sendToFrontend", "Packet format ${body[0]} not recognised")

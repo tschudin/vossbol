@@ -31,6 +31,11 @@ class SodiumAPI {
         }
 
         @JvmStatic
+        fun nonce(length: Int): ByteArray {
+            return lazySodiumInst.nonce(length)
+        }
+
+        @JvmStatic
         fun ByteArray.sha256(): ByteArray {
             var h = ByteArray(Hash.SHA256_BYTES)
             lazySodiumInst.cryptoHashSha256(h, this, this.size.toLong())

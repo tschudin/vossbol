@@ -35,6 +35,7 @@ class Constants{
         val TINYSSB_TOP_KANBAN       = Bipf.mkString("KAN") // Content for the Kanban app
 //         val TINYSSB_TOP_TEXTANDVOICE = Bipf.mkString("TAV") // str bytes int (xref)  FIXME deprecated
         val TINYSSB_TOP_TEXTANDMEDIA = Bipf.mkString("TAM") // dictionary
+        val TINYSSB_TOP_BATTLESHIP   = Bipf.mkString("BTS") // Battleship app
 
         // Tags inside of the "TAM" value
         val TINYSSB_APP_TIME         = Bipf.mkString("TIM") // int : unix time in seconds since Jan 1, 1970
@@ -50,6 +51,14 @@ class Constants{
         val TINYSSB_ATTACH_LOCATION_GPS        = Bipf.mkString("LOGP") // bin:         GPS location
         val TINYSSB_ATTACH_LOCATION_MAIDENHEAD = Bipf.mkString("LOMD") // bin:         Maidenhead location
 
+        // Battleship
+        val BATTLESHIP_INVITE     = Bipf.mkString("I")
+        val BATTLESHIP_ACCEPT     = Bipf.mkString("A")
+        val BATTLESHIP_REFUSE     = Bipf.mkString("R")
+        val BATTLESHIP_MOVE       = Bipf.mkString("M")
+        val BATTLESHIP_SURRENDER  = Bipf.mkString("S")
+        val BATTLESHIP_LOOSE      = Bipf.mkString("L")
+        val BATTLESHIP_WIN        = Bipf.mkString("W")
 
         val TINYSSB_BLE_REPL_SERVICE_2022 = UUID.fromString("6e400001-7646-4b5b-9a50-71becce51558")
         val TINYSSB_BLE_RX_CHARACTERISTIC = UUID.fromString("6e400002-7646-4b5b-9a50-71becce51558") // for writing to the remote device

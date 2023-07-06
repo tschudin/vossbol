@@ -28,8 +28,7 @@ var scenarioDisplay = {
 }
 
 var scenarioMenu = {
-    'chats': [['Launch my game', 'menu_new_game'],
-        ['Connected Devices', 'menu_connection'],
+    'chats': [['Connected Devices', 'menu_connection'],
         ['New conversation', 'menu_new_conversation'],
         ['Settings', 'menu_settings'],
         ['About', 'menu_about']],
