@@ -39,27 +39,29 @@ int DmxClass::_blbt_index(unsigned char *h)
 
 void DmxClass::arm_dmx(unsigned char *dmx,
              void (*fct)(unsigned char*, int, unsigned char*, struct face_s*),
-             unsigned char *aux)
+                       unsigned char *aux, int ndx, int seq)
 {
-  int ndx = this->_dmxt_index(dmx);
+  int fndx = this->_dmxt_index(dmx);
   if (fct == NULL) { // del
-    if (ndx != -1) {
-      memmove(this->dmxt+ndx, this->dmxt+ndx+1,
-              (this->dmxt_cnt - ndx - 1) * sizeof(struct dmx_s));
+    if (fndx != -1) {
+      memmove(this->dmxt+fndx, this->dmxt+fndx+1,
+              (this->dmxt_cnt - fndx - 1) * sizeof(struct dmx_s));
       this->dmxt_cnt--;
     }
     return;
   }
-  if (ndx == -1) {
+  if (fndx == -1) {
     if (this->dmxt_cnt >= DMXT_SIZE) {
       Serial.println("adm_dmx: dmxt is full");
       return; // full
     }
-    ndx = this->dmxt_cnt++;
+    fndx = this->dmxt_cnt++;
   }
-  memcpy(this->dmxt[ndx].dmx, dmx, DMX_LEN);
-  this->dmxt[ndx].fct = fct;
-  this->dmxt[ndx].aux = aux;
+  memcpy(this->dmxt[fndx].dmx, dmx, DMX_LEN);
+  this->dmxt[fndx].fct = fct;
+  this->dmxt[fndx].aux = aux;
+  this->dmxt[fndx].ndx = ndx;
+  this->dmxt[fndx].seq = seq;
 }
 
 void DmxClass::arm_blb(unsigned char *h,

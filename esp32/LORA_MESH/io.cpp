@@ -288,7 +288,7 @@ void io_send(unsigned char *buf, short len, struct face_s *f)
 
 void io_enqueue(unsigned char *pkt, int len, unsigned char *dmx, struct face_s *f)
 {
-  // Serial.printf("   enqueue %dB %s..\r\n", len, to_hex(dmx?dmx:pkt,7,0));
+  // Serial.printf("   enqueue %dB %s..\r\n", len, to_hex(dmx?dmx:pkt,7));
   for (int i = 0; i < NR_OF_FACES; i++) {
     if (faces[i]->send == NULL)
       continue;
@@ -318,6 +318,7 @@ void io_enqueue(unsigned char *pkt, int len, unsigned char *dmx, struct face_s *
         if (!memcmp(faces[i]->queue[(faces[i]->offs + k)%IO_MAX_QUEUE_LEN], buf, 1+sz))
           break;
       if (k == faces[i]->queue_len) {
+        Serial.printf("   enqueue %dB %s.. on face %s\r\n", *buf, to_hex(buf+1,7), faces[i]->name);
         faces[i]->queue[(faces[i]->offs + faces[i]->queue_len) % IO_MAX_QUEUE_LEN] = buf;
         faces[i]->queue_len++;
       } else
@@ -334,7 +335,7 @@ void io_dequeue() // enforces interpacket time
     if (f->send == NULL || f->queue_len <= 0 || now < f->next_send) // FIXME: handle wraparound
       continue;
     // Serial.printf("dequeue i=%d, len=%d\r\n", i, f->queue_len);
-    f->next_send = now + f->next_delta + esp_random() % (f->next_delta/50);
+    f->next_send = now + f->next_delta + esp_random() % (f->next_delta/10);
     unsigned char *buf = f->queue[f->offs];
     // io_send(buf+1, *buf, f);
     f->send(buf+1, *buf);
@@ -385,7 +386,7 @@ int fishForNewLoRaPkt()
     lora_pkt_cnt++;
     lora_rcvd_pkts++;
     if (lora_buf_cnt >= LORA_BUF_CNT) {
-      Serial.printf("  ohh %d, rcvd too many LoRa pkts, cnt=%d\r\n",
+      Serial.printf("   ohh %d, rcvd too many LoRa pkts, cnt=%d\r\n",
                     sz, lora_buf_cnt);
       while (sz-- > 0)
         LoRa.read();
@@ -393,13 +394,14 @@ int fishForNewLoRaPkt()
     }
     if (sz > LORA_MAX_LEN)
       sz = LORA_MAX_LEN;
-    unsigned char *ptr = (unsigned char*) lora_buf + lora_buf_offs * (LORA_MAX_LEN+1);
+    unsigned char *pkt = (unsigned char*) lora_buf + lora_buf_offs * (LORA_MAX_LEN+1);
+    unsigned char *ptr = pkt;
     *ptr++ = sz;
     while (sz-- > 0)
       *ptr++ = LoRa.read();
     lora_buf_offs = (lora_buf_offs + 1) % LORA_BUF_CNT;
     lora_buf_cnt++;
-    // Serial.printf("  yeah %d, now %d pkts in buf\r\n", sz, lora_buf_cnt);
+    Serial.printf("   rcvd %dB on lora, %s.., now %d pkts in buf\r\n", *pkt, to_hex(pkt+1, 7), lora_buf_cnt);
   }
 }
 

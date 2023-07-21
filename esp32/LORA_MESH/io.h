@@ -6,8 +6,8 @@
 #if !defined(_INCLUDE_IO_H)
 #define _INCLUDE_IO_H
 
-#define IO_MAX_QUEUE_LEN          4
-#define LORA_INTERPACKET_TIME  1200  // millis
+#define IO_MAX_QUEUE_LEN          5
+#define LORA_INTERPACKET_TIME  1350  // millis
 #define UDP_INTERPACKET_TIME    100  // millis
 
 struct face_s {

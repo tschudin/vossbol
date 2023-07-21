@@ -198,7 +198,7 @@ void RepoClass::load()
 void RepoClass::new_feed(unsigned char *fid)
 {
   char *path = _feed_path(fid);
-  Serial.printf("new feed '%s'\r\n", path);
+  Serial.printf("   repo: new feed '%s'\r\n", path);
   MyFS.mkdir(path);
   char *log = _feed_log(fid);
   File f = MyFS.open(log, "w");
@@ -249,11 +249,17 @@ int RepoClass::feed_len(unsigned char *fid)
 void RepoClass::feed_append(unsigned char *fid, unsigned char *pkt)
 {
   // Serial.println(String("incoming entry for log ") + to_hex(fid, FID_LEN, 0));
+
+  long durations[10], t1, t2;
+  t1 = millis();
+
   int ndx = feed_index(fid);
   if (ndx < 0) {
     Serial.println("  no such feed");
     return;
   }
+  t2 = millis(); durations[0] = t2 - t1; t1 = t2;
+  
   // check dmx
   unsigned char buf[strlen(DMX_PFX) + FID_LEN + 4 + HASH_LEN + TINYSSB_PKT_LEN];
   memcpy(buf, DMX_PFX, strlen(DMX_PFX));
@@ -267,6 +273,9 @@ void RepoClass::feed_append(unsigned char *fid, unsigned char *pkt)
     Serial.println("   DMX mismatch");
     return;
   }
+  t2 = millis(); durations[1] = t2 - t1; t1 = t2;
+  fishForNewLoRaPkt();
+
   // check signature
   memcpy(buf + strlen(DMX_PFX) + FID_LEN + 4 + HASH_LEN, pkt, TINYSSB_PKT_LEN);
   // cpu_set_fast();
@@ -276,6 +285,7 @@ void RepoClass::feed_append(unsigned char *fid, unsigned char *pkt)
     Serial.println("   ed25519 signature verification failed");
     return;
   }
+  t2 = millis(); durations[2] = t2 - t1; t1 = t2;
   fishForNewLoRaPkt();
 
   // create file for sidechain first, in case of crash before extending the log
@@ -289,15 +299,18 @@ void RepoClass::feed_append(unsigned char *fid, unsigned char *pkt)
       File f = MyFS.open(_feed_chnk(fid, this->feeds[ndx].next_seq, 1), FILE_WRITE);
       f.close();
     }
+    fishForNewLoRaPkt();
   }
+  t2 = millis(); durations[3] = t2 - t1; t1 = t2;
 
   File f = MyFS.open(_feed_log(fid), FILE_APPEND);
   Serial.printf("   appended %d.%d\r\n", theGOset->_key_index(fid), f.size()/TINYSSB_PKT_LEN + 1);
   f.write(pkt, TINYSSB_PKT_LEN);
   f.close();
   this->entry_cnt++;
-
+  t2 = millis(); durations[4] = t2 - t1; t1 = t2;
   fishForNewLoRaPkt();
+
   // update the MID file. When this is not reached due to a creah, we re-scan at LOAD time
   unsigned char h[crypto_hash_sha256_BYTES];
   crypto_hash_sha256(h, buf, sizeof(buf));
@@ -306,12 +319,17 @@ void RepoClass::feed_append(unsigned char *fid, unsigned char *pkt)
     File f = MyFS.open(_feed_mid(fid, this->feeds[ndx].next_seq), "w");
     f.write(this->feeds[ndx].prev, HASH_LEN);
     f.close();
+    fishForNewLoRaPkt();
   }
+  t2 = millis(); durations[5] = t2 - t1; t1 = t2;
+
   if (this->feeds[ndx].next_seq >= 2) // above new file replaces old MID file that can be deleted now
     MyFS.remove(_feed_mid(fid, this->feeds[ndx].next_seq - 1));
   this->feeds[ndx].next_seq++;
+  t2 = millis(); durations[6] = t2 - t1; t1 = t2;
 
   dmx->arm_dmx(pkt); // remove old DMX handler for this packet
+  t2 = millis(); durations[7] = t2 - t1; t1 = t2;
 
   // install handler for next pkt:
   s = htonl(this->feeds[ndx].next_seq); // big endian
@@ -319,9 +337,17 @@ void RepoClass::feed_append(unsigned char *fid, unsigned char *pkt)
   memcpy(buf + strlen(DMX_PFX) + FID_LEN + 4, this->feeds[ndx].prev, HASH_LEN);
   // unsigned char dmx[DMX_LEN];
   dmx->compute_dmx(dmx_val, buf + strlen(DMX_PFX), FID_LEN + 4 + HASH_LEN);
-  dmx->arm_dmx(dmx_val, incoming_pkt, fid);
+  t2 = millis(); durations[8] = t2 - t1; t1 = t2;
+  fishForNewLoRaPkt();
+  dmx->arm_dmx(dmx_val, incoming_pkt, fid, ndx, this->feeds[ndx].next_seq);
   // Serial.printf("   armed %s for %d.%d\r\n", to_hex(dmx_val, 7),
   //               ndx, this->feeds[ndx].next_seq);
+  t2 = millis(); durations[9] = t2 - t1; t1 = t2;
+
+  Serial.printf("   durations");
+  for (int i = 0; i < sizeof(durations)/sizeof(long); i++)
+    Serial.printf(" %ld", durations[i]);
+  Serial.printf("\r\n");
 }
 
 int RepoClass::feed_index(unsigned char* fid) {

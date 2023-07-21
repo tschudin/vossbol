@@ -17,6 +17,8 @@ struct dmx_s {
   unsigned char dmx[DMX_LEN];
   void (*fct)(unsigned char*, int, unsigned char *aux, struct face_s *f);
   unsigned char *aux;
+  int ndx;
+  int seq;
 };
 
 struct blb_s {
@@ -45,7 +47,7 @@ class DmxClass {
   void arm_dmx(unsigned char *dmx,
                void (*fct)(unsigned char*, int, unsigned char*,
                            struct face_s*)=NULL,
-               unsigned char *aux=NULL);
+               unsigned char *aux=NULL, int ndx=-1, int seq=0);
   void arm_blb(unsigned char *h,
                void (*fct)(unsigned char*, int, int, struct face_s*)=NULL,
                unsigned char *fid=NULL, int seq=-1, int bnr=-1, int last=0);

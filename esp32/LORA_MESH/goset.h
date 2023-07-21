@@ -10,7 +10,7 @@
 
 #define GOSET_KEY_LEN FID_LEN // 32
 #define GOSET_MAX_KEYS      MAX_FEEDS
-#define GOSET_ROUND_LEN  10000 // in millis
+#define GOSET_ROUND_LEN  20000 // in millis
 #define MAX_PENDING        10 // log2(maxSetSize) + density (#neighbors)
 #define NOVELTY_PER_ROUND   1
 #define ASK_PER_ROUND       1

@@ -309,7 +309,7 @@ void GOsetClass::tick()
   // if (this->pending_c_cnt > 2)
   //   this->pending_c_cnt = 2; // better: log2(largest_claim_span) ?
   if (this->pending_c_cnt > 0)
-    Serial.printf("   |GOset|=%d, %d pending claims", this->goset_len, this->pending_c_cnt);
+    Serial.printf("   |GOset|=%d, %d pending claims:\r\n", this->goset_len, this->pending_c_cnt);
   // unsigned char *heap = reinterpret_cast<unsigned char*>(sbrk(0));
   // Serial.println(String(", heap sbrk=") + to_hex((unsigned char *)&heap, sizeof(heap)));
   for (int i = 0; i < this->pending_c_cnt; i++)

@@ -67,7 +67,8 @@ void cmd_rx(String cmd) {
       }
       Serial.println("DMX table:");
       for (int i = 0; i < dmx->dmxt_cnt; i++)
-        Serial.printf("  %s\r\n", to_hex(dmx->dmxt[i].dmx, DMX_LEN, 0));
+        Serial.printf("  %s %d.%d\r\n", to_hex(dmx->dmxt[i].dmx, DMX_LEN, 0),
+                      dmx->dmxt[i].ndx, dmx->dmxt[i].seq);
       Serial.println("CHUNK table:");
       for (int i = 0; i < dmx->blbt_cnt; i++)
         Serial.printf("  %s %d.%d.%d\r\n", to_hex(dmx->blbt[i].h, HASH_LEN, 0),
