@@ -58,6 +58,8 @@ int bipf_encode(unsigned char *buf, struct bipf_s *bptr);
 unsigned char* bipf_dumps(struct bipf_s *bptr, int *len);
 struct bipf_s* bipf_loads(unsigned char *buf, int len);
 
+struct bipf_s* str2bipf(char *s);
+
 #endif // _INCLUDE_BIPF_H
 
 // eof

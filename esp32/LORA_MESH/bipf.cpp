@@ -436,4 +436,10 @@ struct bipf_s* bipf_loads(unsigned char *buf, int len)
   return bipf_decode(buf, 0, &len);
 }
 
+struct bipf_s* str2bipf(char *s)
+{
+  static bipf_s e = { BIPF_STRING, strlen(s), {.str = s} };
+  return &e;
+}
+
 // eof
