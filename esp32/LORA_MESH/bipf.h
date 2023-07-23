@@ -55,7 +55,7 @@ unsigned int bipf_varint_encode(unsigned char *buf, unsigned int val);
 
 int bipf_encodingLength(bipf_s *bptr);
 int bipf_encode(unsigned char *buf, struct bipf_s *bptr);
-unsigned char* bipf_dumps(struct bipf_s *bptr);
+unsigned char* bipf_dumps(struct bipf_s *bptr, int *len);
 struct bipf_s* bipf_loads(unsigned char *buf, int len);
 
 #endif // _INCLUDE_BIPF_H

@@ -136,8 +136,7 @@ void bipf_dict_set(struct bipf_s *dptr, struct bipf_s *k, struct bipf_s *v)
 
 struct bipf_s* bipf_dict_getref(struct bipf_s *dptr, struct bipf_s *k)
 {
-  int i;
-  for (i = 0; i < dptr->cnt; i++)
+  for (int i = 0; i < dptr->cnt; i++)
     if (bipf_equal(k, dptr->u.dict[2*i]))
       return dptr->u.dict[2*i + 1];
   return NULL;
@@ -424,10 +423,10 @@ int bipf_encode(unsigned char *buf, struct bipf_s *bptr)
   return tagLen + sz;
 }
 
-unsigned char* bipf_dumps(struct bipf_s *bptr)
+unsigned char* bipf_dumps(struct bipf_s *bptr, int *len)
 {
-  int len = bipf_encodingLength(bptr);
-  unsigned char *buf = (unsigned char*) malloc(len);
+  *len = bipf_encodingLength(bptr);
+  unsigned char *buf = (unsigned char*) malloc(*len);
   bipf_encode(buf, bptr);
   return buf;
 }
