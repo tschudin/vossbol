@@ -154,7 +154,7 @@ class MainActivity : Activity() {
                     Handler().postDelayed({
                         mkSockets()
                         if (websocket == null)
-                            websocket = WebsocketIO(this@MainActivity, Constants.TINYSSB_SIMPLEPUB_URL)
+                            websocket = WebsocketIO(this@MainActivity, settings!!.getWebsocketUrl())
                         websocket!!.start()
                         Log.d("main", "msc_sock ${mc_socket.toString()}")
                     }, 1000)
@@ -320,7 +320,7 @@ class MainActivity : Activity() {
         ble = BlePeers(this)
         ble!!.startBluetooth()
 
-        websocket = WebsocketIO(this, Constants.TINYSSB_SIMPLEPUB_URL)
+        websocket = WebsocketIO(this, settings!!.getWebsocketUrl())
         websocket!!.start()
         //ble = BlePeersBroadcast(this)
         //ble!!.checkPermissions(true)

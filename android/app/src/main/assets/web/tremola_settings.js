@@ -11,7 +11,8 @@ function get_default_settings() {
         'hide_forgotten_conv': true,
         'hide_forgotten_contacts': true,
         'udp_multicast': true,
-        'ble': true
+        'ble': true,
+        'websocket_url': "ws://meet.dmi.unibas.ch:8989"
     }
 }
 
@@ -37,13 +38,21 @@ function applySetting(nm, val) {
         load_chat_list();
     } else if (nm == 'hide_forgotten_contacts') {
         load_contact_list();
+    } else if (nm == 'websocket') {
+        if (val)
+            document.getElementById("container:settings_ws_url").style.display = 'flex'
+        else
+            document.getElementById("container:settings_ws_url").style.display = 'none'
     }
 }
 
 function setSetting(nm, val) {
     // console.log("setting", nm, val)
+    if (nm == "websocket_url") {
+      document.getElementById("settings_urlInput").value = val
+      return
+    }
     applySetting(nm, val);
-    console.log("DEBUG: " + nm)
     document.getElementById(nm).checked = val;
 }
 
@@ -59,6 +68,34 @@ function settings_wipe() {
     menu_redraw();
     setScenario('chats');
     */
+}
+
+function btn_setWebsocketUrl() {
+   var new_url = document.getElementById("settings_urlInput").value
+
+   if(!(new_url.startsWith("ws://") || new_url.startsWith("wss://"))) {
+      launch_snackbar("Invalid Websocket Url")
+      document.getElementById("settings_urlInput").classList.add("invalid")
+      return
+   }
+
+   document.getElementById("settings_urlInput").classList.remove("invalid")
+
+   document.getElementById("settings_urlInput").classList.add("valid")
+   setTimeout(function() {
+           document.getElementById("settings_urlInput").classList.remove("valid");
+       }, 700);
+   document.getElementById("settings_urlInput").blur();
+   backend("settings:set websocket_url " + new_url)
+   tremola.settings["websocket_url"] = new_url
+   persist()
+   launch_snackbar("New Websocket Url saved")
+}
+
+function enter_setWebsocketUrl(ev) {
+    if (ev.key == "Enter") {
+        btn_setWebsocketUrl()
+    }
 }
 
 // eof

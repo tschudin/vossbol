@@ -9,9 +9,10 @@ import okio.ByteString.Companion.toByteString
 
 const val WS_CLOSE_NORMAL = 1000
 
-class WebsocketIO(val context: MainActivity, val url: String) {
+class WebsocketIO(val context: MainActivity, private var url: String) {
     private var ws: WebSocket? = null
     private var reconnectJob: Job? = null
+    private val client = OkHttpClient()
 
 
     fun start() {
@@ -20,7 +21,6 @@ class WebsocketIO(val context: MainActivity, val url: String) {
             return
 
         Log.d("Websocket","starting Websocket")
-        val client = OkHttpClient()
 
         val connectReq = Request.Builder().url(url).build()
 
@@ -67,6 +67,10 @@ class WebsocketIO(val context: MainActivity, val url: String) {
 
     }
 
+    fun getUrl(): String {
+        return url
+    }
+
     fun send(buf: ByteArray) {
         if (ws == null)
             return
@@ -83,5 +87,17 @@ class WebsocketIO(val context: MainActivity, val url: String) {
             delay(5000)
             start()
         }
+    }
+
+    fun updateUrl(newUrl: String) {
+        ws?.close(WS_CLOSE_NORMAL, "connection closed by client")
+        reconnectJob?.cancel()
+        context.wai.eval("b2f_local_peer(\"ws\", \"$url\", \"${url}\", \"offline\")")
+        url = newUrl
+
+        val connectReq = Request.Builder().url(newUrl).build()
+        ws = client.newWebSocket(connectReq, wslistener)
+        Log.d("ws", "changed to new address: $newUrl")
+
     }
 }

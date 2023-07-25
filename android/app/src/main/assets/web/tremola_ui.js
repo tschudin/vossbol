@@ -182,6 +182,10 @@ function btnBridge(e) {
 function menu_settings() {
     closeOverlay();
     setScenario('settings')
+    document.getElementById("settings_urlInput").classList.remove("invalid")
+    document.getElementById("settings_urlInput").value = tremola.settings["websocket_url"]
+    if (tremola.settings["websocket"])
+      document.getElementById("container:settings_ws_url").style.display = 'flex'
     /*
     prev_scenario = curr_scenario;
     curr_scenario = 'settings';

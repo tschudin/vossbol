@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html xmlns="http://www.w3.org/1999/html">
 <head>
   <meta charset="UTF-8">
   <link rel="stylesheet" type="text/css" href="tremola.css" media="screen" />
@@ -417,10 +417,15 @@
     <hr>
 
     <div class="settings">
-      <div class="settingsText">Connect to Pub via Websocket</div>
-      <div style="float: right;"><label class="switch">
-        <input id="websocket" type="checkbox" onchange="toggle_changed(this);">
-        <span class="slider round"></span></label></div>
+        <div class="settingsText">Connect to Pub via Websocket</div>
+        <div style="float: right;"><label class="switch">
+          <input id="websocket" type="checkbox" onchange="toggle_changed(this);">
+          <span class="slider round"></span></label></div>
+    </div>
+    <div id="container:settings_ws_url" class="websocket_url_settings" style="display:none;">
+          <div class="settingsText" style="margin-right: 10px;font-size: 16px;margin-bottom: 5px;">URL: </div>
+          <input type="text" id="settings_urlInput" onkeypress="enter_setWebsocketUrl(event)" placeholder="Websocket-Url (ws://...)" required style="height:30px; width: 70%">
+          <button id="btn:url" class ="flat passive buttontext" onclick="btn_setWebsocketUrl()" style="background-image: url('img/checked.svg'); width:35px; height:35px; margin-left: 5px;"></button>
     </div>
     <hr>
 

@@ -1,7 +1,9 @@
 package nz.scuttlebutt.tremolavossbol
 
 import android.content.Context
+import androidx.core.content.withStyledAttributes
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_DIR
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_SIMPLEPUB_URL
 import java.io.File
 
 class Settings(val context: MainActivity) {
@@ -17,6 +19,8 @@ class Settings(val context: MainActivity) {
     private val HIDE_FORGOTTEN_CONTACTS_BY_DEFAULT = true
     private val HIDE_FORGOTTEN_KANBAN_BY_DEFAULT = true
     private val SHOW_SHORTNAME_BY_DEFAULT = true
+
+    private val WEBSOCKET_URL_DEFAULT = "ws://meet.dmi.unibas.ch:8989"
 
 
 
@@ -94,6 +98,10 @@ class Settings(val context: MainActivity) {
         return sharedPreferences.getBoolean("show_shortnames", SHOW_SHORTNAME_BY_DEFAULT)
     }
 
+    fun getWebsocketUrl(): String {
+        return sharedPreferences.getString("websocket_url", WEBSOCKET_URL_DEFAULT)!!
+    }
+
     // ------------------------------------------------------------------------------------------//
 
     fun setWebsocketEnabled(value: Boolean) {
@@ -115,6 +123,11 @@ class Settings(val context: MainActivity) {
         if (!value)
             context.rmSockets()
         context.mkSockets()
+    }
+
+    fun setWebsocketUrl(value: String) {
+        put("websocket_url", value)
+        context.websocket?.updateUrl(value)
     }
 
 }

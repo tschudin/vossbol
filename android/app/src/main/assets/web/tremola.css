@@ -434,8 +434,24 @@ input:checked + .slider:before {
   left: 2px;
   top: 50%;
   transform: translateY(-50%);
-  width: 24px; /* Adjust the width as needed */
-  height: 24px; /* Adjust the height as needed */
+  width: 24px;
+  height: 24px;
+}
+
+.invalid {
+    border: 2px solid red;
+}
+
+.valid {
+    border: 2px solid green;
+    transition: border-color 0.2s ease-in-out;
+}
+
+.websocket_url_settings {
+  background: rgba(255,255,255,0.75);
+  padding:6px;
+  display: flex;
+  align-items: center;
 }
 /* --------------------------------------------------------------------------- */
 /*                                Kanban Board                                 */

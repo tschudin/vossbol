@@ -212,6 +212,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     "ble" -> {act.settings!!.setBleEnabled(args[2].toBooleanStrict())}
                     "udp_multicast" -> {act.settings!!.setUdpMulticastEnabled(args[2].toBooleanStrict())}
                     "websocket" -> {act.settings!!.setWebsocketEnabled(args[2].toBooleanStrict())}
+                    "websocket_url" -> {act.settings!!.setWebsocketUrl(args[2])}
                 }
             }
             else -> {
