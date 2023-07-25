@@ -97,9 +97,20 @@ class GOset(val context: MainActivity) {
         if (cl.sz == keys.size && byteArrayCmp(state, cl.xo) == 0) {
             Log.d("goset", "seems we are synced (with at least someone), |GOset|=${keys.size}")
         } else {
-            _add_key(cl.lo)
-            _add_key(cl.hi)
-            _add_pending_claim(cl)
+            val i1 = keys.indexOf(cl.lo)
+            val i2 = keys.indexOf(cl.hi)
+            if (i2-i1 == 1 && cl.sz == 3) {
+                for (i in cl.xo.indices) {
+                    cl.xo[i] = cl.xo[i] xor cl.lo[i]
+                    cl.xo[i] = cl.xo[i] xor cl.hi[i]
+                }
+                Log.d("goset", "computed the mussung middle key ${cl.xo.toHex()}")
+                _add_key(cl.xo)
+            } else {
+                _add_key(cl.lo)
+                _add_key(cl.hi)
+                _add_pending_claim(cl)
+            }
         }
         // Log.d("goset", "goset size=${keys.size}, pending_claims.size=${pending_claims.size}")
     }
@@ -294,4 +305,5 @@ class GOset(val context: MainActivity) {
         // Log.d("xor", "xo=${xor.toHex()}")
         return xor
     }
+
 }
