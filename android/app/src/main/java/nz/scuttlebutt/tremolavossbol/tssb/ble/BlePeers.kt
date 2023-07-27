@@ -371,6 +371,8 @@ class BlePeers(val act: MainActivity) {
     @SuppressLint("MissingPermission")
     private fun stopServer() {
         stopAdvertising()
+        for (d in connectedDevices)
+            gattServer?.cancelConnection(d)
         gattServer?.close()
         Log.d("GATT_Server", "Server stopped")
     }

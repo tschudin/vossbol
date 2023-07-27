@@ -95,9 +95,17 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 act.settings!!.resetToDefault()
                 act.idStore.setNewIdentity(null) // creates new identity
                 act.tinyRepo.repo_reset()
+                if (act.websocket != null)
+                    act.websocket!!.stop()
+                if (act.ble != null)
+                    act.ble!!.stopBluetooth()
+                val ctx = act.applicationContext
+                ctx.startActivity(Intent.makeRestartActivityTask(act.applicationContext.packageManager.getLaunchIntentForPackage(ctx.packageName)!!.component))
+                Runtime.getRuntime().exit(0)
+
                 // eval("b2f_initialize(\"${tremolaState.idStore.identity.toRef()}\")")
                 // FIXME: should kill all active connections, or better then the app
-                act.finishAffinity()
+                //act.finishAffinity()
             }
             "add:contact" -> {
 
