@@ -198,13 +198,6 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 val op: String = args[3]
                 val argsList: List<String>? = if(args[4] != "null") Base64.decode(args[4], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
 
-                if (bid != null) {
-                    Log.d("KanbanPostBID", bid)
-                    Log.d("KanbanPostPREV", prev.toString())
-                }
-                Log.d("KanbanPostOP", op)
-                Log.d("KanbanPostARGS", args.toString())
-
                 kanban(bid, prev , op, argsList)
             }
             "settings:set" -> {
@@ -279,25 +272,29 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
         val lst = Bipf.mkList()
         Bipf.list_append(lst, TINYSSB_APP_KANBAN)
         if (bid != null)
-            Bipf.list_append(lst, Bipf.mkString(bid))
+            Bipf.list_append(lst, Bipf.mkBytes(Base64.decode(bid, Base64.NO_WRAP)))
         else
-            Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
+            Bipf.list_append(lst, Bipf.mkNone())
 
         if(prev != null) {
             val prevList = Bipf.mkList()
             for(p in prev) {
-                Bipf.list_append(prevList, Bipf.mkString(p))
+                Bipf.list_append(prevList, Bipf.mkBytes(Base64.decode(p, Base64.NO_WRAP)))
             }
             Bipf.list_append(lst, prevList)
         } else {
-            Bipf.list_append(lst, Bipf.mkString("null")) // Bipf.mkNone()
+            Bipf.list_append(lst, Bipf.mkNone())
         }
 
         Bipf.list_append(lst, Bipf.mkString(operation))
 
         if(args != null) {
             for(arg in args) {
-                Bipf.list_append(lst, Bipf.mkString(arg))
+                if (Regex("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?\$").matches(arg)) {
+                    Bipf.list_append(lst, Bipf.mkBytes(Base64.decode(arg, Base64.NO_WRAP)))
+                } else { // arg is not a b64 string
+                    Bipf.list_append(lst, Bipf.mkString(arg))
+                }
             }
         }
 
