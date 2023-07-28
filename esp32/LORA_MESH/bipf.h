@@ -9,7 +9,7 @@
 
 struct bipf_s {
   unsigned char typ;
-  unsigned short cnt; // for list, dict and bytes
+  unsigned short cnt; // for list, dict, string and bytes
   union {
     int i;
     double d;
@@ -58,7 +58,8 @@ int bipf_encode(unsigned char *buf, struct bipf_s *bptr);
 unsigned char* bipf_dumps(struct bipf_s *bptr, int *len);
 struct bipf_s* bipf_loads(unsigned char *buf, int len);
 
-struct bipf_s* str2bipf(char *s);
+struct bipf_s* str2bipf(char *s); // return static bipf_s for s
+struct String bipf2String(struct bipf_s *bptr);
 
 #endif // _INCLUDE_BIPF_H
 

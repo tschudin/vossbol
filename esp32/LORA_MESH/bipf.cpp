@@ -3,9 +3,11 @@
 // tinySSB for ESP32
 // 2022-2023 <christian.tschudin@unibas.ch>
 
+#include <Arduino.h>
 #include <string.h>
 
 #include "bipf.h"
+#include "util.h"
 
 #define TAG_SIZE 3
 #define TAG_MASK 7
@@ -18,7 +20,6 @@ int bipf_equal(struct bipf_s *a, struct bipf_s *b)
     return 0;
   switch(a->typ) {
     case BIPF_STRING:
-      return !strcmp(a->u.str, b->u.str);
     case BIPF_BYTES:
       return a->cnt == b->cnt && !memcmp(a->u.buf, b->u.buf, a->cnt);
     case BIPF_INT:
@@ -37,8 +38,8 @@ int bipf_equal(struct bipf_s *a, struct bipf_s *b)
       if (a->cnt != b->cnt)
         return 0;
       for (int i = 0; i < a->cnt; i++)
-        if (!bipf_equal(a->u.list[2*i], b->u.list[2*i]) ||
-            !bipf_equal(a->u.list[2*i + 1], b->u.list[2*i + 1]))
+        if (!bipf_equal(a->u.dict[2*i], b->u.dict[2*i]) ||
+            !bipf_equal(a->u.dict[2*i + 1], b->u.dict[2*i + 1]))
           return 0;
       return 1;
     default:
@@ -108,6 +109,7 @@ struct bipf_s* bipf_mkString(char *cp)
 void bipf_list_append(struct bipf_s *lptr, struct bipf_s *e)
 {
   lptr->cnt++;
+  // Serial.printf("realloc list\n\r");
   lptr->u.list = (struct bipf_s**) realloc(lptr->u.list, lptr->cnt * sizeof(struct bipf_s*));
   lptr->u.list[lptr->cnt - 1] = e;
 }
@@ -128,22 +130,28 @@ void bipf_dict_set(struct bipf_s *dptr, struct bipf_s *k, struct bipf_s *v)
     bipf_free(dptr->u.dict[2*i + 1]);
   } else {
     dptr->cnt++;
+    // Serial.printf("realloc dict new cnt=%d\n\r", dptr->cnt);
     dptr->u.dict = (struct bipf_s**) realloc(dptr->u.dict, dptr->cnt * 2 * sizeof(struct bipf_s*));
   }
+  // Serial.printf("dict set k=%p v=%p\n\r", k, v);
   dptr->u.dict[2*i] = k;
-  dptr->u.dict[2* + 1] = v;
+  dptr->u.dict[2*i + 1] = v;
 }
 
 struct bipf_s* bipf_dict_getref(struct bipf_s *dptr, struct bipf_s *k)
 {
   for (int i = 0; i < dptr->cnt; i++)
-    if (bipf_equal(k, dptr->u.dict[2*i]))
+    if (bipf_equal(k, dptr->u.dict[2*i])) {
+      // Serial.printf("dict_getref %d %s=", i, to_hex((unsigned char*) (k->u.str), k->cnt));
+      // Serial.printf("%s\r\n", to_hex((unsigned char*) (dptr->u.dict[2*i]->u.str), dptr->u.dict[2*i]->cnt));
       return dptr->u.dict[2*i + 1];
+    }
   return NULL;
 }
 
 void bipf_dict_delete(struct bipf_s *dptr, struct bipf_s *k)
 {
+  // Serial.printf("BIPF dict delete %d\r\n", dptr->cnt);
   for (int i = 0; i < dptr->cnt; i++)
     if (bipf_equal(k, dptr->u.dict[2*i])) {
       bipf_free(dptr->u.dict[2*i]);
@@ -151,8 +159,8 @@ void bipf_dict_delete(struct bipf_s *dptr, struct bipf_s *k)
       // dptr->u.dict[2*i] = NULL;
       // dptr->u.dict[2*i + 1] = NULL;
       if (i != dptr->cnt-1)
-        memmove(dptr->u.dict + i, dptr->u.dict + i + 2,
-                (dptr->cnt - i - 1) * sizeof(bipf_s));
+        memmove(dptr->u.dict + 2*i, dptr->u.dict + 2*i + 2,
+                2*(dptr->cnt - i - 1) * sizeof(struct bipf_s*));
       dptr->cnt--;
       return;
     }
@@ -304,6 +312,33 @@ struct bipf_s* _bipf_dec_inner(int tag, unsigned char *buf, int pos, int *lptr)
       // Serial.println("cnt=" + String(bptr->cnt));
       return bptr;
     }
+    case BIPF_DICT: {
+      int old = pos; 
+      struct bipf_s *bptr = bipf_mkDict();
+      while (pos < lim) {
+        // Serial.println("dict loop pos=" + String(pos));
+        int szK = lim;
+        unsigned int tagK = bipf_varint_decode(buf, pos, &szK);
+        pos += szK;
+        szK = lim;
+        struct bipf_s *k = _bipf_dec_inner(tagK, buf, pos, &szK);
+        if (k == NULL)
+          return NULL;
+        pos += szK;
+        int szV = lim;
+        unsigned int tagV = bipf_varint_decode(buf, pos, &szV);
+        pos += szV;
+        szV = lim;
+        struct bipf_s *v = _bipf_dec_inner(tagV, buf, pos, &szV);
+        if (v == NULL)
+          return NULL;
+        bipf_dict_set(bptr, k, v);
+        pos += szV;
+      }
+      *lptr = pos - old;
+      // Serial.println("cnt=" + String(bptr->cnt));
+      return bptr;
+    }
     case BIPF_STRING: {
       struct bipf_s *bptr = (struct bipf_s*) calloc(1, sizeof(struct bipf_s));
       bptr->typ = BIPF_STRING;
@@ -315,7 +350,7 @@ struct bipf_s* _bipf_dec_inner(int tag, unsigned char *buf, int pos, int *lptr)
       return bptr;
     }
     default:
-      // Serial.println("bipf not implemented or wrong tag " + String(tag) + " pos=" + String(pos));
+      Serial.printf("bipf not implemented or wrong tag=%d, pos=%d\r\n", tag, pos);
       break;
   }
   return NULL; // _type2decoder[t](buf, pos, tag >> _TAG_SIZE, lptr);
@@ -325,12 +360,13 @@ struct bipf_s* _bipf_dec_inner(int tag, unsigned char *buf, int pos, int *lptr)
 
 struct bipf_s* bipf_decode(unsigned char *buf, int pos, int *lptr)
 {
+  // Serial.printf("decode %s\r\n", to_hex(buf+pos, *lptr, 0));
   // read the next value from buffer at start.
   // returns a tuple with the value and the consumed bytes
   int sz1 = *lptr;
   int tag = bipf_varint_decode(buf, pos, &sz1);
   int sz2 = *lptr;
-  // Serial.println("bipf tag " + String(tag,DEC) + "/" + String(tag>>3) + " " + String(sz1) + " " + String(sz2));
+  // Serial.printf("bipf tag %d/%d sz1=%d sz2=%d\r\n", tag&7, tag>>3, sz1, sz2);
   struct bipf_s *val = _bipf_dec_inner(tag, buf, pos + sz1, &sz2);
   *lptr = sz1 + sz2;
   return val;
@@ -364,6 +400,15 @@ int bipf_bodyLength(bipf_s *bptr)
       for (int i = 0; i < bptr->cnt; i++)
         sz += bipf_encodingLength(bptr->u.list[i]);
       // Serial.println("list " + String(sz));
+      return sz;
+    }
+    case BIPF_DICT: {
+      int sz = 0;
+      for (int i = 0; i < bptr->cnt; i++) {
+        sz += bipf_encodingLength(bptr->u.dict[2*i]);
+        sz += bipf_encodingLength(bptr->u.dict[2*i+1]);
+      }
+      // Serial.println("dict " + String(sz));
       return sz;
     }
     default:
@@ -407,6 +452,12 @@ void bipf_encodeBody(unsigned char *buf, bipf_s *bptr)
       for (int i = 0; i < bptr->cnt; i++)
         buf += bipf_encode(buf, bptr->u.list[i]);
       return;
+    case BIPF_DICT:
+      for (int i = 0; i < bptr->cnt; i++) {
+        buf += bipf_encode(buf, bptr->u.dict[2*i]);
+        buf += bipf_encode(buf, bptr->u.dict[2*i+1]);
+      }
+      return;
     default:
       break;
   }
@@ -436,10 +487,58 @@ struct bipf_s* bipf_loads(unsigned char *buf, int len)
   return bipf_decode(buf, 0, &len);
 }
 
-struct bipf_s* str2bipf(char *s)
+struct bipf_s* str2bipf(char *s) // returns addr of a static (!) BIPF obj
 {
-  static bipf_s e = { BIPF_STRING, strlen(s), {.str = s} };
+  static bipf_s e = { BIPF_STRING };
+  e.cnt = strlen(s);
+  e.u.str = s;
   return &e;
+}
+
+String bipf2String(struct bipf_s *bptr)
+{
+  String v;
+  struct bipf_s **pp;
+
+  switch (bptr->typ) {
+    case BIPF_BYTES:
+      return "0x...";
+    case BIPF_STRING:
+      return "\"" + String(bptr->u.str) + "\"";
+    case BIPF_BOOLNONE:
+      if  (bptr->u.i < 0)
+        return "none";
+      if  (bptr->u.i == 0)
+        return "false";
+      return "true";
+    case BIPF_DOUBLE:
+      return String(bptr->u.d);
+    case BIPF_INT:
+      return String(bptr->u.i);
+    case BIPF_LIST:
+      v = "[";
+      pp = bptr->u.list;
+      for (int i = 0; i < bptr->cnt; i++) {
+        if (v.length() != 1)
+          v += ",";
+        v += bipf2String(*pp++);
+      }
+      return v + "]";
+    case BIPF_DICT:
+      v = "{";
+      pp = bptr->u.dict;
+      for (int i = 0; i < bptr->cnt; i++) {
+        if (v.length() != 1)
+          v += ",";
+        v += bipf2String(*pp++) + ":";
+        v += bipf2String(*pp++);
+      }
+      return v + "}";
+    default:
+      // Serial.println("can't render typ=" + String(bptr->typ));
+      break;
+  }
+  return "?";
 }
 
 // eof
