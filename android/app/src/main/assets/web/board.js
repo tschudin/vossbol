@@ -234,7 +234,7 @@ function kanban_new_event(e) {
     // parse data
     var op = e.public[3]
     var bid = op == Operation.BOARD_CREATE ? e.header.ref : e.public[1]
-    var prev = e.public[2] != null ? e.public[2] : []
+    var prev = e.public[2] != "null" ? e.public[2] : [] // TODO: change to null instead of "null" if backend sends this field as Bipf.mkNone()
     var args = e.public.length > 4 ? e.public.slice(4) : []
 
     // add new entry if it is a new board

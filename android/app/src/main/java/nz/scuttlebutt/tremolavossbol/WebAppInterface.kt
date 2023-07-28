@@ -291,7 +291,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             }
             Bipf.list_append(lst, prevList)
         } else {
-            Bipf.list_append(lst, Bipf.mkNone())
+            Bipf.list_append(lst, Bipf.mkString("null"))  // TODO: Change to Bipf.mkNone(), but would be incompatible with the old format
         }
 
         Bipf.list_append(lst, Bipf.mkString(operation))
