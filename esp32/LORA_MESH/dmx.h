@@ -16,18 +16,27 @@
 struct dmx_s {
   unsigned char dmx[DMX_LEN];
   void (*fct)(unsigned char*, int, unsigned char *aux, struct face_s *f);
-  unsigned char *aux;
-  int ndx;
+  unsigned char *fid;
+  // int ndx;
   int seq;
 };
 
 struct blb_s {
   unsigned char h[HASH_LEN];
   void (*fct)(unsigned char*, int, int, struct face_s *f);
+  struct chain_s *front;
+  // unsigned char *fid;
+  // int seq;
+  // int bnr;
+  // int last_bnr;
+};
+
+struct chain_s {
+  struct chain_s *next;
   unsigned char *fid;
-  int seq;
-  int bnr;
-  int last_bnr;
+  unsigned short seq;
+  unsigned short cnr;
+  unsigned short last_cnr;
 };
 
 class DmxClass {
@@ -47,7 +56,7 @@ class DmxClass {
   void arm_dmx(unsigned char *dmx,
                void (*fct)(unsigned char*, int, unsigned char*,
                            struct face_s*)=NULL,
-               unsigned char *aux=NULL, int ndx=-1, int seq=0);
+               unsigned char *aux=NULL, /*int ndx=-1,*/ int seq=0);
   void arm_blb(unsigned char *h,
                void (*fct)(unsigned char*, int, int, struct face_s*)=NULL,
                unsigned char *fid=NULL, int seq=-1, int bnr=-1, int last=0);

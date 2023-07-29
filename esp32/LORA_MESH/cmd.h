@@ -23,7 +23,6 @@ void cmd_rx(String cmd) {
       Serial.println("  l        list log file");
       Serial.println("  m        empty log file");
 #endif
-      Serial.println("  q[0|1]   analyze (0) and fix (1) file system");
       Serial.println("  r[id|*]  reset this repo to blank / request reset from id/all");
       Serial.println("  s[id|*]  status / request status from id/all");
       Serial.println("  x[id|*]  reboot / request reboot from id/all");
@@ -61,18 +60,42 @@ void cmd_rx(String cmd) {
     case 'd': // dump
       // goset_dump(theGOset);
       Serial.println("Installed feeds:");
-      for (int i = 0; i < repo->feed_cnt; i++) {
+      for (int i = 0; i < repo->rplca_cnt; i++) {
         unsigned char *key = theGOset->get_key(i);
-        Serial.printf("  %d %s, next_seq=%d\r\n", i, to_hex(key, 32, 0), repo->fid2feed(key)->next_seq);
+        Serial.printf("  %d %s, next_seq=%d\r\n", i, to_hex(key, 32, 0), repo->fid2replica(key)->get_next_seq(NULL));
       }
-      Serial.println("DMX table:");
-      for (int i = 0; i < dmx->dmxt_cnt; i++)
-        Serial.printf("  %s %d.%d\r\n", to_hex(dmx->dmxt[i].dmx, DMX_LEN, 0),
-                      dmx->dmxt[i].ndx, dmx->dmxt[i].seq);
-      Serial.println("CHUNK table:");
-      for (int i = 0; i < dmx->blbt_cnt; i++)
-        Serial.printf("  %s %d.%d.%d\r\n", to_hex(dmx->blbt[i].h, HASH_LEN, 0),
-                      theGOset->_key_index(dmx->blbt[i].fid), dmx->blbt[i].seq, dmx->blbt[i].bnr);
+      Serial.printf("DMX table: (%d entries)\r\n", dmx->dmxt_cnt);
+      for (int i = 0; i < dmx->dmxt_cnt; i++) {
+        unsigned char *dmx_val = dmx->dmxt[i].dmx;
+        Serial.printf("  %s", to_hex(dmx_val, DMX_LEN));
+        unsigned char *fid = dmx->dmxt[i].fid;
+        if (fid != NULL) {
+          int ndx = theGOset->_key_index(fid);
+          if (ndx >= 0)
+            Serial.printf("  %d.%d\r\n", ndx, dmx->dmxt[i].seq);
+        } else {
+          char *d = "?";
+          if (!memcmp(dmx_val, dmx->goset_dmx, DMX_LEN))
+            d = "<GOset>";
+          else if (!memcmp(dmx_val, dmx->want_dmx, DMX_LEN))
+            d = "<WANT>";
+          else if (!memcmp(dmx_val, dmx->chnk_dmx, DMX_LEN))
+            d = "<CHNK>";
+          else if (!memcmp(dmx_val, dmx->mgmt_dmx, DMX_LEN))
+            d = "<MGMT>";
+          Serial.printf("  %s\r\n", d);
+        }
+      }
+      Serial.printf("CHUNK table: (%d entries)\r\n", dmx->blbt_cnt);
+      for (int i = 0; i < dmx->blbt_cnt; i++) {
+        struct blb_s *bp = dmx->blbt + i;
+        Serial.printf("  %s ", to_hex(bp->h, HASH_LEN, 0));
+        for (struct chain_s *tp = bp->front; tp; tp = tp->next) {
+          int ndx = theGOset->_key_index(tp->fid);
+          Serial.printf(" %d.%d.%d", ndx, tp->seq, tp->cnr);
+        }
+        Serial.printf("\r\n");
+      }
       break;
     case 'f': // Directory dump
       Serial.printf("File system: %d total bytes, %d used\r\n",
@@ -110,100 +133,6 @@ void cmd_rx(String cmd) {
       lora_log = MyFS.open("/lora_log.txt", FILE_WRITE);
       break;
 #endif
-    case 'q':
-      { // analyze file system
-        char doit = cmd[1] == '1';
-        File fdir = MyFS.open(FEED_DIR);
-        File g = fdir.openNextFile("r");
-        while (g) { // walk each feed
-          unsigned char *fid = from_hex((char*)g.name(), FID_LEN);
-          // this code should not be necessary to run anymore because we
-          // handle now the case that a crash occurs between extending the log
-          // and creating the sidechan file (which we now do first)
-          Serial.printf(" check feed %s\r\n", g.name());
-          unsigned char buf[TINYSSB_PKT_LEN];
-          char *path = repo->_feed_log(fid);
-          File f = MyFS.open(path, "r");
-          int i = 0, sz;
-          while(-1) { // walk each log entry
-            int sz = f.read(buf, sizeof(buf));
-            i++;
-            if (sz != TINYSSB_PKT_LEN)
-              break;
-            if (buf[DMX_LEN] != PKTTYPE_chain20) {
-              path = repo->_feed_chnk(fid, i, 1);
-              if (MyFS.exists(path)) {
-                Serial.printf(" !! sidechain file %s should NOT exist (1)\r\n", path);
-                if (doit) {
-                  Serial.printf("    removing sidechain file %s\r\n", path);
-                  MyFS.remove(path);
-                }
-              }
-              path = repo->_feed_chnk(fid, i, 0);
-              if (MyFS.exists(path)) {
-                Serial.printf(" !! sidechain file %s should NOT exist (2)\r\n", path);
-                if (doit) {
-                  Serial.printf("    removing sidechain file %s\r\n", path);
-                  MyFS.remove(path);
-                }
-              }
-              continue;
-            }
-            // read length of content
-            int len = 4; // max lenght of content length field
-            sz = bipf_varint_decode(buf, DMX_LEN+1, &len);
-            // Serial.printf("   sidechain will have %d bytes\r\n", sz);
-            if (sz > (48 - HASH_LEN - len)) { // entry HAS/SHOULD have a sidechain file
-              path = repo->_feed_chnk(fid, i, 0);
-              if (MyFS.exists(path)) {
-                File h = MyFS.open(path, FILE_READ);
-                int sz2 = h.size();
-                h.close();
-                if ((sz2 / TINYSSB_PKT_LEN) != ((sz - (48 - HASH_LEN - len) + TINYSSB_SCC_LEN-1)/ TINYSSB_SCC_LEN)) {
-                  Serial.printf(" !! sidechain size mismatch %s: sz=%d, len=%d\r\n", path, sz, sz2);
-                  if (doit) {
-                    Serial.printf("    removing sidechain file %s\r\n", path);
-                    MyFS.remove(path);
-                    // esp_restart(); // because chunk count got changed
-                  }
-                }
-                continue;
-                // FIXME: should also check whether length is OK, and no !nn file exists
-              }
-              path = repo->_feed_chnk(fid, i, 1);
-              if (MyFS.exists(path))
-                continue;
-                // FIXME: should also check whether length already exceeds sz
-              if (doit) {
-                Serial.printf(" !! creating the missing sidechain file %s\r\n", path);
-                MyFS.open(path, FILE_WRITE).close();
-              } else
-                Serial.printf(" !! missing sidechain file %s\r\n", path);
-            } else { // encoding error, no sidechain file should exist for this small content
-              path = repo->_feed_chnk(fid, i, 1);
-              if (MyFS.exists(path)) {
-                Serial.printf(" !! sidechain file %s should NOT exist (3)\r\n", path);
-                if (doit) {
-                  Serial.printf("    removing sidechain file %s\r\n", path);
-                  MyFS.remove(path);
-                }
-              }
-              path = repo->_feed_chnk(fid, i, 0);
-              if (MyFS.exists(path)) {
-                Serial.printf(" !! sidechain file %s should NOT exist (4)\r\n", path);
-                if (doit) {
-                  Serial.printf("    removing sidechain file %s\r\n", path);
-                  MyFS.remove(path);
-                }
-              }
-            }
-          }
-          f.close();
-          g = fdir.openNextFile();
-        }
-        fdir.close();
-      }
-      break;
     case 'r': // reset
       if (cmd[1] == '*') {
         Serial.printf("sending reset request to all nodes\r\n");

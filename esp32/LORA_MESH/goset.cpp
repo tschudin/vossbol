@@ -118,11 +118,12 @@ void GOsetClass::add(unsigned char *key)
     Serial.printf("   too many keys: %d\n", this->goset_len);
     return;
   }
-  repo->new_feed(key);
 
   memcpy(this->goset_keys + this->goset_len * GOSET_KEY_LEN, key, GOSET_KEY_LEN);
   this->goset_len++;
   qsort(this->goset_keys, this->goset_len, GOSET_KEY_LEN, _cmp_key32);
+
+  repo->add_replica(key);
 
   if (this->goset_len >= this->largest_claim_span) { // only rebroadcast if we are up to date
     if (this->novelty_credit-- > 0)
@@ -134,6 +135,7 @@ void GOsetClass::add(unsigned char *key)
   }
 
   Serial.printf("   G: added key %s, len=%d\r\n", to_hex(key, GOSET_KEY_LEN, 0), this->goset_len);
+  this->populate(NULL); // recomputes DMX
 }
 
 void GOsetClass::populate(unsigned char *key)

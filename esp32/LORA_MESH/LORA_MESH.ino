@@ -14,7 +14,7 @@ Dummy::Dummy() { Serial.begin(BAUD_RATE); }
 Dummy *d = new Dummy();
 
 DmxClass   *dmx      = new DmxClass();
-RepoClass  *repo     = new RepoClass();
+Repo2Class *repo     = new Repo2Class();
 GOsetClass *theGOset = new GOsetClass();
 
 // our own local code:
@@ -100,6 +100,7 @@ void setup()
 
   mgmt_setup();
 
+  // cmd_rx("r");
   repo->load();
 
   // strcpy(lora_line, "?");
@@ -307,7 +308,7 @@ void loop()
     lora_log.printf("battery=%.04gV ", axp.getBattVoltage()/1000);
 # endif
     lora_log.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%dXX\r\n",
-                dmx->dmxt_cnt, dmx->blbt_cnt, repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap());
+                dmx->dmxt_cnt, dmx->blbt_cnt, repo->rplca_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap());
     next_log_battery = millis() + LOG_BATTERY_INTERVAL;
   }
 
@@ -339,7 +340,7 @@ void loop()
   }
 #endif // LORA_LOG
 
-  int sum = repo->feed_cnt + repo->entry_cnt + repo->chunk_cnt;
+  int sum = repo->rplca_cnt + repo->entry_cnt + repo->chunk_cnt;
   if (sum != old_repo_sum) {
     old_repo_sum = sum;
     refresh = 1;
@@ -377,7 +378,7 @@ void loop()
 #endif
 
     theDisplay.setFont(ArialMT_Plain_16);
-    right_aligned(repo->feed_cnt,  'F', 0); 
+    right_aligned(repo->rplca_cnt, 'F', 0); 
     right_aligned(repo->entry_cnt, 'E', 22); 
     right_aligned(repo->chunk_cnt, 'C', 44); 
 

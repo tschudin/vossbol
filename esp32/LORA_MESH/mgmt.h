@@ -26,7 +26,7 @@ unsigned char MGMT_KEY[crypto_auth_hmacsha512_KEYBYTES] = { 0 };
 
 extern GOsetClass *theGOset;
 extern DmxClass   *dmx;
-extern RepoClass  *repo;
+// extern RepoClass  *repo;
 
 #define MGMT_DMX_STR         "tinySSB-0.1 mgmt 1"
 #define MGMT_ID_LEN          2
@@ -160,7 +160,7 @@ unsigned char* _mkStatus()
 #if defined(AXP_DEBUG)
   status.state.voltage = axp.getBattVoltage()/1000;
 #endif
-  status.state.feeds = repo->feed_cnt;
+  status.state.feeds = repo->rplca_cnt;
   status.state.entries = repo->entry_cnt;
   status.state.chunks = repo->chunk_cnt;
   int total = MyFS.totalBytes();

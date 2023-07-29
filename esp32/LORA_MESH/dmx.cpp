@@ -14,8 +14,8 @@
 
 extern GOsetClass *theGOset;
 
-extern void incoming_want_request(unsigned char* buf, int len, unsigned char* aux, struct face_s *);
-extern void incoming_chnk_request(unsigned char* buf, int len, unsigned char* aux, struct face_s *);
+extern void incoming_want_request(unsigned char* buf, int len, unsigned char* fid, struct face_s *);
+extern void incoming_chnk_request(unsigned char* buf, int len, unsigned char* fid, struct face_s *);
 
 // -----------------------------------------------------------------------
 
@@ -39,7 +39,7 @@ int DmxClass::_blbt_index(unsigned char *h)
 
 void DmxClass::arm_dmx(unsigned char *dmx,
              void (*fct)(unsigned char*, int, unsigned char*, struct face_s*),
-                       unsigned char *aux, int ndx, int seq)
+                       unsigned char *fid, /*int ndx,*/ int seq)
 {
   int fndx = this->_dmxt_index(dmx);
   if (fct == NULL) { // del
@@ -59,20 +59,89 @@ void DmxClass::arm_dmx(unsigned char *dmx,
   }
   memcpy(this->dmxt[fndx].dmx, dmx, DMX_LEN);
   this->dmxt[fndx].fct = fct;
-  this->dmxt[fndx].aux = aux;
-  this->dmxt[fndx].ndx = ndx;
+  this->dmxt[fndx].fid = fid;
+  // this->dmxt[fndx].ndx = ndx;
   this->dmxt[fndx].seq = seq;
 }
 
 void DmxClass::arm_blb(unsigned char *h,
              void (*fct)(unsigned char*, int, int, struct face_s*),
-                       unsigned char *fid, int seq, int bnr, int last)
+                       unsigned char *fid, int seq, int cnr, int last)
 {
+  int ndx = _blbt_index(h);
+  struct blb_s *bptr = ndx < 0 ? NULL : blbt + ndx;
+  if (fct == NULL) {
+    // Serial.printf("arm_blb REMOVE\r\n");
+    if (bptr != NULL) {
+      while (bptr->front) {
+        struct chain_s *tp = bptr->front->next;
+        free(bptr->front);
+        bptr->front = tp;
+      }
+      memmove(bptr, bptr+1, (blbt_cnt - ndx - 1) * sizeof(struct blb_s));
+      blbt_cnt--;
+    }
+    return;
+  }
+  if (bptr == NULL) {
+    ndx = this->blbt_cnt++;
+    bptr = blbt + ndx;
+    memset(bptr, 0, sizeof(struct blb_s));
+  }
+
+  /*
+  // FIXME: could simply below because we always remove the whole chain
+  // and we never add the same tuple twice
+  if (ndx < 0 && fct != NULL) {
+    if (blbt_cnt >= BLBT_SIZE) {
+      Serial.println("arm_dmx: blbt is full");
+      return; // full
+    }
+    ndx = this->blbt_cnt++;
+    memset(blbt+ndx, 0, sizeof(struct blb_s));
+  }
+  if (ndx < 0)
+    return;
+  struct blb_s *bptr = blbt + ndx;
+  struct chain_s *t = bptr->front, **tp = &(bptr->front);
+  while (t) { // remove (fid,seq,cnr) tuples from the linked list
+    Serial.printf(" wloop %p\r\n", t);
+    if (fct == NULL ||
+        (!memcmp(t->fid, fid, FID_LEN) && t->seq == seq && t->cnr == cnr) ) {
+      *tp = t->next;
+      free(t);
+      t = *tp;
+    } else {
+      tp = &(t->next);
+      t = t->next;
+    }
+  }
+  if (fct == NULL) {
+    if (bptr->front == NULL) { // remove if linked list empty
+      Serial.printf(" remove if empty\r\n");
+      memmove(blbt+ndx, blbt+ndx+1,
+              (blbt_cnt - ndx - 1) * sizeof(struct blb_s));
+      blbt_cnt--;
+    } else
+      Serial.printf(" remove from blbt: front not empty\r\n");
+    return;
+  }
+  */
+  memcpy(bptr->h, h, HASH_LEN);
+  bptr->fct = fct;
+  struct chain_s *tp = (struct chain_s*) malloc(sizeof(struct chain_s));
+  tp->fid = fid; // (unsigned char*) malloc(FID_LEN);
+  tp->seq = seq;
+  tp->cnr = cnr;
+  tp->last_cnr = last;
+  tp->next = bptr->front;
+  bptr->front = tp;
+  /*
   int ndx = this->_blbt_index(h);
   // Serial.printf(" _ arm_blb ndx=%d %s\r\n", ndx, to_hex(h, HASH_LEN));
   if (ndx >= 0) { // this entry will be either erased or newly written to
     // Serial.printf("   %p\r\n", this->blbt[ndx].fid);
-    free(this->blbt[ndx].fid);
+    // free(this->blbt[ndx].fid);
     // int fNDX = theGOset->_key_index(this->blbt[ndx].fid);
     // Serial.printf(" _ squashing old CHKTAB entry %d %s %d.%d.%d\r\n",
     //               ndx, to_hex(h, HASH_LEN), fNDX,
@@ -98,15 +167,16 @@ void DmxClass::arm_blb(unsigned char *h,
     ndx = this->blbt_cnt++;
   }
   // int fNDX = theGOset->_key_index(fid);
-  // Serial.printf(" _ new CHKTAB entry @%d %s %d.%d.%d/%d\r\n", ndx, to_hex(h, HASH_LEN), fNDX,
-  //               seq, bnr, last);
+  // Serial.printf(" _ new CHKTAB entry @%d %s %d.%d.%d/%d\r\n", ndx,
+  //               to_hex(h, HASH_LEN), fNDX, seq, bnr, last);
   memcpy(this->blbt[ndx].h, h, HASH_LEN);
   this->blbt[ndx].fct = fct;
-  this->blbt[ndx].fid = (unsigned char*) malloc(FID_LEN);
-  memcpy(this->blbt[ndx].fid, fid, FID_LEN);
+  this->blbt[ndx].fid = fid; // (unsigned char*) malloc(FID_LEN);
+  // memcpy(this->blbt[ndx].fid, fid, FID_LEN);
   this->blbt[ndx].seq = seq;
   this->blbt[ndx].bnr = bnr;
   this->blbt[ndx].last_bnr = last;
+  */
 }
 
 void DmxClass::compute_dmx(unsigned char *dst, unsigned char *buf, int len)
@@ -134,7 +204,7 @@ int DmxClass::on_rx(unsigned char *buf, int len, struct face_s *f)
   int ndx = this->_dmxt_index(buf);
   if (ndx >= 0) {
     // dmxt[ndx].fct(buf + DMX_LEN, len - DMX_LEN, dmxt[ndx].aux);
-    this->dmxt[ndx].fct(buf, len, this->dmxt[ndx].aux, f);
+    this->dmxt[ndx].fct(buf, len, this->dmxt[ndx].fid, f);
     // return 0;  // try also the hash path (colliding DMX values so both handler must be served)
     rc = 0;
   }

@@ -1,13 +1,9 @@
 // node.h
 
 // tinySSB for ESP32
-// Aug 2022 <christian.tschudin@unibas.ch>
+// (c) 2022-2023 <christian.tschudin@unibas.ch>
 
 #include <lwip/def.h> // htonl()
-
-extern DmxClass   *dmx;
-extern RepoClass  *repo;
-extern GOsetClass *theGOset;
 
 
 #define NODE_ROUND_LEN   7000  // millis, take turns between log entries and chunks
@@ -45,7 +41,7 @@ void incoming_want_request(unsigned char *buf, int len, unsigned char *aux, stru
       unsigned char *fid = theGOset->get_key(fNDX);
       int seq = seq_copy[i];
       fishForNewLoRaPkt();
-      unsigned char *pkt = repo->feed_read(fid, seq);
+      unsigned char *pkt = repo->fid2replica(fid)->get_entry_pkt(seq);
       if (pkt == NULL)
         continue;
       Serial.printf("  repo.read(%d.%d) -> %s..\r\n", fNDX, seq, to_hex(pkt, 8));
@@ -119,7 +115,7 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux, stru
       // v += (v.length() == 0 ? "[ " : " ") + String(fNDX) + "." + String(seq) + "." + String(cnr);
     // Serial.printf(" %d.%d.%d", fNDX, seq, cnr);
       unsigned char *fid = theGOset->get_key(fNDX);
-      unsigned char *pkt = repo->feed_read(fid, seq);
+      unsigned char *pkt = repo->fid2replica(fid)->get_entry_pkt(seq);
       if (pkt == NULL || pkt[DMX_LEN] != PKTTYPE_chain20) continue;
       int szlen = 4;
       int sz = bipf_varint_decode(pkt, DMX_LEN + 1, &szlen);
@@ -134,7 +130,7 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux, stru
         continue;
       }
       fishForNewLoRaPkt();
-      unsigned char *chunk = repo->feed_read_chunk(fid, seq, cnr);
+      unsigned char *chunk = repo->fid2replica(fid)->get_chunk_pkt(seq, cnr);
 
       if (chunk == NULL) { // missing content
         // Serial.printf("   -- cannot load chunk %d.%d.%d\r\n", fNDX, seq, cnr);
@@ -170,29 +166,77 @@ void incoming_chnk_request(unsigned char *buf, int len, unsigned char *aux, stru
 
 void incoming_pkt(unsigned char *buf, int len, unsigned char *fid, struct face_s *f)
 {
-  Serial.println("   incoming log entry");
+  // Serial.println("   incoming log entry");
   if (len != TINYSSB_PKT_LEN) return;
   unsigned long now = millis();
-  repo->feed_append(fid, buf);
-  packet_proc_time += millis() - now;
+  ReplicaClass *r = repo->fid2replica(fid);
+  if (r->ingest_entry_pkt(buf)) {
+    repo->want_is_valid = 0;
+    repo->entry_cnt++;
+    dmx->arm_dmx(buf); // remove old DMX handler for this packet
+
+    // install handler for next pkt:
+    unsigned char dmx_val[DMX_LEN];
+    int ns = r->get_next_seq(dmx_val);
+    Serial.printf("   appended %d.%d\r\n", theGOset->_key_index(fid), ns-1);
+    fishForNewLoRaPkt();
+    // int ndx = theGOset->_key_index(fid);
+    dmx->arm_dmx(dmx_val, incoming_pkt, r->fid, /*ndx,*/ ns);
+
+    struct bipf_s *p = r->get_next_in_chain(ns-1);
+    if (p != NULL) {
+      repo->chnk_is_valid = 0;
+      // Serial.printf("   .. new sidechain for seq=%d\r\n", ns-1);
+      // [cnr, rem, hptr, pos]
+      dmx->arm_blb(p->u.list[2]->u.buf, incoming_chunk, r->fid,
+                   ns-1, 0, p->u.list[1]->u.i);
+    }
+  } else
+    Serial.printf("   .. not a valid pkt\r\n");
+  int delta = millis() - now;
+  Serial.printf("  .. stored in %d msec\r\n", delta);
+  packet_proc_time += delta;
   packet_proc_cnt++;
 }
 
 void incoming_chunk(unsigned char *buf, int len, int blbt_ndx, struct face_s *f)
 {
-  Serial.println("   incoming chunk");
-  if (len != TINYSSB_PKT_LEN) return;
+  // Serial.println("   incoming chunk");
+  if (len != TINYSSB_PKT_LEN)
+    return;
   unsigned long now = millis();
-  repo->sidechain_append(buf, blbt_ndx);
-  chunk_proc_time += millis() - now;
+
+  char is_valid = 0;
+  struct blb_s *bp = dmx->blbt + blbt_ndx;
+  for (struct chain_s *tp = bp->front; tp; tp = tp->next) {
+    int ndx = theGOset->_key_index(tp->fid);
+    int next_cnr;
+    if (repo->fid2replica(tp->fid)->ingest_chunk_pkt(buf, tp->seq, &next_cnr)) {
+      is_valid = 1;
+      Serial.printf("   persisted chunk %d.%d.%d\r\n", ndx, tp->seq, tp->cnr);
+      repo->chnk_is_valid = 0;
+      repo->chunk_cnt++;
+      if (next_cnr > 0)
+        dmx->arm_blb(buf+100, incoming_chunk, tp->fid, tp->seq, tp->cnr+1, tp->last_cnr);
+    } else 
+      Serial.printf("  invalid chunk %d.%d.%d/%d or file problem?\r\n",
+                    ndx, tp->seq, tp->cnr, tp->last_cnr);
+    fishForNewLoRaPkt();
+    io_dequeue();
+  }
+  if (is_valid)
+    dmx->arm_blb(bp->h); // remove old CHUNK handler for this hash val
+  // Serial.printf("   end of persisting chunk\r\n");
+
+  int delta = millis() - now;
+  Serial.printf("   .. stored in %d msec\r\n", delta);
+  chunk_proc_time += delta;
   chunk_proc_cnt++;
 }
 
 void node_tick()
 {
   static unsigned char turn; // alternate between requesting log entries an chunks
-  static unsigned int log_offs;
-  static unsigned int chunk_offs;
 
   unsigned long now = millis();
   if (now < node_next_vector) // && (node_next_vector-now) < 2*NODE_ROUND_LEN) // FIXME: test whether wraparound works
@@ -210,7 +254,7 @@ void node_tick()
   //  Serial.printf("|dmxt|=%d |blbt|=%d |feeds|=%d |entries|=%d |chunks|=%d |freeHeap|=%d pps=%1.2f\r\n",
   //                dmx->dmxt_cnt, dmx->blbt_cnt, repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt, ESP.getFreeHeap(), lora_pps);
   Serial.printf("%dF%dE%dC |dmxt|=%d |blbt|=%d |freeHeap|=%d lora_sent=%d lora_rcvd=%d pps=%1.2f\r\n",
-                repo->feed_cnt, repo->entry_cnt, repo->chunk_cnt,
+                repo->rplca_cnt, repo->entry_cnt, repo->chunk_cnt,
                 dmx->dmxt_cnt, dmx->blbt_cnt, ESP.getFreeHeap(),
                 lora_sent_pkts, lora_rcvd_pkts, lora_pps);
   if (packet_proc_time != 0 && chunk_proc_time != 0) {
@@ -221,152 +265,21 @@ void node_tick()
 
   if (theGOset->goset_len == 0)
     return;
-  String v = "";
-  struct bipf_s *lptr = bipf_mkList();
+
   // Serial.printf("turn=%d t=%d.%0d\r\n", turn, now/1000, now%1000);
   turn = 1 - turn;
-
   if (turn) {
-    log_offs = (log_offs+1) % theGOset->goset_len;
-    bipf_list_append(lptr, bipf_mkInt(log_offs));
-    int encoding_len = bipf_encodingLength(lptr);
-    int i;
-    for (i = 0; i < theGOset->goset_len; i++) {
-      unsigned int ndx = (log_offs + i) % theGOset->goset_len;
-      unsigned char *fid = theGOset->get_key(ndx);
-      struct feed_s *f = repo->fid2feed(fid);
-
-      // arm DMX
-      unsigned char pktID[FID_LEN + 4 + HASH_LEN];
-      memcpy(pktID, fid, FID_LEN);
-      int s = htonl(f->next_seq); // big endian
-      memcpy(pktID + FID_LEN, (unsigned char*) &s, 4);
-      memcpy(pktID + FID_LEN + 4, f->prev, HASH_LEN);
-      unsigned char dmx_val[DMX_LEN];
-      dmx->compute_dmx(dmx_val, pktID, FID_LEN + 4 + HASH_LEN);
-      dmx->arm_dmx(dmx_val, incoming_pkt, f->fid, ndx, f->next_seq);
-      // Serial.printf("   armed %s for %d.%d\r\n", to_hex(dmx_val, 7),
-      //               ndx, f->next_seq);
-
-      // add to want vector
-      struct bipf_s *bptr = bipf_mkInt(f->next_seq);
-      encoding_len += bipf_encodingLength(bptr);
-      bipf_list_append(lptr, bptr);
-      v += (v.length() == 0 ? "[ " : " ") + String(ndx) + "." + String(f->next_seq);
-      if (encoding_len > 100) {
-        i++;
-        break;
-      }
-      fishForNewLoRaPkt();
-      io_dequeue();
-    }
-    // Serial.printf(".. after loop\r\n");
-    log_offs = (log_offs+i) % theGOset->goset_len;
-    if (lptr->cnt > 1) {
-      int sz = bipf_encodingLength(lptr);
-      unsigned char buf[sz];
-      bipf_encode(buf, lptr);
-      io_enqueue(buf, sz, dmx->want_dmx);
-      bipf_free(lptr);
-      Serial.printf(">> W %s ] %dB\r\n", v.c_str(), sz);
-    }
-    return;
+    repo->mk_want_vect();
+    if (repo->want_len > 0)
+      io_enqueue(repo->want_vect, repo->want_len, dmx->want_dmx);
+  } else { // chunks:
+    repo->mk_chnk_vect();
+    if (repo->chnk_len > 0)
+      io_enqueue(repo->chnk_vect, repo->chnk_len, dmx->chnk_dmx);
   }
 
-  // hunt for unfinished sidechains
-  // FIXME: must sort for sequence numbers
-  chunk_offs = (chunk_offs+1) % theGOset->goset_len;
-  int encoding_len = 0;
-  int requested_first = -1; // in number of feeds requesting sthg
-  for (int i = 0; i < theGOset->goset_len; i++) {
-    unsigned int ndx = (chunk_offs + i) % theGOset->goset_len;
-    unsigned char *fid = theGOset->get_key(ndx);
-    struct feed_s *f = repo->fid2feed(fid);
-    char dname[FEED_PATH_SIZE];
-    sprintf(dname, "%s/%s", FEED_DIR, to_hex(fid, FID_LEN, 0));
-    File fdir = MyFS.open(dname);
-    File g = fdir.openNextFile("r");
-    short max_chunk_req_per_feed = 2;
-    while (g) {
-      char *pos = strchr(g.name(), '!');
-      if (pos != NULL) { // unfinished chain
-        int chunk_cnt;
-        unsigned char h[HASH_LEN];
-        int seq = atoi(pos+1);
-        unsigned char *pkt = repo->feed_read(fid, seq);
-        fishForNewLoRaPkt();
-        if (pkt != NULL && pkt[DMX_LEN] == PKTTYPE_chain20) {
-          // read length of content
-          int len = 4; // max length of content length field
-          int content_len = bipf_varint_decode(pkt, DMX_LEN+1, &len);
-          content_len -= 48 - HASH_LEN - len; // content in the sidechain proper
-          chunk_cnt = (content_len + TINYSSB_SCC_LEN - 1) / TINYSSB_SCC_LEN;
-          int chainfile_len = g.size();
-          if (chunk_cnt <= chainfile_len / TINYSSB_PKT_LEN) { // mv file to a '-NNN' name
-            char *fold = repo->_feed_chnk(fid, seq, 1);
-            char *fnew = strdup(fold);
-            char *pos = strrchr(fnew, '!');
-            *pos = '-';
-            Serial.printf(" _ rename %s to %s\r\n", fold, fnew);
-            g.close();
-            MyFS.rename(fold, fnew);
-            free(fnew);
-            seq = -1;
-          } else {
-            if (chainfile_len == 0) // fetch first ptr from log entry
-              memcpy(h, pkt+DMX_LEN+1+28, HASH_LEN);
-            else {
-              // Serial.printf("    must fetch latest ptr from chain file\r\n");
-              g.seek(chainfile_len - HASH_LEN, SeekSet);
-              if (g.read(h, HASH_LEN) != HASH_LEN) {
-                // Serial.println("could not read() after seek");
-                seq = -1;
-              }
-            }
-          }
-        } else
-          seq = -1;
-        if (seq > 0) {
-          int next_chunk = g.size() / TINYSSB_PKT_LEN;
-          struct bipf_s *slptr = bipf_mkList();
-          bipf_list_append(slptr, bipf_mkInt(ndx));
-          bipf_list_append(slptr, bipf_mkInt(seq));
-          bipf_list_append(slptr, bipf_mkInt(next_chunk));
-          bipf_list_append(lptr, slptr);
-          dmx->arm_blb(h, incoming_chunk, fid, seq, next_chunk, chunk_cnt-1);
-          // Serial.printf("   armed %s for %d.%d.%d/%d\r\n", to_hex(h, HASH_LEN),
-          //               ndx, seq, next_chunk, chunk_cnt-1);
-          v += (v.length() == 0 ? "[ " : " ") + String(ndx) + "." + String(seq) + "." + String(next_chunk);
-          encoding_len += bipf_encodingLength(slptr);
-          if (requested_first == -1)
-            requested_first = i;
-          max_chunk_req_per_feed--;
-        }
-      }
-      g.close();
-      fishForNewLoRaPkt();
-      io_dequeue();
-      if (encoding_len > 100 || max_chunk_req_per_feed <= 0)
-        break;
-      g = fdir.openNextFile("r");
-    } // while (g)
-    fdir.close();
-    if (encoding_len > 100)
-      break;
-  }
-  if (requested_first != -1)
-    chunk_offs = (chunk_offs+requested_first) % theGOset->goset_len;
-  // Serial.printf("chunk_offs ending: %d, requested_first: %d\n",
-  //               chunk_offs, requested_first);
-  
-  if (lptr->cnt > 0) {
-    int sz = bipf_encodingLength(lptr);
-    unsigned char buf[sz];
-    bipf_encode(buf, lptr);
-    Serial.printf(">> C %s ] %dB\r\n", v.c_str(), sz);
-    io_enqueue(buf, sz, dmx->chnk_dmx);
-    bipf_free(lptr);
-  }
+  fishForNewLoRaPkt();
+  io_dequeue();
 }
 
 // eof

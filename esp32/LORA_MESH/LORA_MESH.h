@@ -81,11 +81,14 @@ extern void ble_init();
 #include "device.h"
 #include "util.h"
 #include "io.h"
+#include "bipf.h"
 #include "goset.h"
 extern GOsetClass *theGOset;
 #include "dmx.h"
 extern DmxClass   *dmx;
-#include "repo.h"
-extern RepoClass  *repo;
+// #include "repo.h"
+#include "replica.h"
+#include "repo2.h"
+extern Repo2Class *repo;
 
 // eof

@@ -161,12 +161,13 @@ void ble_init()
 
 // --------------------------------------------------------------------------------
 
+/*
 #define LORA_BUF_CNT 4
 #define LORA_MAX_LEN 127
 
 volatile unsigned char lora_buf[LORA_BUF_CNT * (LORA_MAX_LEN+1)];
 volatile int lora_buf_cnt, lora_buf_offs;
-
+*/
 
 void lora_send(unsigned char *buf, short len)
 {
@@ -228,7 +229,7 @@ void ble_send_stats(unsigned char *str, short len)
   // no CRC added, we rely on BLE's CRC
   STChar->setValue(str, len);
   STChar->notify();
-  Serial.printf("   BLE  sent %3dB stat <%s>\r\n", len, str);
+  // Serial.printf("   BLE  sent %3dB stat <%s>\r\n", len, str);
 }
 
 #endif // BLE
@@ -377,44 +378,55 @@ void newLoRaPkt(int sz) {
 }
 */
 
+class RingBuffer {
+#define LORA_BUF_CNT 4
+#define LORA_MAX_LEN 127
+
+public:
+  volatile unsigned char buf[LORA_BUF_CNT * (LORA_MAX_LEN+1)];
+  volatile short cnt, offs;
+};
+
+RingBuffer lora_buf;
+  
 int fishForNewLoRaPkt()
 {
   while (-1) {
     int sz = LoRa.parsePacket();
     if (sz <= 0)
-      return lora_buf_cnt;
+      return lora_buf.cnt;
     lora_pkt_cnt++;
     lora_rcvd_pkts++;
-    if (lora_buf_cnt >= LORA_BUF_CNT) {
+    if (lora_buf.cnt >= LORA_BUF_CNT) {
       Serial.printf("   ohh %d, rcvd too many LoRa pkts, cnt=%d\r\n",
-                    sz, lora_buf_cnt);
+                    sz, lora_buf.cnt);
       while (sz-- > 0)
         LoRa.read();
       continue;
     }
     if (sz > LORA_MAX_LEN)
       sz = LORA_MAX_LEN;
-    unsigned char *pkt = (unsigned char*) lora_buf + lora_buf_offs * (LORA_MAX_LEN+1);
+    unsigned char *pkt = (unsigned char*) lora_buf.buf + lora_buf.offs * (LORA_MAX_LEN+1);
     unsigned char *ptr = pkt;
     *ptr++ = sz;
     while (sz-- > 0)
       *ptr++ = LoRa.read();
-    lora_buf_offs = (lora_buf_offs + 1) % LORA_BUF_CNT;
-    lora_buf_cnt++;
-    Serial.printf("   rcvd %dB on lora, %s.., now %d pkts in buf\r\n", *pkt, to_hex(pkt+1, 7), lora_buf_cnt);
+    lora_buf.offs = (lora_buf.offs + 1) % LORA_BUF_CNT;
+    lora_buf.cnt++;
+    Serial.printf("   rcvd %dB on lora, %s.., now %d pkts in buf\r\n", *pkt, to_hex(pkt+1, 7), lora_buf.cnt);
   }
 }
 
 int lora_get_pkt(unsigned char *dst)
 {
-  if (lora_buf_cnt <= 0)
+  if (lora_buf.cnt <= 0)
     return 0;
   // Serial.printf("<\r\n");
   // noInterrupts();
-  unsigned char *ptr = (unsigned char*) lora_buf + ((lora_buf_offs + LORA_BUF_CNT - lora_buf_cnt) % LORA_BUF_CNT) * (LORA_MAX_LEN+1);
+  unsigned char *ptr = (unsigned char*) lora_buf.buf + ((lora_buf.offs + LORA_BUF_CNT - lora_buf.cnt) % LORA_BUF_CNT) * (LORA_MAX_LEN+1);
   int pkt_len = *ptr;
   memcpy(dst, ptr+1, pkt_len);
-  lora_buf_cnt--;
+  lora_buf.cnt--;
   // interrupts();
   return pkt_len;
 }
