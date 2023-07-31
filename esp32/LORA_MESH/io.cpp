@@ -171,7 +171,7 @@ volatile int lora_buf_cnt, lora_buf_offs;
 
 void lora_send(unsigned char *buf, short len)
 {
-#if !defined(NO_LORA)
+#if defined(HAS_LORA)
   if (LoRa.beginPacket()) {
     lora_pkt_cnt++;
     lora_sent_pkts++;
@@ -255,7 +255,7 @@ void bt_send(unsigned char *buf, short len)
 
 void io_init()
 {
-#if !defined(NO_LORA)
+#if defined(HAS_LORA)
   lora_face.name = (char*) "lora";
   lora_face.next_delta = LORA_INTERPACKET_TIME;
   lora_face.send = lora_send;

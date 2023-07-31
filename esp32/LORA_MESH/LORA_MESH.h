@@ -1,12 +1,11 @@
 // LORA_MESH.h
 
-
 #define HAS_BLE   // enable Bluetooth Low Energy
+#define HAS_LORA  // enable LoRa
 
 // FIXME: change the following to positive statements, as above
 #define NO_BT    // disable Bluetooth
 // #define NO_GPS   // disable GPS
-// #define NO_LORA  // disable LoRa
 // #define NO_OLED  // disable OLED
 #define NO_WIFI  // disable WiFi
 
@@ -20,6 +19,7 @@
 
 #define BAUD_RATE    115200 // or 38400 or 460800
 
+/*
 #define LORA_BAND    902.5E6 // USA
 // #define LORA_BAND  865.5E6 // Europe
 #define LORA_BW     500000
@@ -27,6 +27,7 @@
 #define LORA_CR          5
 #define LORA_TXPOWER    20 // highpowermode, otherwise choose 17 or lower
 #define LORA_SYNC_WORD  0x58 // for "SB, Scuttlebutt". Discussion at https://blog.classycode.com/lora-sync-word-compatibility-between-sx127x-and-sx126x-460324d1787a
+*/
 
 #define LORA_LOG // enable macro for logging received pkts
 #define LORA_LOG_FILENAME  "/lora_log.txt"
@@ -78,7 +79,12 @@ extern void incoming_want_request(unsigned char* buf, int len, unsigned char* au
 extern void incoming_chnk_request(unsigned char* buf, int len, unsigned char* aux, struct face_s *);
 extern void ble_init();
 
+extern struct bipf_s *the_config;
+extern struct lora_config_s *the_lora_config;
+
 #include <Arduino.h>
+
+#define MyFS LittleFS
 
 #include "device.h"
 #include "util.h"

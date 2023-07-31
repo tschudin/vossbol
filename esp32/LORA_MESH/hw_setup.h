@@ -8,7 +8,8 @@
 
 // create instances
 
-#define MyFS LittleFS
+#include "config.h"
+
 #if !defined(NO_WIFI)
   WiFiUDP udp;
 #endif
@@ -68,6 +69,18 @@ void pressed(Button2& btn) {
 
 void hw_setup() // T-BEAM or Heltec LoRa32v2
 {
+  the_config = config_load();
+  the_lora_config = lora_configs;
+  struct bipf_s k = { BIPF_STRING, 9, {.str = "lora_plan"} };
+  struct bipf_s *lora_ref = bipf_dict_getref(the_config, &k);
+  if (lora_ref != NULL && lora_ref->typ == BIPF_STRING) {
+    for (int i = 0; i < lora_configs_size; i++)
+      if (!strncmp(lora_configs[i].plan, lora_ref->u.str, lora_ref->cnt)) {
+        the_lora_config = lora_configs + i;
+        break;
+      }
+  }
+  
   // Serial.begin(BAUD_RATE);
 
 #if defined(WIFI_LoRa_32_V2) || defined(WIFI_LORA_32_V2)
@@ -75,8 +88,8 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
                true /*Heltec.Heltec.Heltec.LoRa Disable*/,
                true /*Serial Enable*/,
                true /*PABOOST Enable*/,
-               LORA_BAND /*long*/);
-  LoRa.setTxPower(LORA_TXPOWER, RF_PACONFIG_PASELECT_PABOOST);
+               the_lora_config->fr);
+  LoRa.setTxPower(the_lora_config->tx, RF_PACONFIG_PASELECT_PABOOST);
   
 #else // T-Beam
   while (!Serial);
@@ -97,20 +110,20 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   OLED_toggle();
   */
 
-#if !defined(NO_LORA)
+#if defined(HAS_LORA)
   SPI.begin(SCK,MISO,MOSI,SS);
   LoRa.setPins(SS,RST,DI0);  
-  if (!LoRa.begin(LORA_BAND)) {
+  if (!LoRa.begin(the_lora_config->fr)) {
     Serial.println("Starting LoRa failed!");
     while (1);
   }
-  LoRa.setTxPower(LORA_TXPOWER);
+  LoRa.setTxPower(the_lora_config->tx);
 #endif
 
   Wire.begin(21, 22);
   if (!axp.begin(Wire, AXP192_SLAVE_ADDRESS)) {
     // Serial.println("AXP192 Begin PASS");
-#if defined(NO_LORA)
+#if !defined(HAS_LORA)
     axp.setPowerOutPut(AXP192_LDO2, AXP202_OFF);
 #else
     axp.setPowerOutPut(AXP192_LDO2, AXP202_ON);
@@ -135,12 +148,12 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   }
 #endif // T-Beam
 
-#if !defined(NO_LORA)
-  LoRa.setSignalBandwidth(LORA_BW);
-  LoRa.setSpreadingFactor(LORA_SF);
-  LoRa.setCodingRate4(LORA_CR);
+#if defined(HAS_LORA)
+  LoRa.setSignalBandwidth(the_lora_config->bw);
+  LoRa.setSpreadingFactor(the_lora_config->sf);
+  LoRa.setCodingRate4(the_lora_config->cr);
   LoRa.setPreambleLength(8);
-  LoRa.setSyncWord(LORA_SYNC_WORD);
+  LoRa.setSyncWord(the_lora_config->sw);
   // LoRa.onReceive(newLoRaPkt);
   LoRa.receive();
 #endif

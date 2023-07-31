@@ -23,7 +23,10 @@ GOsetClass *theGOset = new GOsetClass();
 #include "node.h"
 #include "ed25519.h"
 #include "mgmt.h"
+#include "config.h"
 
+struct bipf_s *the_config;
+struct lora_config_s *the_lora_config;
 
 int ble_clients = 0;
 
@@ -72,12 +75,17 @@ void setup()
   theDisplay.setFont(ArialMT_Plain_16);
   theDisplay.drawString(0 , 0, "SSB.virt.lora.pub");
   theDisplay.setFont(ArialMT_Plain_10);
-  theDisplay.drawString(0 , 18, __DATE__ " " __TIME__);
-  int f = LORA_BAND / 10000;
+  theDisplay.drawString(0 , 17, __DATE__ " " __TIME__);
+
+  int f = the_lora_config->fr / 10000;
   char fr[30];
   sprintf(fr, "%d.%02d MHz", f/100, f%100);
   theDisplay.setFont(ArialMT_Plain_24);
-  theDisplay.drawString(0, 38, fr);
+  theDisplay.drawString(0, 30, fr);
+  sprintf(fr, "%s    SF%dBW%d", the_lora_config->plan,
+    the_lora_config->sf, (int)(the_lora_config->bw/1000));
+  theDisplay.setFont(ArialMT_Plain_10);
+  theDisplay.drawString(0, 54, fr);
 
   theDisplay.display();
 #endif
@@ -207,7 +215,7 @@ void loop()
   if (Serial.available())
     cmd_rx(Serial.readString());
 
-#if !defined(NO_LORA)
+#if defined(HAS_LORA)
   fishForNewLoRaPkt();
   pkt_len = lora_get_pkt(pkt_buf);
   if (pkt_len > 0) {
@@ -272,7 +280,7 @@ void loop()
     refresh = 1;
   }
 #endif // OLD_LORA
-#endif // !NO_LORA
+#endif // HAS_LORA
 
 #if !defined(NO_WIFI)
   packetSize = udp.parsePacket();

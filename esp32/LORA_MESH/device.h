@@ -22,7 +22,7 @@
 # include <axp20x.h>
 # include <Wire.h>
 
-#if !defined(NO_LORA)
+#if defined(HAS_LORA)
 # include <LoRa.h>
 #endif
 
