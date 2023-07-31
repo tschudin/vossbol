@@ -23,7 +23,7 @@ struct face_s {
 extern struct face_s lora_face;
 extern struct face_s udp_face;
 extern struct face_s bt_face;
-// #if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
+// #if defined(MAIN_BLEDevice_H_) && defined(HAS_BLE)
   extern struct face_s ble_face;
 // #endif
 

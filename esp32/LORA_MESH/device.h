@@ -73,7 +73,7 @@
 #endif
 
 // BLE
-#if !defined(NO_BLE)
+#if defined(HAS_BLE)
 # include <BLEDevice.h>
 # include <BLEServer.h>
 # include <BLEUtils.h>

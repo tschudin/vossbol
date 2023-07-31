@@ -1,7 +1,9 @@
 // LORA_MESH.h
 
 
-// #define NO_BLE   // disable Bluetooth Low Energy
+#define HAS_BLE   // enable Bluetooth Low Energy
+
+// FIXME: change the following to positive statements, as above
 #define NO_BT    // disable Bluetooth
 // #define NO_GPS   // disable GPS
 // #define NO_LORA  // disable LoRa

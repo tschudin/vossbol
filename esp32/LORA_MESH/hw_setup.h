@@ -189,7 +189,7 @@ void hw_setup() // T-BEAM or Heltec LoRa32v2
   }
 #endif
 
-#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
+#if defined(MAIN_BLEDevice_H_) && defined(HAS_BLE)
   ble_init();
 #endif
 

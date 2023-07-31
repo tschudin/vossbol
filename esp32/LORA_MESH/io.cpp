@@ -20,7 +20,7 @@
 struct face_s lora_face;
 struct face_s udp_face;
 struct face_s bt_face;
-#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
+#if defined(MAIN_BLEDevice_H_) && defined(HAS_BLE)
   struct face_s ble_face;
 #endif
 
@@ -28,7 +28,7 @@ struct face_s *faces[] = {
   &lora_face,
   &udp_face,
   &bt_face,
-#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
+#if defined(MAIN_BLEDevice_H_) && defined(HSA_BLE)
   &ble_face
 #endif
 };
@@ -54,7 +54,7 @@ uint32_t crc32_ieee(unsigned char *pkt, int len) { // Ethernet/ZIP polynomial
 
 // --------------------------------------------------------------------------------
 
-#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
+#if defined(MAIN_BLEDevice_H_) && defined(HAS_BLE)
 
 BLECharacteristic *RXChar = nullptr; // receive
 BLECharacteristic *TXChar = nullptr; // transmit (notify)
@@ -212,7 +212,7 @@ void udp_send(unsigned char *buf, short len)
   */
 }
 
-#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
+#if defined(MAIN_BLEDevice_H_) && defined(HAS_BLE)
 
 void ble_send(unsigned char *buf, short len)
 {
@@ -265,7 +265,7 @@ void io_init()
   udp_face.next_delta = UDP_INTERPACKET_TIME;
   udp_face.send = udp_send;
 #endif
-#if defined(MAIN_BLEDevice_H_) && !defined(NO_BLE)
+#if defined(MAIN_BLEDevice_H_) && defined(HAS_BLE)
   ble_face.name = (char*) "ble";
   ble_face.next_delta = UDP_INTERPACKET_TIME;
   ble_face.send = ble_send;
