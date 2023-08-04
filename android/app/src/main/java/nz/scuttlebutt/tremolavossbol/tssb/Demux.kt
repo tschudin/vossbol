@@ -43,11 +43,8 @@ class Demux(val context: MainActivity) {
         return null
     }
 
-    fun blbt_find(h: ByteArray): Chk? {
-        for (b in chkt)
-            if (h.contentEquals(b.h))
-                return b
-        return null
+    fun blbt_find(h: ByteArray): List<Chk> {
+        return chkt.filter { chnk -> h.contentEquals(chnk.h) }
     }
 
     fun arm_dmx(dmx: ByteArray, fct: Dmx_callback =null, aux: ByteArray? =null) {
@@ -67,21 +64,25 @@ class Demux(val context: MainActivity) {
     }
 
     fun arm_blb(h: ByteArray, fct: Chk_callback =null, fid: ByteArray? =null, seq: Int =-1, bnr: Int =-1): Int {
-        var b = blbt_find(h)
+        val chnks = blbt_find(h)
         if (fct == null) { // del
-            chkt.remove(b)
+            for (c in chkt) {
+                if (c.fid.contentEquals(fid) && c.seq == seq && c.bnr == bnr)
+                    chkt.remove(c)
+            }
             return -1;
         }
-        if (b == null) {
-            b = Chk()
-            chkt.add(b)
-        }
-        b.h = h
-        b.fct = fct
-        b.fid = fid
-        b.seq = seq
-        b.bnr = bnr
-        return chkt.indexOf(b)
+        val existingEntry = chnks.find { c -> c.fid.contentEquals(fid) && c.seq == seq && c.bnr == bnr}
+        if (existingEntry != null)
+            return chkt.indexOf(existingEntry)
+        val c = Chk()
+        c.h = h
+        c.fct = fct
+        c.fid = fid
+        c.seq = seq
+        c.bnr = bnr
+        chkt.add(c)
+        return chkt.indexOf(c)
     }
 
     fun compute_dmx(buf: ByteArray) : ByteArray {
@@ -100,9 +101,9 @@ class Demux(val context: MainActivity) {
         }
         if (buf.size == TINYSSB_PKT_LEN) {
             Log.d("demux", "buf.size == TINYSSB_PKT_LEN")
-            val b = blbt_find(h)
-            if (b != null) {
-                b.fct!!.invoke(buf, chkt.indexOf(b))
+            val chnks = blbt_find(h)
+            for (c in chnks) {
+                c.fct!!.invoke(buf, chkt.indexOf(c))
                 rc = true
             }
         }
