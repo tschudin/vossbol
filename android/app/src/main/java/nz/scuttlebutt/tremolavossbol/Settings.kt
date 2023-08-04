@@ -20,7 +20,7 @@ class Settings(val context: MainActivity) {
     private val HIDE_FORGOTTEN_KANBAN_BY_DEFAULT = true
     private val SHOW_SHORTNAME_BY_DEFAULT = true
 
-    private val WEBSOCKET_URL_DEFAULT = "ws://localhost:8989"
+    private val WEBSOCKET_URL_DEFAULT = "ws://meet.dmi.unibas.ch:8989"
 
 
 

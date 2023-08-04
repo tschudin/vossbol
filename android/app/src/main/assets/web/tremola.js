@@ -315,7 +315,7 @@ function new_image_post() {
 function load_post_item(p) { // { 'key', 'from', 'when', 'body', 'to' (if group or public)>
     var pl = document.getElementById('lst:posts');
     var is_other = p["from"] != myId;
-    var box = "<div class=light style='padding: 3pt; border-radius: 4px; box-shadow: 0 0 5px rgba(0,0,0,0.7);'"
+    var box = "<div class=light style='padding: 3pt; border-radius: 4px; box-shadow: 0 0 5px rgba(0,0,0,0.7); word-break: break-word;'"
     if (p.voice != null)
         box += " onclick='play_voice(\"" + curr_chat + "\", \"" + p.key + "\");'";
     box += ">"
@@ -728,17 +728,18 @@ function backend(cmdStr) { // send this to Kotlin (or simulate in case of browse
     else if (cmdStr[0] == "wipe") {
         resetTremola()
         location.reload()
-    } else if (cmdStr[0] == 'priv:post') {
-        var draft = atob(cmdStr[1])
+    } else if (cmdStr[0] == 'publ:post') {
+        var draft = atob(cmdStr[2])
         cmdStr.splice(0, 2)
+        console.log("CMD STRING", cmdStr)
         var e = {
             'header': {
                 'tst': Date.now(),
                 'ref': Math.floor(1000000 * Math.random()),
                 'fid': myId
             },
-            'confid': {'type': 'post', 'text': draft, 'recps': cmdStr},
-            'public': {}
+            'confid': {},
+            'public': ["TAV", atob(cmdStr[0]), null, Date.now()].concat(args)
         }
         b2f_new_event(e)
     } else if (cmdStr[0] == 'kanban') {
