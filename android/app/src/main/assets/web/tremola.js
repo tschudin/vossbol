@@ -63,13 +63,6 @@ function menu_invite() {
     menu_edit('new_invite_target', "Enter invite code<br><br>Format:<br><tt>IP_ADDR:PORT:@ID_OF_PUB.ed25519~INVITE_CODE</tt>", "");
 }
 
-function menu_stream_all_posts() {
-    // closeOverlay();
-    setScenario('chats')
-    launch_snackbar("DB restreaming launched");
-    backend("restream");
-}
-
 function menu_redraw() {
     closeOverlay();
 
@@ -80,15 +73,6 @@ function menu_redraw() {
 
     if (curr_scenario == "posts")
         load_chat(curr_chat);
-}
-
-function menu_reset() {
-    closeOverlay();
-    resetTremola();
-    setScenario('chats');
-    menu_redraw();
-    launch_snackbar("reloading DB");
-    backend("reset");
 }
 
 function menu_edit(target, title, text) {

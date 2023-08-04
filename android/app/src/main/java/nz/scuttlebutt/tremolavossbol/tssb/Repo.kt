@@ -94,6 +94,17 @@ class Repo(val context: MainActivity) {
         return RandomAccessFile(f, mode)
     }
 
+    fun delete_feed(fid: ByteArray) {
+        val feeds_dir = File(context.getDir(TINYSSB_DIR, MODE_PRIVATE), FEED_DIR)
+        val feed = File(feeds_dir, fid.toHex())
+        if (feed.exists() && feed.isDirectory)
+            for (f in feed.listFiles())
+                f.deleteRecursively()
+        val rec = fid2rec(fid)
+        rec?.next_seq = 1
+        rec?.prev_hash = fid.sliceArray(0 until HASH_LEN)
+    }
+
     fun repo_clean(dir: File) {
         for (f in dir.listFiles()) {
             if (f.isDirectory)

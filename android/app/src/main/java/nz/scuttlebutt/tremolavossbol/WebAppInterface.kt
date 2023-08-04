@@ -63,6 +63,13 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                     }
                 }
             }
+            "wipe:others" -> {
+                for (fid in act.tinyRepo.listFeeds()) {
+                    if (fid == act.idStore.identity.verifyKey)
+                        continue
+                    act.tinyRepo.delete_feed(fid)
+                }
+            }
             "qrscan.init" -> {
                 val intentIntegrator = IntentIntegrator(act)
                 intentIntegrator.setBeepEnabled(false)

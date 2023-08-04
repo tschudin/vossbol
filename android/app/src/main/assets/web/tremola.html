@@ -483,13 +483,12 @@
     <hr>
 
 
-
-    <p><button class="w100 button active item" style="height: 2.5em;" onclick="menu_reset();">
-      Reset UI (but keep ID)</button><hr>
-    <p><button class="w100 button active item" style="height: 2.5em;" onclick="menu_stream_all_posts();">
+    <p><button class="w100 button active item" style="height: 2.5em;" onclick="settings_restream_posts();">
       Re-stream posts</button><hr>
-    <p><button class="w100 button active item" style="height: 2.5em;">
-      <del>Delete all logs (but keep ID)</del></button><hr>
+    <p><button class="w100 button active item" style="height: 2.5em;" onclick="settings_reset_ui();">
+      Reset UI + Re-stream (but keep ID)</button><hr>
+    <p><button class="w100 button active item" style="height: 2.5em;" onclick="settings_clear_other_feeds()">
+      Delete all logs except your own (but keep ID)</button><hr>
     <p><button class="w100 button active item" style="height: 2.5em;">
       <del>Import new secret key (also erases DB)</del></button><hr>
     <p><button class="w100 button active item" style="height: 3em;" onclick="backend('exportSecret');">
