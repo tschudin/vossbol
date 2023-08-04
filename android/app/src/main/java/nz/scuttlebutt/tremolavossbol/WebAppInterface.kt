@@ -48,6 +48,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
             "reset" -> { // UI reset
                 // erase DB content
                 eval("b2f_initialize(\"${act.idStore.identity.toRef()}\")")
+                onFrontendRequest("restream")
             }
             "restream" -> {
                 for (fid in act.tinyRepo.listFeeds()) {
