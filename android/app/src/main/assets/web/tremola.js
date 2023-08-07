@@ -116,14 +116,18 @@ function edit_confirmed() {
             val = id2b32(new_contact_id);
         tremola.contacts[new_contact_id] = {
             "alias": val, "initial": val.substring(0, 1).toUpperCase(),
-            "color": colors[Math.floor(colors.length * Math.random())]
+            "color": colors[Math.floor(colors.length * Math.random())],
+            "iam": "", "forgotten": false
         };
         var recps = [myId, new_contact_id];
         var nm = recps2nm(recps);
+        // TODO reactivate when encrypted chats are implemented
+        /*
         tremola.chats[nm] = {
             "alias": "Chat w/ " + val, "posts": {}, "members": recps,
             "touched": Date.now(), "lastRead": 0, "timeline": new Timeline()
         };
+        */
         persist();
         backend("add:contact " + new_contact_id + " " + btoa(val))
         menu_redraw();
@@ -502,10 +506,16 @@ function fill_members() {
 }
 
 function show_contact_details(id) {
+    if (id == myId) {
+        document.getElementById('old_contact_alias_hdr').innerHTML = "Alias: (own name, visible to others)"
+    } else {
+        document.getElementById('old_contact_alias_hdr').innerHTML = "Alias: (only you can see this alias)"
+    }
     var c = tremola.contacts[id];
     new_contact_id = id;
     document.getElementById('old_contact_alias').value = c['alias'];
     var details = '';
+    details += '<br><div>IAM-Alias: &nbsp;' + (c.iam != "" ? c.iam : "&mdash;") + '</div>\n';
     details += '<br><div>Shortname: &nbsp;' + id2b32(id) + '</div>\n';
     details += '<br><div style="word-break: break-all;">SSB identity: &nbsp;<tt>' + id + '</tt></div>\n';
     details += '<br><div class=settings style="padding: 0px;"><div class=settingsText>Forget this contact</div><div style="float: right;"><label class="switch"><input id="hide_contact" type="checkbox" onchange="toggle_forget_contact(this);"><span class="slider round"></span></label></div></div>'
@@ -527,22 +537,42 @@ function toggle_forget_contact(e) {
 }
 
 function save_content_alias() {
+    var c = tremola.contacts[new_contact_id];
     var val = document.getElementById('old_contact_alias').value;
-    if (val == '')
-        val = id2b32(new_contact_id);
+    var deleteAlias = false
 
-    for (var l in localPeers) {
-        var old = tremola.contacts[new_contact_id].alias
-         console.log("SHOULD CHANGE?", localPeers[l].alias , old)
-        if (localPeers[l].alias == old) {
-
-            localPeers[l].alias = val
-            refresh_connection_entry(localPeers[l].id)
+    if (val == '') {
+        deleteAlias = true
+        if (c.iam != "" && new_contact_id != myId) {
+            val = c.iam
+        } else {
+            val = id2b32(new_contact_id);
         }
     }
-    tremola.contacts[new_contact_id].alias = val;
-    tremola.contacts[new_contact_id].initial = val.substring(0, 1).toUpperCase();
-    tremola.contacts[new_contact_id].color = colors[Math.floor(colors.length * Math.random())];
+    var old_alias = c.alias
+    c.alias = val;
+    c.initial = val.substring(0, 1).toUpperCase();
+    c.color = colors[Math.floor(colors.length * Math.random())];
+
+    // update names in connected devices menu
+    for (var l in localPeers) {
+        if (localPeers[l].alias == old_alias) {
+            localPeers[l].alias = val
+            refresh_connection_entry(l)
+        }
+    }
+
+    // share new alias with others via IAM message
+    if(new_contact_id == myId) {
+        if(deleteAlias) {
+            backend("iam " + btoa(""))
+            c.iam = ""
+        } else {
+            backend("iam " + btoa(val))
+            c.iam = val
+        }
+    }
+
     persist();
     menu_redraw();
     closeOverlay();
@@ -801,7 +831,7 @@ function resetTremola() { // wipes browser-side content
         "members": ["ALL"], "touched": Date.now(), "lastRead": 0,
         "timeline": new Timeline()
     };
-    tremola.contacts[myId] = {"alias": "me", "initial": "M", "color": "#bd7578", "forgotten": false};
+    tremola.contacts[myId] = {"alias": "me", "initial": "M", "color": "#bd7578", "iam": "", "forgotten": false};
     createBoard('Personal Board', [FLAG.PERSONAL])
     persist();
 }
@@ -931,10 +961,8 @@ function b2f_local_peer(type, identifier, displayname, status) {
     if (tremola != null) // can be the case during the first initialisation
         for (var c in tremola["contacts"]) {
             if (id2b32(c) == displayname) {
-                console.log("FOUND ALIAS")
                 localPeers[identifier].alias = tremola.contacts[c].alias
             }
-
         }
 
 
@@ -961,7 +989,8 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
         var a = id2b32(e.header.fid);
         tremola.contacts[e.header.fid] = {
             "alias": a, "initial": a.substring(0, 1).toUpperCase(),
-            "color": colors[Math.floor(colors.length * Math.random())]
+            "color": colors[Math.floor(colors.length * Math.random())],
+            "iam": "", "forgotten": false
         }
         load_contact_list()
     }
@@ -1013,6 +1042,28 @@ function b2f_new_event(e) { // incoming SSB log event: we get map with three ent
         } else if (e.public[0] == "KAN") { // Kanban board event
             console.log("New kanban event")
             kanban_new_event(e)
+        } else if (e.public[0] == "IAM") {
+            var contact = tremola.contacts[e.header.fid]
+            var old_iam = contact.iam
+            var old_alias = contact.alias
+
+            contact.iam = e.public[1]
+
+            if ((contact.alias == id2b32(e.header.fid) || contact.alias == old_iam)) {
+                contact.alias = e.public[1] == "" ? id2b32(e.header.fid) : e.public[1]
+                contact.initial = contact.alias.substring(0, 1).toUpperCase()
+                load_contact_list()
+
+                // update names in connected devices menu
+                for (var l in localPeers) {
+                    if (localPeers[l].alias == old_alias) {
+
+                        localPeers[l].alias = contact.alias
+                        refresh_connection_entry(l)
+                    }
+                }
+            }
+
         }
         persist();
         must_redraw = true;
@@ -1025,7 +1076,8 @@ function b2f_new_contact(fid) {
     var id = id2b32(fid);
     tremola.contacts[fid] = {
         "alias": id, "initial": id.substring(0, 1).toUpperCase(),
-        "color": colors[Math.floor(colors.length * Math.random())]
+        "color": colors[Math.floor(colors.length * Math.random())],
+        "iam": "", "forgotten": false
     };
     persist()
     load_contact_list();

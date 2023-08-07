@@ -18,6 +18,7 @@ import org.json.JSONObject
 import nz.scuttlebutt.tremolavossbol.tssb.LogTinyEntry
 import nz.scuttlebutt.tremolavossbol.utils.Bipf
 import nz.scuttlebutt.tremolavossbol.utils.Bipf.Companion.BIPF_LIST
+import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_IAM
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_TEXTANDVOICE
 import nz.scuttlebutt.tremolavossbol.utils.Constants.Companion.TINYSSB_APP_KANBAN
 import nz.scuttlebutt.tremolavossbol.utils.HelperFunctions.Companion.toBase64
@@ -215,6 +216,17 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 val argsList: List<String>? = if(args[4] != "null") Base64.decode(args[4], Base64.NO_WRAP).decodeToString().split(",").map{ Base64.decode(it, Base64.NO_WRAP).decodeToString()} else null
 
                 kanban(bid, prev , op, argsList)
+            }
+            "iam" -> {
+                val new_alias = Base64.decode(args[1], Base64.NO_WRAP).decodeToString()
+                val lst = Bipf.mkList()
+                Bipf.list_append(lst, TINYSSB_APP_IAM)
+                Bipf.list_append(lst, Bipf.mkString(new_alias))
+
+                val body = Bipf.encode(lst)
+                if (body != null) {
+                    act.tinyNode.publish_public_content(body)
+                }
             }
             "settings:set" -> {
                 when(args[1]) {

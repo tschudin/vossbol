@@ -353,7 +353,7 @@ function qr_scan_confirmed() {
     var s = document.getElementById('alias_id').innerHTML;
     // c = {alias: a, id: s};
     var i = (a + "?").substring(0, 1).toUpperCase()
-    var c = {"alias": a, "initial": i, "color": colors[Math.floor(colors.length * Math.random())]};
+    var c = {"alias": a, "initial": i, "color": colors[Math.floor(colors.length * Math.random())], "iam": "", "forgotten": false};
     tremola.contacts[s] = c;
     persist();
     backend("add:contact " + s + " " + btoa(a))
