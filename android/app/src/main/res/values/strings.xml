@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Tremola VoSSBoL</string>
+    <string name="app_name">tinySSB</string>
     <string-array name="c2modes">
         <item>3200 (large)</item>
         <item>2400</item>
