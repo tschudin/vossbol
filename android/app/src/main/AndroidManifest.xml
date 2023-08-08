@@ -37,6 +37,7 @@
         <activity android:name="nz.scuttlebutt.tremolavossbol.RecordActivity"></activity>
         <activity
             android:name="nz.scuttlebutt.tremolavossbol.MainActivity"
+            android:theme="@style/Launcher"
             android:exported="true"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
