@@ -334,7 +334,7 @@ function kanban_new_event(e) {
         }
 
         // creates Personal Board
-        if (board.flags.includes(FLAG.PERSONAL) ) {
+        if (board.flags.includes(FLAG.PERSONAL) && !restream) {
             if (op == Operation.BOARD_CREATE && Object.values(board.columns).length == 0)
                 createColumn(bid, 'Your Kanban Board')
             else if (Object.values(board.columns).length == 1 && Object.values(board.columns)[0].item_ids.length == 0)

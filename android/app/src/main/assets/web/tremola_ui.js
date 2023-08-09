@@ -101,6 +101,7 @@ function onBackPressed() {
 
 function setScenario(s) {
     // console.log('setScenario ' + s)
+    closeOverlay();
     var lst = scenarioDisplay[s];
     if (lst) {
         // if (s != 'posts' && curr_scenario != "members" && curr_scenario != 'posts') {
@@ -147,6 +148,21 @@ function setScenario(s) {
             document.getElementById('core').style.height = 'calc(100% - 60px)';
         else
             document.getElementById('core').style.height = 'calc(100% - 118px)';
+
+        if (s == 'kanban') {
+            var personalBoardAlreadyExists = false
+            for (var b in tremola.board) {
+                var board = tremola.board[b]
+                if (board.flags.indexOf(FLAG.PERSONAL) >= 0 && board.members.length == 1 && board.members[0] == myId) {
+                    personalBoardAlreadyExists = true
+                    break
+                }
+            }
+            if(!personalBoardAlreadyExists && display_create_personal_board) {
+                menu_create_personal_board()
+            }
+        }
+
     }
 }
 
@@ -210,6 +226,8 @@ function closeOverlay() {
     document.getElementById('confirm_contact-overlay').style.display = 'none';
     document.getElementById('overlay-bg').style.display = 'none';
     document.getElementById('overlay-trans').style.display = 'none';
+    document.getElementById('overlay-bg-core').style.display = 'none';
+    document.getElementById('overlay-trans-core').style.display = 'none';
     document.getElementById('about-overlay').style.display = 'none';
     document.getElementById('edit-overlay').style.display = 'none';
     document.getElementById('new_contact-overlay').style.display = 'none';
@@ -222,6 +240,7 @@ function closeOverlay() {
     document.getElementById('div:menu_history').style.display = 'none';
     document.getElementById('div:item_menu').style.display = 'none';
     document.getElementById("kanban-invitations-overlay").style.display = 'none';
+    document.getElementById('kanban-create-personal-board-overlay').style.display = 'none';
     curr_item = null
     close_board_context_menu()
     document.getElementById('btn:item_menu_description_save').style.display = 'none'

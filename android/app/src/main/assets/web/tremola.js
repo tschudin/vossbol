@@ -17,6 +17,8 @@ var curr_img_candidate = null;
 var pubs = []
 var wants = {}
 
+var restream = false // whether the backend is currently restreaming all posts
+
 // --- menu callbacks
 
 /*
@@ -832,7 +834,6 @@ function resetTremola() { // wipes browser-side content
         "timeline": new Timeline()
     };
     tremola.contacts[myId] = {"alias": "me", "initial": "M", "color": "#bd7578", "iam": "", "forgotten": false};
-    createBoard('Personal Board', [FLAG.PERSONAL])
     persist();
 }
 

@@ -52,6 +52,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                 onFrontendRequest("restream")
             }
             "restream" -> {
+                eval("restream = true")
                 for (fid in act.tinyRepo.listFeeds()) {
                     Log.d("wai", "restreaming ${fid.toHex()}")
                     var i = 1
@@ -63,6 +64,7 @@ class WebAppInterface(val act: MainActivity, val webView: WebView) {
                         i++
                     }
                 }
+                eval("restream = false")
             }
             "wipe:others" -> {
                 for (fid in act.tinyRepo.listFeeds()) {

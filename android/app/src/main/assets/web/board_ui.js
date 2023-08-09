@@ -13,6 +13,8 @@ const Color = { // all available colors for card title
     ORANGE: 'orange'
 }
 
+var display_create_personal_board = true // Whether to prompt the user to create a personal board when they open the Kanban application
+
 function allowDrop(ev) {
     ev.preventDefault();
 }
@@ -119,6 +121,26 @@ function ui_set_board_list_badge(bid) {
     e.style.display = null
     if (board.unreadEvents > 9) cnt = ">9"; else cnt = "" + board.unreadEvents
     e.innerHTML = cnt
+}
+
+function create_personal_board() {
+    createBoard('Personal Board', [FLAG.PERSONAL])
+}
+
+function menu_create_personal_board() {
+    closeOverlay()
+    document.getElementById('kanban-create-personal-board-overlay').style.display = 'initial'
+    document.getElementById('overlay-trans-core').style.display = 'initial'
+}
+
+function btn_create_personal_board_accept() {
+    create_personal_board()
+    closeOverlay()
+}
+
+function btn_create_personal_board_decline() {
+    closeOverlay()
+    display_create_personal_board = false
 }
 
 function load_board(bid) { //switches scene to board and changes title to board name

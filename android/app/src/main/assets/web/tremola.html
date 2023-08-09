@@ -68,6 +68,19 @@
 
   <div id='lst:kanban' class=w100 style="overflow: hidden; display: none;"></div>
 
+  <div id='kanban-create-personal-board-overlay' class='qr-overlay'>
+    <div style="display:flex; justify-content: center;align-items: center; flex-direction: column; gap: 20px">
+      <div style="text-align: center">
+        <b>Would you like to create your own personal kanban board?</b> <br>
+        (You can also generate new kanban boards using the + icon)
+      </div>
+      <div>
+        <button class="kanban_create_personal_btn" style="background-image: url('img/checked.svg');" onclick="btn_create_personal_board_accept()"></button>
+        <button class="kanban_create_personal_btn" style="background-image: url('img/cancel.svg'); background-position-x: -1.5px;" onclick="btn_create_personal_board_decline()"></button>
+      </div>
+    </div>
+  </div>
+
   <div id='kanban-invitations-overlay' class='qr-overlay'>
     <div style="text-align: center;font-size:20px;">
       Invitations
@@ -85,6 +98,12 @@
   </div>
 
   <div id='overlay-trans' class='overlay-trans' onclick="closeOverlay();">
+  </div>
+
+  <div id='overlay-bg-core' class='overlay-bg-core' onclick="closeOverlay();">
+  </div>
+
+  <div id='overlay-trans-core' class='overlay-trans-core' onclick="closeOverlay();">
   </div>
 
   <div id='new_chat-overlay' class='qr-overlay'>
